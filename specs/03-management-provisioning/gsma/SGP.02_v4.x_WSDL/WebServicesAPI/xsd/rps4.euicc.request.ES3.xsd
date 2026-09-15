@@ -1,0 +1,551 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://namespaces.gsma.org/esim-messaging/4"
+           xmlns="http://namespaces.gsma.org/esim-messaging/4"
+           xmlns:rps3="http://namespaces.gsma.org/esim-messaging/3"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified">
+
+  <xs:import namespace="http://namespaces.gsma.org/esim-messaging/3" schemaLocation="euicc.common.request.xsd"/>
+  <xs:include schemaLocation="rps4.euicc.common.types.xsd"/>
+
+  <xs:group name="ES3">
+    <xs:annotation>
+      <xs:documentation>Provides the list of all function execution requests and function execution responses defined in ES3 interface</xs:documentation>
+    </xs:annotation>
+    <xs:choice>
+      <xs:element ref="ES3-GetPLMARequest"/>
+      <xs:element ref="ES3-GetPLMAResponse"/>
+      <xs:element ref="ES3-SetPLMARequest"/>
+      <xs:element ref="ES3-SetPLMAResponse"/>
+      <xs:element ref="ES3-GetONCRequest"/>
+      <xs:element ref="ES3-GetONCResponse"/>
+      <xs:element ref="ES3-SetONCRequest"/>
+      <xs:element ref="ES3-SetONCResponse"/>
+      <xs:element ref="ES3-SetEmergencyProfileAttributeRequest"/>
+      <xs:element ref="ES3-SetEmergencyProfileAttributeResponse"/>
+      <xs:element ref="ES3-SetFallBackAttributeRequest"/>
+      <xs:element ref="ES3-SetFallBackAttributeResponse"/>
+      <xs:element ref="ES3-HandleProfileDownloadedNotification"/>
+      <xs:element ref="ES3-HandlePolicyRulesUpdatedNotification"/>
+      <xs:element ref="ES3-HandlePLMAChangedNotification"/>
+      <xs:element ref="ES3-HandleEmergencyProfileAttributeSetNotification"/>
+      <xs:element ref="ES3-HandleEmergencyProfileAttributeUnsetNotification"/>
+      <xs:element ref="ES3-HandleProfileFallBackAttributeSetNotification"/>
+      <xs:element ref="ES3-HandleProfileFallBackAttributeUnsetNotification"/>
+    </xs:choice>
+  </xs:group>
+  <xs:simpleType name="ES3-MessageType">
+    <xs:annotation>
+      <xs:documentation>List of all possible message types. A type shall exist for each supported function of the interface.</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="ES3-GetPLMARequest"/>
+      <xs:enumeration value="ES3-GetPLMAResponse"/>
+      <xs:enumeration value="ES3-SetPLMARequest"/>
+      <xs:enumeration value="ES3-SetPLMAResponse"/>
+      <xs:enumeration value="ES3-GetONCRequest"/>
+      <xs:enumeration value="ES3-GetONCResponse"/>
+      <xs:enumeration value="ES3-SetONCRequest"/>
+      <xs:enumeration value="ES3-SetONCResponse"/>
+      <xs:enumeration value="ES3-SetEmergencyProfileAttributeRequest"/>
+      <xs:enumeration value="ES3-SetEmergencyProfileAttributeResponse"/>
+      <xs:enumeration value="ES3-SetFallBackAttributeRequest"/>
+      <xs:enumeration value="ES3-SetFallBackAttributeResponse"/>
+      <xs:enumeration value="ES3-HandleProfileDownloadedNotification"/>
+      <xs:enumeration value="ES3-HandlePolicyRulesUpdatedNotification"/>
+      <xs:enumeration value="ES3-HandlePLMAChangedNotification"/>
+      <xs:enumeration value="ES3-HandleEmergencyProfileAttributeSetNotification"/>
+      <xs:enumeration value="ES3-HandleEmergencyProfileAttributeUnsetNotification"/>
+      <xs:enumeration value="ES3-HandleProfileFallBackAttributeSetNotification"/>
+      <xs:enumeration value="ES3-HandleProfileFallBackAttributeUnsetNotification"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <!--============================================================================================================================-->
+  <xs:element name="ES3-GetPLMARequest">
+    <xs:annotation>
+      <xs:documentation>Maps an execution request of the ES3-GetPLMA function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseRequestType">
+          <xs:sequence>
+            <xs:element name="ProfileType" type="rps3:String100" minOccurs="0">
+              <xs:annotation>
+                <xs:documentation>Identification of the Profile type for which PLMAs are searched</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="M2m-sp-id" type="rps3:ObjectIdentifierType" minOccurs="0">
+              <xs:annotation>
+                <xs:documentation>Identification of the M2M SP for which PLMAs are searched</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Iccid" type="rps3:ICCIDType" minOccurs="0">
+              <xs:annotation>
+                <xs:documentation>Identification of one specific Profile  for which PLMAs are searched</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Mno-id" type="rps3:ObjectIdentifierType" minOccurs=”0”>
+              <xs:annotation>
+                <xs:documentation>Identification of the Operator owner of the Profiles to be matched.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ES3-GetPLMAResponse">
+    <xs:annotation>
+      <xs:documentation>Maps an execution response of the ES3-GetPLMA function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseResponseType">
+          <xs:sequence>
+            <xs:element name="Plma" type="PLMAType" minOccurs="0" maxOccurs="unbounded">
+              <xs:annotation>
+                <xs:documentation>The list of PLMA rules that match the search criterion </xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES3-SetPLMARequest">
+    <xs:annotation>
+      <xs:documentation>Maps an execution request of the ES3-SetPLMA function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseRequestType">
+          <xs:sequence>
+            <xs:element name="Plma" type="PLMAType">
+              <xs:annotation>
+                <xs:documentation>The specification of the PLMA, and the criteria on which this PLMA applies.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ES3-SetPLMAResponse">
+    <xs:annotation>
+      <xs:documentation>Maps an execution response of the ES3-SetPLMA function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseResponseType">
+          <xs:sequence>
+            <xs:annotation>
+              <xs:documentation>No specific output</xs:documentation>
+            </xs:annotation>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES3-GetONCRequest">
+    <xs:annotation>
+      <xs:documentation>Maps an execution request of the ES3-GetONC function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseRequestType">
+          <xs:sequence>
+            <xs:element name="ProfileType" type="rps3:String100" minOccurs="0">
+              <xs:annotation>
+                <xs:documentation>Identification of the Profile Type for which the ONC applies is searched</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Iccid" type="rps3:ICCIDType" minOccurs="0">
+              <xs:annotation>
+                <xs:documentation>Identification of one specific Profile for which the ONC applies is searched</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ES3-GetONCResponse">
+    <xs:annotation>
+      <xs:documentation>Maps an execution response of the ES3-GetONC function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseResponseType">
+          <xs:sequence>
+            <xs:element name="Onc" type="ONCType" minOccurs="0" maxOccurs="unbounded">
+              <xs:annotation>
+                <xs:documentation>The ONC including the list of unwanted notifications that match the search criterion</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES3-SetONCRequest">
+    <xs:annotation>
+      <xs:documentation>Maps an execution request of the ES3-SetONC function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseRequestType">
+          <xs:sequence>
+            <xs:element name="Onc" type="ONCType">
+              <xs:annotation>
+                <xs:documentation>The specification of the ONC, and the criterion on which this ONC applies.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ES3-SetONCResponse">
+    <xs:annotation>
+      <xs:documentation>Maps an execution response of the ES3-SetONC function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseResponseType">
+          <xs:sequence>
+            <xs:annotation>
+              <xs:documentation>No specific output</xs:documentation>
+            </xs:annotation>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES3-HandleProfileDownloadedNotification">
+    <xs:annotation>
+      <xs:documentation>Maps an execution of the ES3-HandleProfileDownloadedNotification notification.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseNotificationType">
+          <xs:sequence>
+            <xs:element name="Eid" type="rps3:EIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the targeted eUICC.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Iccid" type="rps3:ICCIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the Profile that has been downloaded.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Mno-id" type="rps3:ObjectIdentifierType">
+              <xs:annotation>
+                <xs:documentation>Identification of the Operator owner of the Profile that has been downloaded.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="CompletionTimestamp" type="xs:dateTime">
+              <xs:annotation>
+                <xs:documentation>Indication of the date/time when the operation has been performed</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES3-HandlePLMAChangedNotification">
+    <xs:annotation>
+      <xs:documentation>Maps an execution of the ES3-HandlePLMAChangedNotification notification.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseNotificationType">
+          <xs:sequence>
+            <xs:element name="Plma" type="PLMAType">
+              <xs:annotation>
+                <xs:documentation>The specification of the PLMA that now applies on a subset of Profiles. Information about the subset are contained in the PLMA rule structure</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Mno-id" type="rps3:ObjectIdentifierType">
+              <xs:annotation>
+                <xs:documentation>Identification of the MNO owner of the PLMA.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="CompletionTimestamp" type="xs:dateTime">
+              <xs:annotation>
+                <xs:documentation>Indication of the date/time when the operation has been performed</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES3-HandlePolicyRulesUpdatedNotification">
+    <xs:annotation>
+      <xs:documentation>Maps an execution of the ES3-HandlePolicyRulesUpdatedNotification notification.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseNotificationType">
+          <xs:sequence>
+            <xs:element name="Eid" type="rps3:EIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the targeted eUICC.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Iccid" type="rps3:ICCIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the Profile whose POL2 has been updated.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Mno-id" type="rps3:ObjectIdentifierType">
+              <xs:annotation>
+                <xs:documentation>Identification of the Operator owner of the Profile whose POL2 has been updated.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="pol2" type="rps3:POL2Type">
+              <xs:annotation>
+                <xs:documentation>Value of the POL2 after being updated by the Operator owning the Profile</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="CompletionTimestamp" type="xs:dateTime">
+              <xs:annotation>
+                <xs:documentation>Indication of the date/time when the operation has been performed</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES3-SetEmergencyProfileAttributeRequest">
+    <xs:annotation>
+      <xs:documentation>Maps an execution request of the ES3-SetEmergencyProfileAttribute function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseRequestType">
+          <xs:sequence>
+            <xs:element name="Eid" type="rps3:EIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the targeted eUICC.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Iccid" type="rps3:ICCIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the Profile on which to set the Emergency Profile Attribute.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ES3-SetEmergencyProfileAttributeResponse">
+    <xs:annotation>
+      <xs:documentation>Maps an execution response of the ES3-SetEmergencyProfileAttribute function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseResponseType">
+          <xs:sequence>
+            <xs:element name="EuiccResponseData" type="xs:hexBinary" minOccurs="0">
+              <xs:annotation>
+                <xs:documentation>Contains the detailed error returned by the eUICC in case the function execution failed on eUICC. The response data is defined in ES5.SetEmergencyProfileAttribute.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES3-HandleEmergencyProfileAttributeSetNotification">
+    <xs:annotation>
+      <xs:documentation>Maps an execution of the ES3-HandleEmergencyProfileAttributeSetNotification notification.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseNotificationType">
+          <xs:sequence>
+            <xs:element name="Eid" type="rps3:EIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the targeted eUICC.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Iccid" type="rps3:ICCIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the Profile that has the Emergency Profile Attribute set.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Mno-id" type="rps3:ObjectIdentifierType">
+              <xs:annotation>
+                <xs:documentation>Identification of the Operator owner of the Profile that has the Emergency Profile Attribute set.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="CompletionTimestamp" type="xs:dateTime">
+              <xs:annotation>
+                <xs:documentation>Indication of the date/time when the operation has been performed</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES3-HandleEmergencyProfileAttributeUnsetNotification">
+    <xs:annotation>
+      <xs:documentation>Maps an execution of the ES3-HandleEmergencyProfileAttributeUnsetNotification notification.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseNotificationType">
+          <xs:sequence>
+            <xs:element name="Eid" type="rps3:EIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the targeted eUICC.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Iccid" type="rps3:ICCIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the Profile that has the Emergency Profile Attribute unset.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Mno-id" type="rps3:ObjectIdentifierType">
+              <xs:annotation>
+                <xs:documentation>Identification of the Operator owner of the Profile that has the Emergency Profile Attribute unset.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="CompletionTimestamp" type="xs:dateTime">
+              <xs:annotation>
+                <xs:documentation>Indication of the date/time when the operation has been performed</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES3-SetFallBackAttributeRequest">
+    <xs:annotation>
+      <xs:documentation>Maps an execution request of the ES3-SetFallBackAttribute function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseRequestType">
+          <xs:sequence>
+            <xs:element name="Eid" type="rps3:EIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the targeted eUICC.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Iccid" type="rps3:ICCIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the Profile on which to set the Fall-Back Attribute.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ES3-SetFallBackAttributeResponse">
+    <xs:annotation>
+      <xs:documentation>Maps an execution response of the ES3-SetFallBackAttribute function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseResponseType">
+          <xs:sequence>
+            <xs:element name="EuiccResponseData" type="xs:hexBinary" minOccurs="0">
+              <xs:annotation>
+                <xs:documentation>Contains the detailed error returned by the eUICC in case the function execution failed on eUICC. The response data is defined in ES5.SetFallBackAttribute.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES3-HandleProfileFallBackAttributeSetNotification">
+    <xs:annotation>
+      <xs:documentation>Maps an execution of the ES3-HandleProfileFallBackAttributeSetNotification notification.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseNotificationType">
+          <xs:sequence>
+            <xs:element name="Eid" type="rps3:EIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the targeted eUICC.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Iccid" type="rps3:ICCIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the Profile on which the Fall-Back Attribute has been set.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Mno-id" type="rps3:ObjectIdentifierType">
+              <xs:annotation>
+                <xs:documentation>Identification of the Operator owner of the Profile that has had its Fall-Back Attribute set.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="CompletionTimestamp" type="xs:dateTime">
+              <xs:annotation>
+                <xs:documentation>Indication of the date/time when the operation has been performed</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES3-HandleProfileFallBackAttributeUnsetNotification">
+    <xs:annotation>
+      <xs:documentation>Maps an execution of the ES3-HandleProfileFallBackAttributeUnsetNotification notification.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseNotificationType">
+          <xs:sequence>
+            <xs:element name="Eid" type="rps3:EIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the targeted eUICC.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Iccid" type="rps3:ICCIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the Profile on which the Fall-Back Attribute has been unset.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Mno-id" type="rps3:ObjectIdentifierType">
+              <xs:annotation>
+                <xs:documentation>Identification of the Operator owner of the Profile that has had its Fall-Back Attribute set.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="CompletionTimestamp" type="xs:dateTime">
+              <xs:annotation>
+                <xs:documentation>Indication of the date/time when the operation has been performed</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+
+</xs:schema>

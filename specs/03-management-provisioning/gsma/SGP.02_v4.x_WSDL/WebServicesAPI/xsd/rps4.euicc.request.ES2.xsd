@@ -1,0 +1,593 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://namespaces.gsma.org/esim-messaging/4"
+           xmlns="http://namespaces.gsma.org/esim-messaging/4"
+           xmlns:rps3="http://namespaces.gsma.org/esim-messaging/3"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified">
+
+  <xs:import namespace="http://namespaces.gsma.org/esim-messaging/3" schemaLocation="euicc.common.request.xsd"/>
+  <xs:include schemaLocation="rps4.euicc.common.types.xsd"/>
+
+  <xs:group name="ES2">
+    <xs:annotation>
+      <xs:documentation>Provides the list of all function execution requests and function execution responses defined in ES2 interface</xs:documentation>
+    </xs:annotation>
+    <xs:choice>
+      <xs:element ref="ES2-GetPLMARequest"/>
+      <xs:element ref="ES2-GetPLMAResponse"/>
+      <xs:element ref="ES2-SetPLMARequest"/>
+      <xs:element ref="ES2-SetPLMAResponse"/>
+      <xs:element ref="ES2-GetONCRequest"/>
+      <xs:element ref="ES2-GetONCResponse"/>
+      <xs:element ref="ES2-SetONCRequest"/>
+      <xs:element ref="ES2-SetONCResponse"/>
+      <xs:element ref="ES2-SetEmergencyProfileAttributeRequest"/>
+      <xs:element ref="ES2-SetEmergencyProfileAttributeResponse"/>
+      <xs:element ref="ES2-SetFallBackAttributeRequest"/>
+      <xs:element ref="ES2-SetFallBackAttributeResponse"/>
+      <xs:element ref="ES2-AuditEISRequest"/>
+      <xs:element ref="ES2-AuditEISResponse"/>
+      <xs:element ref="ES2-HandleProfileDownloadedNotification"/>
+      <xs:element ref="ES2-HandlePolicyRulesUpdatedNotification"/>
+      <xs:element ref="ES2-HandlePLMAChangedNotification"/>
+      <xs:element ref="ES2-HandleEmergencyProfileAttributeSetNotification"/>
+      <xs:element ref="ES2-HandleEmergencyProfileAttributeUnsetNotification"/>
+      <xs:element ref="ES2-HandleProfileFallBackAttributeSetNotification"/>
+      <xs:element ref="ES2-HandleProfileFallBackAttributeUnsetNotification"/>
+    </xs:choice>
+  </xs:group>
+  <xs:simpleType name="ES2-MessageType">
+    <xs:annotation>
+      <xs:documentation>List of all possible message types. A type shall exist for each supported function of the interface.</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="ES2-GetPLMARequest"/>
+      <xs:enumeration value="ES2-GetPLMAResponse"/>
+      <xs:enumeration value="ES2-SetPLMARequest"/>
+      <xs:enumeration value="ES2-SetPLMAResponse"/>
+      <xs:enumeration value="ES2-GetONCRequest"/>
+      <xs:enumeration value="ES2-GetONCResponse"/>
+      <xs:enumeration value="ES2-SetONCRequest"/>
+      <xs:enumeration value="ES2-SetONCResponse"/>
+      <xs:enumeration value="ES2-SetEmergencyProfileAttributeRequest"/>
+      <xs:enumeration value="ES2-SetEmergencyProfileAttributeResponse"/>
+      <xs:enumeration value="ES2-SetFallBackAttributeRequest"/>
+      <xs:enumeration value="ES2-SetFallBackAttributeResponse"/>
+      <xs:enumeration value="ES2-AuditEISRequest"/>
+      <xs:enumeration value="ES2-AuditEISResponse"/>
+      <xs:enumeration value="ES2-HandleProfileDownloadedNotification"/>
+      <xs:enumeration value="ES2-HandlePolicyRulesUpdatedNotification"/>
+      <xs:enumeration value="ES2-HandlePLMAChangedNotification"/>
+      <xs:enumeration value="ES2-HandleEmergencyProfileAttributeSetNotification"/>
+      <xs:enumeration value="ES2-HandleEmergencyProfileAttributeUnsetNotification"/>
+      <xs:enumeration value="ES2-HandleProfileFallBackAttributeSetNotification"/>
+      <xs:enumeration value="ES2-HandleProfileFallBackAttributeUnsetNotification"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <!--============================================================================================================================-->
+  <xs:element name="ES2-GetPLMARequest">
+    <xs:annotation>
+      <xs:documentation>Maps an execution request of the ES2-GetPLMA function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseRequestType">
+          <xs:sequence>
+            <xs:element name="ProfileType" type="rps3:String100" minOccurs="0">
+              <xs:annotation>
+                <xs:documentation>Identification of the Profile type for which PLMAs are searched</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="M2m-sp-id" type="rps3:ObjectIdentifierType" minOccurs="0">
+              <xs:annotation>
+                <xs:documentation>Identification of the M2M SP for which PLMAs are searched</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Iccid" type="rps3:ICCIDType" minOccurs="0">
+              <xs:annotation>
+                <xs:documentation>Identification of one specific Profile  for which PLMAs are searched</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Mno-id" type="rps3:ObjectIdentifierType" minOccurs=”0”>
+              <xs:annotation>
+                <xs:documentation>Identification of the Operator owner of the Profiles to be matched.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Smsr-id" type="rps3:ObjectIdentifierType">
+              <xs:annotation>
+                <xs:documentation>Identification of the SM-SR from which to get the PLMAs.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ES2-GetPLMAResponse">
+    <xs:annotation>
+      <xs:documentation>Maps an execution response of the ES2-GetPLMA function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseResponseType">
+          <xs:sequence>
+            <xs:element name="Plma" type="PLMAType" minOccurs="0" maxOccurs="unbounded">
+              <xs:annotation>
+                <xs:documentation>The list of PLMA rules that match the search criterion </xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES2-SetPLMARequest">
+    <xs:annotation>
+      <xs:documentation>Maps an execution request of the ES2-SetPLMA function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseRequestType">
+          <xs:sequence>
+            <xs:element name="Plma" type="PLMAType">
+              <xs:annotation>
+                <xs:documentation>The specification of the PLMA, and the criteria on which this PLMA applies.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Smsr-id" type="rps3:ObjectIdentifierType">
+              <xs:annotation>
+                <xs:documentation>Identification of the SM-SR on which to apply the PLMA.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ES2-SetPLMAResponse">
+    <xs:annotation>
+      <xs:documentation>Maps an execution response of the ES2-SetPLMA function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseResponseType">
+          <xs:sequence>
+            <xs:annotation>
+              <xs:documentation>No specific output</xs:documentation>
+            </xs:annotation>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES2-GetONCRequest">
+    <xs:annotation>
+      <xs:documentation>Maps an execution request of the ES2-GetONC function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseRequestType">
+          <xs:sequence>
+            <xs:element name="ProfileType" type="rps3:String100" minOccurs="0">
+              <xs:annotation>
+                <xs:documentation>Identification of the Profile Type for which the ONC applies is searched</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Iccid" type="rps3:ICCIDType" minOccurs="0">
+              <xs:annotation>
+                <xs:documentation>Identification of one specific Profile for which the ONC applies is searched</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Smsr-id" type="rps3:ObjectIdentifierType">
+              <xs:annotation>
+                <xs:documentation>Identification of the SM-SR from which to get ONCs.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ES2-GetONCResponse">
+    <xs:annotation>
+      <xs:documentation>Maps an execution response of the ES2-GetONC function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseResponseType">
+          <xs:sequence>
+            <xs:element name="Onc" type="ONCType" minOccurs="0" maxOccurs="unbounded">
+              <xs:annotation>
+                <xs:documentation>The ONC including the list of unwanted notifications that match the search criterion</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES2-SetONCRequest">
+    <xs:annotation>
+      <xs:documentation>Maps an execution request of the ES2-SetONC function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseRequestType">
+          <xs:sequence>
+            <xs:element name="Onc" type="ONCType">
+              <xs:annotation>
+                <xs:documentation>The specification of the ONC, and the criterion on which this ONC applies.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Smsr-id" type="rps3:ObjectIdentifierType">
+              <xs:annotation>
+                <xs:documentation>Identification of the SM-SR on which to apply the ONC.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ES2-SetONCResponse">
+    <xs:annotation>
+      <xs:documentation>Maps an execution response of the ES2-SetONC function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseResponseType">
+          <xs:sequence>
+            <xs:annotation>
+              <xs:documentation>No specific output</xs:documentation>
+            </xs:annotation>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES2-HandleProfileDownloadedNotification">
+    <xs:annotation>
+      <xs:documentation>Maps an execution of the ES2-HandleProfileDownloadedNotification notification.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseNotificationType">
+          <xs:sequence>
+            <xs:element name="Eid" type="rps3:EIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the targeted eUICC.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Iccid" type="rps3:ICCIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the Profile that has been downloaded.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="CompletionTimestamp" type="xs:dateTime">
+              <xs:annotation>
+                <xs:documentation>Indication of the date/time when the operation has been performed</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES2-HandlePLMAChangedNotification">
+    <xs:annotation>
+      <xs:documentation>Maps an execution of the ES2-HandlePLMAChangedNotification notification.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseNotificationType">
+          <xs:sequence>
+            <xs:element name="Plma" type="PLMAType">
+              <xs:annotation>
+                <xs:documentation>The specification of the PLMA that now applies on a subset of Profiles. Information about the subset are contained in the PLMA rule structure</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="CompletionTimestamp" type="xs:dateTime">
+              <xs:annotation>
+                <xs:documentation>Indication of the date/time when the operation has been performed</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES2-HandlePolicyRulesUpdatedNotification">
+    <xs:annotation>
+      <xs:documentation>Maps an execution of the ES2-HandlePolicyRulesUpdatedNotification notification.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseNotificationType">
+          <xs:sequence>
+            <xs:element name="Eid" type="rps3:EIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the targeted eUICC.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Iccid" type="rps3:ICCIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the Profile whose POL2 has been updated.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="pol2" type="rps3:POL2Type">
+              <xs:annotation>
+                <xs:documentation>Value of the POL2 after being updated by the Operator owning the Profile</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="CompletionTimestamp" type="xs:dateTime">
+              <xs:annotation>
+                <xs:documentation>Indication of the date/time when the operation has been performed</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES2-SetEmergencyProfileAttributeRequest">
+    <xs:annotation>
+      <xs:documentation>Maps an execution request of the ES2-SetEmergencyProfileAttribute function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseRequestType">
+          <xs:sequence>
+            <xs:element name="Eid" type="rps3:EIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the targeted eUICC.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Smsr-id" type="rps3:ObjectIdentifierType">
+              <xs:annotation>
+                <xs:documentation>Identification of the SM-SR currently in charge of eUICC management.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Iccid" type="rps3:ICCIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the Profile on which to set the Emergency Profile Attribute.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ES2-SetEmergencyProfileAttributeResponse">
+    <xs:annotation>
+      <xs:documentation>Maps an execution response of the ES2-SetEmergencyProfileAttribute function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseResponseType">
+          <xs:sequence>
+            <xs:annotation>
+              <xs:documentation>No specific output</xs:documentation>
+            </xs:annotation>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES2-HandleEmergencyProfileAttributeSetNotification">
+    <xs:annotation>
+      <xs:documentation>Maps an execution of the ES2-HandleEmergencyProfileAttributeSetNotification notification.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseNotificationType">
+          <xs:sequence>
+            <xs:element name="Eid" type="rps3:EIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the targeted eUICC.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Iccid" type="rps3:ICCIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the Profile that has the Emergency Profile Attribute set.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="CompletionTimestamp" type="xs:dateTime">
+              <xs:annotation>
+                <xs:documentation>Indication of the date/time when the operation has been performed</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES2-HandleEmergencyProfileAttributeUnsetNotification">
+    <xs:annotation>
+      <xs:documentation>Maps an execution of the ES2-HandleEmergencyProfileAttributeUnsetNotification notification.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseNotificationType">
+          <xs:sequence>
+            <xs:element name="Eid" type="rps3:EIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the targeted eUICC.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Iccid" type="rps3:ICCIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the Profile that has the Emergency Profile Attribute unset.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="CompletionTimestamp" type="xs:dateTime">
+              <xs:annotation>
+                <xs:documentation>Indication of the date/time when the operation has been performed</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES2-SetFallBackAttributeRequest">
+    <xs:annotation>
+      <xs:documentation>Maps an execution request of the ES2-SetFallBackAttribute function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseRequestType">
+          <xs:sequence>
+            <xs:element name="Eid" type="rps3:EIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the targeted eUICC.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Smsr-id" type="rps3:ObjectIdentifierType">
+              <xs:annotation>
+                <xs:documentation>Identification of the SM-SR currently in charge of eUICC management.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Iccid" type="rps3:ICCIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the Profile on which to set the Fall-Back Attribute.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ES2-SetFallBackAttributeResponse">
+    <xs:annotation>
+      <xs:documentation>Maps an execution response of the ES2-SetFallBackAttribute function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseResponseType">
+          <xs:sequence>
+            <xs:annotation>
+              <xs:documentation>No specific output</xs:documentation>
+            </xs:annotation>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES2-HandleProfileFallBackAttributeSetNotification">
+    <xs:annotation>
+      <xs:documentation>Maps an execution of the ES2-HandleProfileFallBackAttributeSetNotification notification.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseNotificationType">
+          <xs:sequence>
+            <xs:element name="Eid" type="rps3:EIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the targeted eUICC.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Iccid" type="rps3:ICCIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the Profile on which the Fall-Back Attribute has been set.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="CompletionTimestamp" type="xs:dateTime">
+              <xs:annotation>
+                <xs:documentation>Indication of the date/time when the operation has been performed</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES2-HandleProfileFallBackAttributeUnsetNotification">
+    <xs:annotation>
+      <xs:documentation>Maps an execution of the ES2-HandleProfileFallBackAttributeUnsetNotification notification.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseNotificationType">
+          <xs:sequence>
+            <xs:element name="Eid" type="rps3:EIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the targeted eUICC.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Iccid" type="rps3:ICCIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the Profile on which the Fall-Back Attribute has been unset.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="CompletionTimestamp" type="xs:dateTime">
+              <xs:annotation>
+                <xs:documentation>Indication of the date/time when the operation has been performed</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES2-AuditEISRequest">
+    <xs:annotation>
+      <xs:documentation>Maps an execution request of the ES2-AuditEIS function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseRequestType">
+          <xs:sequence>
+            <xs:element name="Eid" type="rps3:EIDType">
+              <xs:annotation>
+                <xs:documentation>Identification of the targeted eUICC to be audited.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Smsr-id" type="rps3:ObjectIdentifierType">
+              <xs:annotation>
+                <xs:documentation>Identification of the SM-SR currently in charge of eUICC management.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Iccid" type="rps3:ICCIDType" minOccurs="0" maxOccurs="unbounded">
+              <xs:annotation>
+                <xs:documentation>List of “iccid” identifying Profiles to be audited</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ES2-AuditEISResponse">
+    <xs:annotation>
+      <xs:documentation>Maps an execution response of the ES2-AuditEIS function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseResponseType">
+          <xs:sequence>
+            <xs:element name="Eis" type="rps3:EISType" minOccurs="0">
+              <xs:annotation>
+                <xs:documentation>This is the eUICC Information Set of the eUICC</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+
+</xs:schema>

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://namespaces.gsma.org/esim-messaging/4"
+           xmlns="http://namespaces.gsma.org/esim-messaging/4"
+           xmlns:rps3="http://namespaces.gsma.org/esim-messaging/3"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified">
+
+    <xs:import namespace="http://namespaces.gsma.org/esim-messaging/3" schemaLocation="euicc.common.request.xsd"/>
+    <xs:include schemaLocation="rps4.euicc.common.types.xsd"/>
+
+    <xs:group name="ES1">
+        <xs:annotation>
+            <xs:documentation>Provides the list of all function execution requests and function execution responses defined in ES1 interface</xs:documentation>
+        </xs:annotation>
+        <xs:choice>
+            <xs:element ref="ES1-UpdateEISAdditionalPropertiesRequest"/>
+            <xs:element ref="ES1-UpdateEISAdditionalPropertiesResponse"/>
+        </xs:choice>
+    </xs:group>
+    <xs:simpleType name="ES1-MessageType">
+        <xs:annotation>
+            <xs:documentation>List of all possible message types. A type shall exist for each supported function of the interface.</xs:documentation>
+        </xs:annotation>
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="ES1-UpdateEISAdditionalPropertiesRequest"/>
+            <xs:enumeration value="ES1-UpdateEISAdditionalPropertiesResponse"/>
+        </xs:restriction>
+    </xs:simpleType>
+    <!--============================================================================================================================-->
+    <xs:element name="ES1-UpdateEISAdditionalPropertiesRequest">
+        <xs:annotation>
+            <xs:documentation>Maps an execution request of the ES1-UpdateEISAdditionalPropertiesRequest function.</xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+            <xs:complexContent>
+                <xs:extension base="rps3:BaseRequestType">
+                    <xs:sequence>
+                        <xs:element name="Eid" type="rps3:EIDType">
+                            <xs:annotation>
+                                <xs:documentation>Identification of the targeted eUICC.</xs:documentation>
+                            </xs:annotation>
+                        </xs:element>
+                        <xs:element name="AdditionalProperties">
+                            <xs:annotation>
+                                <xs:documentation>This is the EIS field as described in section 5.1.1.2.10</xs:documentation>
+                            </xs:annotation>
+                            <xs:complexType>
+                                <xs:sequence>
+                                    <xs:element name="Property" type="rps3:PropertyType" maxOccurs="unbounded"/>
+                                </xs:sequence>
+                            </xs:complexType>
+                        </xs:element>
+                    </xs:sequence>
+                </xs:extension>
+            </xs:complexContent>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="ES1-UpdateEISAdditionalPropertiesResponse">
+        <xs:annotation>
+            <xs:documentation>Maps an execution response of the ES1-UpdateEISAdditionalPropertiesResponse function.</xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+            <xs:complexContent>
+                <xs:extension base="rps3:BaseResponseType">
+                    <xs:sequence>
+                        <xs:annotation>
+                            <xs:documentation>No specific output</xs:documentation>
+                        </xs:annotation>
+                    </xs:sequence>
+                </xs:extension>
+            </xs:complexContent>
+        </xs:complexType>
+    </xs:element>
+
+</xs:schema>

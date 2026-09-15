@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<wsdl:definitions targetNamespace="http://namespaces.gsma.org/esim-messaging/4"
+    xmlns:rps4="http://namespaces.gsma.org/esim-messaging/4"
+    xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+    xmlns:wsa="http://www.w3.org/2005/08/addressing"
+    xmlns:wsaw="http://www.w3.org/2006/05/addressing/wsdl"
+    xmlns:wsam="http://www.w3.org/2007/05/addressing/metadata"
+    xmlns:wsoap12="http://schemas.xmlsoap.org/wsdl/soap12/"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+    
+<!-- WSDL TYPES -->
+    <wsdl:types>
+        <xs:schema targetNamespace="http://namespaces.gsma.org/esim-messaging/4" elementFormDefault="qualified" >
+            <xs:include schemaLocation="xsd/rps4.euicc.request.ES4A.xsd"/>
+        </xs:schema>
+        <xs:schema targetNamespace="http://www.w3.org/2005/08/addressing" elementFormDefault="qualified" >
+            <xs:include schemaLocation="xsd/import/ws-addr.xsd"/>
+        </xs:schema>
+    </wsdl:types>
+
+ <!-- WSA MESSAGES -->
+    <wsdl:message name="SoapHeader">
+        <!-- WSA MANDATORY -->
+        <wsdl:part name="From" element="wsa:From"/>
+        <wsdl:part name="To" element="wsa:To"/>
+        <wsdl:part name="Action" element="wsa:Action"/>
+        <wsdl:part name="MessageID" element="wsa:MessageID"/>
+        <wsdl:part name="RelatesTo" element="wsa:RelatesTo"/>
+        <!-- WSA OPTIONAL -->
+        <wsdl:part name="ReplyTo" element="wsa:ReplyTo"/>      
+    </wsdl:message>
+
+    <!-- ES4A MESSAGES -->
+    <wsdl:message name="ES4A-GetPLMARequestMessage">
+        <wsdl:part name="parameters" element="rps4:ES4A-GetPLMARequest"/>
+    </wsdl:message>
+    <wsdl:message name="ES4A-GetPLMAResponseMessage">
+        <wsdl:part name="parameters" element="rps4:ES4A-GetPLMAResponse"/>
+    </wsdl:message>
+    <wsdl:message name="ES4A-SetPLMARequestMessage">
+        <wsdl:part name="parameters" element="rps4:ES4A-SetPLMARequest"/>
+    </wsdl:message>
+    <wsdl:message name="ES4A-SetPLMAResponseMessage">
+        <wsdl:part name="parameters" element="rps4:ES4A-SetPLMAResponse"/>
+    </wsdl:message>
+    <wsdl:message name="ES4A-GetONCRequestMessage">
+        <wsdl:part name="parameters" element="rps4:ES4A-GetONCRequest"/>
+    </wsdl:message>
+    <wsdl:message name="ES4A-GetONCResponseMessage">
+        <wsdl:part name="parameters" element="rps4:ES4A-GetONCResponse"/>
+    </wsdl:message>
+    <wsdl:message name="ES4A-SetONCRequestMessage">
+        <wsdl:part name="parameters" element="rps4:ES4A-SetONCRequest"/>
+    </wsdl:message>
+    <wsdl:message name="ES4A-SetONCResponseMessage">
+        <wsdl:part name="parameters" element="rps4:ES4A-SetONCResponse"/>
+    </wsdl:message>
+    
+<!-- SOAP PORT OPERATIONS -->
+    <wsdl:portType name="ES4ASmSr">
+        <wsdl:operation name="ES4A-GetPLMA">
+            <wsdl:input message="rps4:ES4A-GetPLMARequestMessage"
+                wsaw:Action="http://gsma.com/ES4A/ProfileManagement/ES4A-GetPLMARequest"
+                wsam:Action="http://gsma.com/ES4A/ProfileManagement/ES4A-GetPLMARequest"/>
+            <wsdl:output message="rps4:ES4A-GetPLMAResponseMessage"
+                wsaw:Action="http://gsma.com/ES4A/ProfileManagement/ES4A-GetPLMAResponse"
+                wsam:Action="http://gsma.com/ES4A/ProfileManagement/ES4A-GetPLMAResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="ES4A-SetPLMA">
+            <wsdl:input message="rps4:ES4A-SetPLMARequestMessage"
+                        wsaw:Action="http://gsma.com/ES4A/ProfileManagement/ES4A-SetPLMARequest"
+                        wsam:Action="http://gsma.com/ES4A/ProfileManagement/ES4A-SetPLMARequest"/>
+            <wsdl:output message="rps4:ES4A-SetPLMAResponseMessage"
+                         wsaw:Action="http://gsma.com/ES4A/ProfileManagement/ES4A-SetPLMAResponse"
+                         wsam:Action="http://gsma.com/ES4A/ProfileManagement/ES4A-SetPLMAResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="ES4A-GetONC">
+            <wsdl:input message="rps4:ES4A-GetONCRequestMessage"
+                        wsaw:Action="http://gsma.com/ES4A/ProfileManagement/ES4A-GetONCRequest"
+                        wsam:Action="http://gsma.com/ES4A/ProfileManagement/ES4A-GetONCRequest"/>
+            <wsdl:output message="rps4:ES4A-GetONCResponseMessage"
+                         wsaw:Action="http://gsma.com/ES4A/ProfileManagement/ES4A-GetONCResponse"
+                         wsam:Action="http://gsma.com/ES4A/ProfileManagement/ES4A-GetONCResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="ES4A-SetONC">
+            <wsdl:input message="rps4:ES4A-SetONCRequestMessage"
+                        wsaw:Action="http://gsma.com/ES4A/ProfileManagement/ES4A-SetONCRequest"
+                        wsam:Action="http://gsma.com/ES4A/ProfileManagement/ES4A-SetONCRequest"/>
+            <wsdl:output message="rps4:ES4A-SetONCResponseMessage"
+                         wsaw:Action="http://gsma.com/ES4A/ProfileManagement/ES4A-SetONCResponse"
+                         wsam:Action="http://gsma.com/ES4A/ProfileManagement/ES4A-SetONCResponse"/>
+        </wsdl:operation>
+    </wsdl:portType>
+
+ <!-- SOAP BINDING -->
+    <wsdl:binding name="ES4ASmSrServiceBinding" type="rps4:ES4ASmSr">
+        <wsoap12:binding transport="http://www.w3.org/2003/05/soap/bindings/HTTP/" style="document"/>
+        <wsdl:operation name="ES4A-GetPLMA">
+            <wsoap12:operation style="document"/>
+            <wsdl:input>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="From" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="To" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="MessageID" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="Action" wsdl:required="true"/>
+                <wsoap12:body use="literal" wsdl:required="true"/>
+            </wsdl:input>
+            <wsdl:output>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="From" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="To" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="MessageID" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="Action" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="RelatesTo" wsdl:required="true"/>
+                <wsoap12:body use="literal" wsdl:required="true"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="ES4A-SetPLMA">
+            <wsoap12:operation style="document"/>
+            <wsdl:input>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="From" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="To" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="MessageID" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="Action" wsdl:required="true"/>
+                <wsoap12:body use="literal" wsdl:required="true"/>
+            </wsdl:input>
+            <wsdl:output>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="From" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="To" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="MessageID" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="Action" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="RelatesTo" wsdl:required="true"/>
+                <wsoap12:body use="literal" wsdl:required="true"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="ES4A-GetONC">
+            <wsoap12:operation style="document"/>
+            <wsdl:input>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="From" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="To" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="MessageID" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="Action" wsdl:required="true"/>
+                <wsoap12:body use="literal" wsdl:required="true"/>
+            </wsdl:input>
+            <wsdl:output>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="From" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="To" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="MessageID" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="Action" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="RelatesTo" wsdl:required="true"/>
+                <wsoap12:body use="literal" wsdl:required="true"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="ES4A-SetONC">
+            <wsoap12:operation style="document"/>
+            <wsdl:input>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="From" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="To" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="MessageID" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="Action" wsdl:required="true"/>
+                <wsoap12:body use="literal" wsdl:required="true"/>
+            </wsdl:input>
+            <wsdl:output>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="From" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="To" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="MessageID" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="Action" wsdl:required="true"/>
+                <wsoap12:header message="rps4:SoapHeader" use="literal" part="RelatesTo" wsdl:required="true"/>
+                <wsoap12:body use="literal" wsdl:required="true"/>
+            </wsdl:output>
+        </wsdl:operation>
+    </wsdl:binding>
+
+<!-- SOAP SERVICE -->
+    <wsdl:service name="ES4ASmSrService">
+        <wsdl:port binding="rps4:ES4ASmSrServiceBinding" name="SmSrES4APort">
+            <wsoap12:address location="http://gsma.org/esim-messaging/4/ES4A/ES4SmSrService"/>
+        </wsdl:port>
+    </wsdl:service>
+</wsdl:definitions>

@@ -1,0 +1,18 @@
+######################################################################################################################################################################
+# Extensions for a DPTLS
+keyUsage = critical, digitalSignature
+extendedKeyUsage = critical, serverAuth, clientAuth
+
+#SGP.23: CERT.DP.TLS certificate of the S_SM-DP+ with invalid 'Certificate Policies' extension (OID not set to ‘id-rspRole-dp-tls' or 'id-rspRole-ds-tls'), formatted as X.509 certificate.
+# Solution here: in extension ‘Certificate Policies’, set OID to 'id-rspRole-dp-auth' = 2.23.146.1.2.1.4
+certificatePolicies = 2.23.146.1.2.1.4
+
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer
+
+# RID shall be aligend with SGP.23 value SM-DP+OID 
+# DNS name shall be aligned with SGP.23 value #TEST_DP_ADDRESS1
+subjectAltName =  DNS:testsmdpplus1.example.com, RID:2.999.10
+
+crlDistributionPoints=URI:http://ci.test.example.com/CRL-A.crl, URI:http://ci.test.example.com/CRL-B.crl
+

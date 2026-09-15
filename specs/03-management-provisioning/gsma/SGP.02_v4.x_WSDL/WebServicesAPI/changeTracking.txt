@@ -1,0 +1,41 @@
+This file records the CRs that introduced changes to the Web Services API specified in this package.
+The current subminor revision is "RC1", corresponding to SGP.02v4.0 entering public review
+
+Version         CR references                                                   Files impacted
+=======         =============                                                   ==============
+3.2-draft1      16ESIMWI422_Doc_002r1_Editorial Issues                          euicc.request.ES4.xsd
+3.2-r1          17ESIMWI424_011_CR_related_to_missing_items_in_WSDL_r01         euicc.request.ES2.xsd
+                                                                                euicc.request.ES4.xsd
+                17ESIMWI4271_Doc_009_CR_Action27_14                             euicc.request.ES2.xsd
+                                                                                euicc.request.ES3.xsd
+3.2             --
+4.0-draft2      18ESIMWI446_Doc_011r2_ES4_Audit_WSDL_CR1_v2                         euicc.common.types.xsd
+                18ESIMWI447_Doc_006r1_Clarify AllocatedMemory when CGM is notused   euicc.common.types.xsd
+                --
+4.0-draft4      18ESIMWI4511_Doc_005r2_WSDL vs SGP.02 fixes                     ES2MNO.wsdl
+                                                                                euicc.request.ES3.xsd
+                18ESIMWI454_Doc_003r1_ SGP.02 InitialSequenceCounter and HostIDClarification                    euicc.request.ES7.xsd
+                18ESIMWI454_Doc_004r1_ SGP.02 ISD-P-AID in Audit Trail RecordClarification                      euicc.common.types.xsd
+4.0-draft7      18ESIMWI454_Doc_009r5_EIS Signature - Clarify properties of eCASD XMLstructure - TAR list       euicc.common.types.xsd
+                19ESIMWI459_Doc_018r1_MNO_identification                                                        euicc.root.xsd
+4.0-draft8      19ESIMWI460_Doc_004R01_UpdatePolicyRules_optional_pol2                                          euicc.request.ES4.xsd
+4.0-RC1         18ESIMWI455_Doc_004r4_SGP-02_EIS_after_OS_Update_v0-2                                           ES1_SMSR.wsdl
+                                                                                                                +rps4.euicc.request.xsd
+                Major refactor introducing new types and new functions for v4.                                  all files
+                This includes:                                                                                                
+                    18ESIMWI457_Doc_003r3_Introduction ES2.AuditEIS
+                    18ESIMWI458_Doc_021r3_M2MSP Introduction - set and get PLMA ES2ES3ES4 ES4A
+                    19ESIMWI4582_Doc_010r3_M2MSP Introduction - set and get ONC ES2ES3ES4 ES4A
+                    19ESIMWI459_Doc_019R03_M2MSP Introduction - set and get PLMAES2ES3ES4ES4A Corrections
+                    19ESIMWI459_Doc_023r3 - Fall-back Attribute Management_R07
+                    19ESIMWI459_Doc_030r1_SGP02_M2MSP_Introduction_Fallback_EmergencyProfile_Annex_A (2)
+                    19ESIMWI459_Doc_031r1_SGP02_M2MSP_Introduction_Annex_B (1)
+                    19ESIMWI460_Doc_003R01_mno-id_in_new_notifications
+                    19ESIMWI460_Doc_005R01_Missing_fields_on_ES2_ES3_ES4_requests_related_with_ONC_and_PLMA
+4.0-RC2         19ESIMWI460_Doc_014R06 M2MSP Introduction - mno-id ingetPLMA                                    rps4.euicc.request.ES2.xsd
+                                                                                                                rps4.euicc.request.ES3.xsd
+                                                                                                                rps4.euicc.request.ES4.xsd
+                                                                                                                rps4.euicc.request.ES4A.xsd
+                Include message types v4 for non-SOAP interfaces                                                euicc.root.xsd
+                Bug fixes - editorial                                                                           rps4.euicc.common.types.xsd
+				                                                                                                rps4.euicc.request.ES1.xsd

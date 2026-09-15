@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://namespaces.gsma.org/esim-messaging/4"
+           xmlns="http://namespaces.gsma.org/esim-messaging/4"
+           xmlns:rps3="http://namespaces.gsma.org/esim-messaging/3"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified">
+
+  <xs:import namespace="http://namespaces.gsma.org/esim-messaging/3" schemaLocation="euicc.common.request.xsd"/>
+  <xs:include schemaLocation="rps4.euicc.common.types.xsd"/>
+
+  <xs:group name="ES4A">
+    <xs:annotation>
+      <xs:documentation>Provides the list of all function execution requests and function execution responses defined in ES2 interface</xs:documentation>
+    </xs:annotation>
+    <xs:choice>
+      <xs:element ref="ES4A-GetPLMARequest"/>
+      <xs:element ref="ES4A-GetPLMAResponse"/>
+      <xs:element ref="ES4A-SetPLMARequest"/>
+      <xs:element ref="ES4A-SetPLMAResponse"/>
+      <xs:element ref="ES4A-GetONCRequest"/>
+      <xs:element ref="ES4A-GetONCResponse"/>
+      <xs:element ref="ES4A-SetONCRequest"/>
+      <xs:element ref="ES4A-SetONCResponse"/>
+    </xs:choice>
+  </xs:group>
+  <xs:simpleType name="ES4A-MessageType">
+    <xs:annotation>
+      <xs:documentation>List of all possible message types. A type shall exist for each supported function of the interface.</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="ES4A-GetPLMARequest"/>
+      <xs:enumeration value="ES4A-GetPLMAResponse"/>
+      <xs:enumeration value="ES4A-SetPLMARequest"/>
+      <xs:enumeration value="ES4A-SetPLMAResponse"/>
+      <xs:enumeration value="ES4A-GetONCRequest"/>
+      <xs:enumeration value="ES4A-GetONCResponse"/>
+      <xs:enumeration value="ES4A-SetONCRequest"/>
+      <xs:enumeration value="ES4A-SetONCResponse"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <!--============================================================================================================================-->
+  <xs:element name="ES4A-GetPLMARequest">
+    <xs:annotation>
+      <xs:documentation>Maps an execution request of the ES4A-GetPLMA function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseRequestType">
+          <xs:sequence>
+            <xs:element name="ProfileType" type="rps3:String100" minOccurs="0">
+              <xs:annotation>
+                <xs:documentation>Identification of the Profile type for which PLMAs are searched</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="M2m-sp-id" type="rps3:ObjectIdentifierType" minOccurs="0">
+              <xs:annotation>
+                <xs:documentation>Identification of the M2M SP for which PLMAs are searched</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Iccid" type="rps3:ICCIDType" minOccurs="0">
+              <xs:annotation>
+                <xs:documentation>Identification of one specific Profile  for which PLMAs are searched</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+            <xs:element name="Mno-id" type="rps3:ObjectIdentifierType" minOccurs=”0”>
+              <xs:annotation>
+                <xs:documentation>Identification of the Operator owner of the Profiles to be matched.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ES4A-GetPLMAResponse">
+    <xs:annotation>
+      <xs:documentation>Maps an execution response of the ES4A-GetPLMA function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseResponseType">
+          <xs:sequence>
+            <xs:element name="Plma" type="PLMAType" minOccurs="0" maxOccurs="unbounded">
+              <xs:annotation>
+                <xs:documentation>The list of PLMA rules that match the search criterion </xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES4A-SetPLMARequest">
+    <xs:annotation>
+      <xs:documentation>Maps an execution request of the ES4A-SetPLMA function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseRequestType">
+          <xs:sequence>
+            <xs:element name="Plma" type="PLMAType">
+              <xs:annotation>
+                <xs:documentation>The specification of the PLMA, and the criteria on which this PLMA applies.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ES4A-SetPLMAResponse">
+    <xs:annotation>
+      <xs:documentation>Maps an execution response of the ES4A-SetPLMA function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseResponseType">
+          <xs:sequence>
+            <xs:annotation>
+              <xs:documentation>No specific output</xs:documentation>
+            </xs:annotation>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES4A-GetONCRequest">
+    <xs:annotation>
+      <xs:documentation>Maps an execution request of the ES4A-GetONC function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseRequestType">
+          <xs:sequence>
+            <xs:element name="ProfileType" type="rps3:String100" minOccurs="0">
+              <xs:annotation>
+                <xs:documentation>Identification of the Profile Type for which the ONC applies is searched</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+            <xs:element name="Iccid" type="rps3:ICCIDType" minOccurs="0">
+              <xs:annotation>
+                <xs:documentation>Identification of one specific Profile for which the ONC applies is searched</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ES4A-GetONCResponse">
+    <xs:annotation>
+      <xs:documentation>Maps an execution response of the ES4A-GetONC function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseResponseType">
+          <xs:sequence>
+            <xs:element name="Onc" type="ONCType" minOccurs="0" maxOccurs="unbounded">
+              <xs:annotation>
+                <xs:documentation>The ONC including the list of unwanted notifications that match the search criterion</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <!--============================================================================================================================-->
+  <xs:element name="ES4A-SetONCRequest">
+    <xs:annotation>
+      <xs:documentation>Maps an execution request of the ES4A-SetONC function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseRequestType">
+          <xs:sequence>
+            <xs:element name="Onc" type="ONCType">
+              <xs:annotation>
+                <xs:documentation>The specification of the ONC, and the criterion on which this ONC applies.</xs:documentation>
+              </xs:annotation>
+            </xs:element>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ES4A-SetONCResponse">
+    <xs:annotation>
+      <xs:documentation>Maps an execution response of the ES4A-SetONC function.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="rps3:BaseResponseType">
+          <xs:sequence>
+            <xs:annotation>
+              <xs:documentation>No specific output</xs:documentation>
+            </xs:annotation>
+          </xs:sequence>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+
+</xs:schema>

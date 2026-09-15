@@ -1,0 +1,67 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://namespaces.gsma.org/esim-messaging/4"
+           xmlns="http://namespaces.gsma.org/esim-messaging/4"
+           xmlns:rps3="http://namespaces.gsma.org/esim-messaging/3"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified">
+
+    <xs:import namespace="http://namespaces.gsma.org/esim-messaging/3" schemaLocation="euicc.common.types.xsd"/>
+
+    <!--============================================================================================================================-->
+
+    <xs:complexType name="PLMAType">
+        <xs:annotation>
+            <xs:documentation>Defines the information representing a PLMA</xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:element name="Mno-id" type="rps3:ObjectIdentifierType">
+                <xs:annotation>
+                    <xs:documentation>Identification of the Operator owner of the Profiles concerned by PLMA</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="ProfileType" type="rps3:String100">
+                <xs:annotation>
+                    <xs:documentation>Identification of the Profile Type of the Profiles concerned by this PLMA.</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="M2m-sp-id" type="rps3:ObjectIdentifierType">
+                <xs:annotation>
+                    <xs:documentation>Identification of the M2M SP that will issue requests to the SM-SR to perform authorised operations, or that will receive authorised notifications.</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="AuthorisedOperation" type="rps3:String100" minOccurs="0" maxOccurs="unbounded">
+                <xs:annotation>
+                    <xs:documentation>List all the possible operations that can be authorised by PLMA. Possible values (literally) are defined in SGP.02 chapter 5.1.1.2.14 table Table 511214-B</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!--============================================================================================================================-->
+
+    <xs:complexType name="ONCType">
+        <xs:annotation>
+            <xs:documentation>Defines the information representing a PLMA</xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:element name="Mno-id" type="rps3:ObjectIdentifierType">
+                <xs:annotation>
+                    <xs:documentation>Identification of the Operator owner of the Profiles concerned by this ONC.</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="ProfileType" type="rps3:String100">
+                <xs:annotation>
+                    <xs:documentation>Identification of the Profile Type of the Profiles concerned by this ONC.</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="DiscardedNotification" type="rps3:String100" minOccurs="0" maxOccurs="unbounded">
+                <xs:annotation>
+                    <xs:documentation>List all the possible notifications to discard by ONC. Possible values (literally) are defined in SGP.02 chapter 5.1.1.2.15 table Table 511215-B</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+
+</xs:schema>
