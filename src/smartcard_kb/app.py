@@ -1,6 +1,14 @@
 """FastAPI 应用入口"""
 
+import os
+
 from fastapi import FastAPI
+
+from smartcard_kb.config import settings
+
+# 设置 Docling 模型路径
+if settings.docling_models_path:
+    os.environ["DOCLING_MODELS_PATH"] = settings.docling_models_path
 
 app = FastAPI(
     title="SmartCard Master Knowledge Base",

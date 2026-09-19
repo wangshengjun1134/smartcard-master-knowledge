@@ -20,7 +20,10 @@ class Settings(BaseSettings):
     
     # 嵌入模型配置
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
-    
+
+    # Docling 模型路径
+    docling_models_path: str = ""
+
     class Config:
         env_file = ".env"
 
