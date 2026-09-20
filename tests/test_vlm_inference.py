@@ -14,7 +14,7 @@ def test_qwen3_vl_local_inference():
     MODEL_PATH = r"D:\softdata\workspaces\ai-models\Qwen3-VL-8B-Instruct"
     
     # 本地图片路径 (请替换为实际存在的 .jpg 或 .png 文件)
-    IMAGE_PATH = r"D:\softdata\workspaces\buff\smartcard-master-knowledge\tests\流程图.png"
+    IMAGE_PATH = r"D:\softdata\workspaces\buff\smartcard-master-knowledge\tests\ocr_test.png"
     
     # 提示词
     PROMPT = "请详细描述这张图片中的内容。"
