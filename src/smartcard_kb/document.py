@@ -14,15 +14,30 @@ class DoclingPDFProcessor:
     def __init__(self, do_ocr: bool = True):
         """
         初始化处理器
+
         :param do_ocr: 是否启用 OCR（默认启用）
         """
         self.pipeline_options = PdfPipelineOptions()
+
+        # OCR
         self.pipeline_options.do_ocr = do_ocr
-        self.pipeline_options.heading_hierarchy_options = HeadingHierarchyOptions(enabled=True)
+
+        # 标题层级识别
+        self.pipeline_options.heading_hierarchy_options = (
+            HeadingHierarchyOptions(enabled=True)
+        )
+
+        # 生成 PictureItem 对应的图片
+        self.pipeline_options.generate_picture_images = True
+
+        # 图片缩放倍数
+        self.pipeline_options.images_scale = 2.0
 
         self.converter = DocumentConverter(
             format_options={
-                InputFormat.PDF: PdfFormatOption(pipeline_options=self.pipeline_options)
+                InputFormat.PDF: PdfFormatOption(
+                    pipeline_options=self.pipeline_options
+                )
             }
         )
 
@@ -67,11 +82,21 @@ class DoclingPDFProcessor:
                 item_type = "table"
                 text = item.export_to_markdown()
             # -------------------------
-            # Table of Contents
+            # Index
             # -------------------------
             elif item.label == DocItemLabel.DOCUMENT_INDEX:
                 item_type = "document_index"
                 text = item.export_to_markdown()
+            # -------------------------
+            # Picture
+            # -------------------------
+            elif item.label == DocItemLabel.PICTURE:
+                item_type = "picture"
+                text = item.text
+                image = item.get_image(doc)
+                if image is not None:
+                    image.save("picture.png")
+                caption = item.caption_text(doc)
             else:
                 continue
 
@@ -85,6 +110,8 @@ class DoclingPDFProcessor:
                 "text": text,
                 "heading_path": heading_stack.copy(),
                 "page": prov.page_no if prov else None,
+                "caption": caption,
+                "image_path": "picture.png",                
                 "bbox": {
                     "l": prov.bbox.l,
                     "t": prov.bbox.t,
