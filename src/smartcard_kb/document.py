@@ -36,6 +36,12 @@ class DoclingPDFProcessor:
         results = []
 
         for item, level in doc.iterate_items():
+            print(
+                f"----------------------------"
+                f"level={level}, "
+                f"label={item.label}, "
+                f"text={getattr(item, 'text', '')[:100]!r}"
+            )
             # -------------------------
             # Heading
             # -------------------------
@@ -50,14 +56,22 @@ class DoclingPDFProcessor:
             if item.label == DocItemLabel.TEXT:
                 item_type = "text"
                 text = item.text
-
+            # List item
+            elif item.label == DocItemLabel.LIST_ITEM:
+                item_type = "text"
+                text = item.text
             # -------------------------
             # Table
             # -------------------------
             elif item.label == DocItemLabel.TABLE:
                 item_type = "table"
                 text = item.export_to_markdown()
-
+            # -------------------------
+            # Table of Contents
+            # -------------------------
+            elif item.label == DocItemLabel.DOCUMENT_INDEX:
+                item_type = "document_index"
+                text = item.export_to_markdown()
             else:
                 continue
 
@@ -88,5 +102,10 @@ class DoclingPDFProcessor:
         :param page_range: 页码范围 (start, end)，1-based
         :return: 结构化内容列表
         """
-        result = self.converter.convert(pdf_path, page_range=page_range)
+        # 动态构建参数，避免 page_range=None 时触发 docling 校验报错
+        kwargs = {}
+        if page_range is not None:
+            kwargs["page_range"] = page_range
+            
+        result = self.converter.convert(pdf_path, **kwargs)
         return self.extract_structured_content(result.document)

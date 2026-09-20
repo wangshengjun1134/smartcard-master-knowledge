@@ -114,7 +114,8 @@ def test_pdf_read_first_page():
 
 
 def test_docling_read_specific_page():
-    """使用 DoclingPDFProcessor 工具包读取 PDF 指定页"""
+    """使用 DoclingPDFProcessor 工具包读取 PDF 并输出到文件"""
+    import json
     from pathlib import Path
     from smartcard_kb.document import DoclingPDFProcessor
 
@@ -128,17 +129,20 @@ def test_docling_read_specific_page():
     # 初始化工具类
     processor = DoclingPDFProcessor(do_ocr=True)
 
-    # 处理前 5 页
-    results = processor.process_pdf(str(pdf_path), page_range=(1, 5))
+    # 处理全部页面
+    results = processor.process_pdf(str(pdf_path), page_range=(2, 2))
 
-    # 打印结果预览
-    print(f"共提取 {len(results)} 个结构化元素")
-    for i, item in enumerate(results[:5]):
-        print(f"\n--- 元素 {i + 1} ---")
-        print(f"类型: {item['type']}")
-        print(f"页码: {item['page']}")
-        print(f"标题路径: {' > '.join(item['heading_path'])}")
-        print(f"内容预览: {item['text'][:200]}...")
+    # 定义输出目录和文件
+    output_dir = Path("output")
+    output_dir.mkdir(exist_ok=True)
+    output_file = output_dir / "docling_results2.json"
+
+    # 写入 JSON 文件
+    with open(output_file, "w", encoding="utf-8") as f:
+        json.dump(results, f, ensure_ascii=False, indent=2)
+
+    print(f"✅ 成功提取 {len(results)} 个结构化元素")
+    print(f"📄 结果已保存到: {output_file.absolute()}")
 
 
 if __name__ == "__main__":
