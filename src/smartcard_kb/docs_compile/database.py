@@ -1,32 +1,31 @@
-"""数据库模块 - document_item 表的建表和 CRUD 操作"""
+"""数据库模块 - PostgreSQL 版本的 document_item 表 CRUD 操作"""
 
-import sqlite3
 import json
-from pathlib import Path
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
+import psycopg2
+import psycopg2.extras
+from psycopg2.extras import execute_values
 
-def get_db_path() -> Path:
-    """获取数据库路径"""
-    return Path("data/knowledge.db")
+from smartcard_kb.config import settings
 
 
-def get_connection() -> sqlite3.Connection:
-    """获取数据库连接"""
-    db_path = get_db_path()
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(db_path))
-    conn.row_factory = sqlite3.Row
+def get_connection():
+    """获取 PostgreSQL 数据库连接"""
+    conn = psycopg2.connect(
+        host=settings.postgres_host,
+        port=settings.postgres_port,
+        user=settings.postgres_user,
+        password=settings.postgres_password,
+        dbname=settings.postgres_db,
+    )
     return conn
 
 
 def init_database():
     """初始化数据库，创建 document_item 表"""
-    db_path = get_db_path()
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    conn = sqlite3.connect(str(db_path))
+    conn = get_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -38,13 +37,13 @@ def init_database():
             label TEXT NOT NULL,
             text TEXT,
             order_index INTEGER NOT NULL,
-            bbox TEXT,
-            metadata TEXT,
-            content TEXT,
-            is_rag_enabled BOOLEAN DEFAULT 1,
-            raw_json TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            bbox JSONB,
+            metadata JSONB,
+            content JSONB,
+            is_rag_enabled BOOLEAN DEFAULT TRUE,
+            raw_json JSONB,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
@@ -67,6 +66,7 @@ def init_database():
     """)
 
     conn.commit()
+    cursor.close()
     conn.close()
 
 
@@ -80,11 +80,15 @@ def insert_document_item(item: Dict[str, Any]) -> None:
     cursor = conn.cursor()
 
     cursor.execute("""
-        INSERT OR REPLACE INTO document_item (
+        INSERT INTO document_item (
             id, document_id, page_id, parent_id, label, text,
             order_index, bbox, metadata, content, is_rag_enabled,
             raw_json, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (id) DO UPDATE SET
+            text = EXCLUDED.text,
+            content = EXCLUDED.content,
+            updated_at = CURRENT_TIMESTAMP
     """, (
         item.get("id"),
         item.get("document_id"),
@@ -103,12 +107,13 @@ def insert_document_item(item: Dict[str, Any]) -> None:
     ))
 
     conn.commit()
+    cursor.close()
     conn.close()
 
 
 def insert_document_items(items: List[Dict[str, Any]]) -> None:
     """
-    批量插入 document_items
+    批量插入 document_items（使用 execute_values 提高性能）
     
     :param items: document_item 字典列表
     """
@@ -135,15 +140,25 @@ def insert_document_items(items: List[Dict[str, Any]]) -> None:
             now,
         ))
 
-    cursor.executemany("""
-        INSERT OR REPLACE INTO document_item (
+    execute_values(
+        cursor,
+        """
+        INSERT INTO document_item (
             id, document_id, page_id, parent_id, label, text,
             order_index, bbox, metadata, content, is_rag_enabled,
             raw_json, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, data)
+        ) VALUES %s
+        ON CONFLICT (id) DO UPDATE SET
+            text = EXCLUDED.text,
+            content = EXCLUDED.content,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        data,
+        template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+    )
 
     conn.commit()
+    cursor.close()
     conn.close()
 
 
@@ -165,25 +180,25 @@ def query_document_items(
     :return: 查询结果列表
     """
     conn = get_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     conditions = []
     params = []
 
     if document_id is not None:
-        conditions.append("document_id = ?")
+        conditions.append("document_id = %s")
         params.append(document_id)
     if page_id is not None:
-        conditions.append("page_id = ?")
+        conditions.append("page_id = %s")
         params.append(page_id)
     if label is not None:
-        conditions.append("label = ?")
+        conditions.append("label = %s")
         params.append(label)
     if is_rag_enabled is not None:
-        conditions.append("is_rag_enabled = ?")
-        params.append(1 if is_rag_enabled else 0)
+        conditions.append("is_rag_enabled = %s")
+        params.append(is_rag_enabled)
 
-    where_clause = " AND ".join(conditions) if conditions else "1=1"
+    where_clause = " AND ".join(conditions) if conditions else "TRUE"
     query = f"SELECT * FROM document_item WHERE {where_clause} ORDER BY {order_by}"
 
     cursor.execute(query, params)
@@ -192,17 +207,10 @@ def query_document_items(
     results = []
     for row in rows:
         item = dict(row)
-        # 反序列化 JSON 字段
-        if item.get("bbox"):
-            item["bbox"] = json.loads(item["bbox"])
-        if item.get("metadata"):
-            item["metadata"] = json.loads(item["metadata"])
-        if item.get("content"):
-            item["content"] = json.loads(item["content"])
-        if item.get("raw_json"):
-            item["raw_json"] = json.loads(item["raw_json"])
+        # PostgreSQL JSONB 字段会自动解析为 Python 对象
         results.append(item)
 
+    cursor.close()
     conn.close()
     return results
 
@@ -217,10 +225,41 @@ def delete_document_items_by_document(document_id: str) -> int:
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM document_item WHERE document_id = ?", (document_id,))
+    cursor.execute("DELETE FROM document_item WHERE document_id = %s", (document_id,))
     count = cursor.rowcount
 
     conn.commit()
+    cursor.close()
     conn.close()
 
     return count
+
+
+def get_document_stats(document_id: str) -> Dict[str, Any]:
+    """
+    获取文档统计信息
+    
+    :param document_id: 文档 ID
+    :return: 统计信息字典
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT 
+            label,
+            COUNT(*) as count
+        FROM document_item
+        WHERE document_id = %s
+        GROUP BY label
+        ORDER BY count DESC
+    """, (document_id,))
+
+    stats = {}
+    for row in cursor.fetchall():
+        stats[row[0]] = row[1]
+
+    cursor.close()
+    conn.close()
+
+    return stats

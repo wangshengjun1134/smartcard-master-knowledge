@@ -6,6 +6,7 @@ from .database import (
     insert_document_items,
     query_document_items,
     delete_document_items_by_document,
+    get_document_stats,
 )
 from .pdf_parser import PDFParser
 from .extractors import (
@@ -30,6 +31,7 @@ __all__ = [
     "insert_document_items",
     "query_document_items",
     "delete_document_items_by_document",
+    "get_document_stats",
     # pdf_parser
     "PDFParser",
     # extractors
