@@ -24,10 +24,66 @@ def get_connection():
 
 
 def init_database():
-    """初始化数据库，创建 document_item 表"""
+    """初始化数据库，创建 document_item 和 document_info 表"""
     conn = get_connection()
     cursor = conn.cursor()
 
+    # 创建 document_info 表
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS document_info (
+            id TEXT PRIMARY KEY,
+            document_code TEXT,
+            title TEXT,
+            series_id TEXT,
+            file_name TEXT NOT NULL,
+            file_path TEXT,
+            file_hash TEXT,
+            file_size INTEGER,
+            file_format TEXT,
+            page_count INTEGER,
+            revision TEXT,
+            publication_date TEXT,
+            effective_date TEXT,
+            issuer TEXT,
+            language TEXT,
+            source_type TEXT,
+            parser TEXT,
+            parser_version TEXT,
+            processing_status TEXT,
+            processing_started_at TEXT,
+            processing_finished_at TEXT,
+            processing_error TEXT,
+            item_count INTEGER DEFAULT 0,
+            text_count INTEGER DEFAULT 0,
+            title_count INTEGER DEFAULT 0,
+            table_count INTEGER DEFAULT 0,
+            picture_count INTEGER DEFAULT 0,
+            formula_count INTEGER DEFAULT 0,
+            metadata JSONB,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # document_info 表索引
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_document_info_document_code
+        ON document_info(document_code)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_document_info_series_id
+        ON document_info(series_id)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_document_info_processing_status
+        ON document_info(processing_status)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_document_info_file_hash
+        ON document_info(file_hash)
+    """)
+
+    # 创建 document_item 表
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS document_item (
             id TEXT PRIMARY KEY,
@@ -47,21 +103,21 @@ def init_database():
         )
     """)
 
-    # 创建索引以提高查询性能
+    # 创建 document_item 表索引以提高查询性能
     cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_document_item_document_id 
+        CREATE INDEX IF NOT EXISTS idx_document_item_document_id
         ON document_item(document_id)
     """)
     cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_document_item_page_id 
+        CREATE INDEX IF NOT EXISTS idx_document_item_page_id
         ON document_item(page_id)
     """)
     cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_document_item_label 
+        CREATE INDEX IF NOT EXISTS idx_document_item_label
         ON document_item(label)
     """)
     cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_document_item_is_rag_enabled 
+        CREATE INDEX IF NOT EXISTS idx_document_item_is_rag_enabled
         ON document_item(is_rag_enabled)
     """)
 
@@ -238,7 +294,7 @@ def delete_document_items_by_document(document_id: str) -> int:
 def get_document_stats(document_id: str) -> Dict[str, Any]:
     """
     获取文档统计信息
-    
+
     :param document_id: 文档 ID
     :return: 统计信息字典
     """
@@ -246,7 +302,7 @@ def get_document_stats(document_id: str) -> Dict[str, Any]:
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT 
+        SELECT
             label,
             COUNT(*) as count
         FROM document_item
@@ -263,3 +319,208 @@ def get_document_stats(document_id: str) -> Dict[str, Any]:
     conn.close()
 
     return stats
+
+
+# ==================== document_info 表操作 ====================
+
+
+def insert_document_info(doc_info: Dict[str, Any]) -> None:
+    """
+    插入或更新 document_info 记录
+
+    :param doc_info: 包含所有字段的字典
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO document_info (
+            id, document_code, title, series_id,
+            file_name, file_path, file_hash, file_size, file_format, page_count,
+            revision, publication_date, effective_date, issuer, language,
+            source_type, parser, parser_version,
+            processing_status, processing_started_at, processing_finished_at, processing_error,
+            item_count, text_count, title_count, table_count, picture_count, formula_count,
+            metadata, created_at, updated_at
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (id) DO UPDATE SET
+            document_code = EXCLUDED.document_code,
+            title = EXCLUDED.title,
+            series_id = EXCLUDED.series_id,
+            file_name = EXCLUDED.file_name,
+            file_path = EXCLUDED.file_path,
+            file_hash = EXCLUDED.file_hash,
+            file_size = EXCLUDED.file_size,
+            file_format = EXCLUDED.file_format,
+            page_count = EXCLUDED.page_count,
+            revision = EXCLUDED.revision,
+            publication_date = EXCLUDED.publication_date,
+            effective_date = EXCLUDED.effective_date,
+            issuer = EXCLUDED.issuer,
+            language = EXCLUDED.language,
+            source_type = EXCLUDED.source_type,
+            parser = EXCLUDED.parser,
+            parser_version = EXCLUDED.parser_version,
+            processing_status = EXCLUDED.processing_status,
+            processing_started_at = EXCLUDED.processing_started_at,
+            processing_finished_at = EXCLUDED.processing_finished_at,
+            processing_error = EXCLUDED.processing_error,
+            item_count = EXCLUDED.item_count,
+            text_count = EXCLUDED.text_count,
+            title_count = EXCLUDED.title_count,
+            table_count = EXCLUDED.table_count,
+            picture_count = EXCLUDED.picture_count,
+            formula_count = EXCLUDED.formula_count,
+            metadata = EXCLUDED.metadata,
+            updated_at = CURRENT_TIMESTAMP
+    """, (
+        doc_info.get("id"),
+        doc_info.get("document_code"),
+        doc_info.get("title"),
+        doc_info.get("series_id"),
+        doc_info.get("file_name"),
+        doc_info.get("file_path"),
+        doc_info.get("file_hash"),
+        doc_info.get("file_size"),
+        doc_info.get("file_format"),
+        doc_info.get("page_count"),
+        doc_info.get("revision"),
+        doc_info.get("publication_date"),
+        doc_info.get("effective_date"),
+        doc_info.get("issuer"),
+        doc_info.get("language"),
+        doc_info.get("source_type"),
+        doc_info.get("parser"),
+        doc_info.get("parser_version"),
+        doc_info.get("processing_status"),
+        doc_info.get("processing_started_at"),
+        doc_info.get("processing_finished_at"),
+        doc_info.get("processing_error"),
+        doc_info.get("item_count", 0),
+        doc_info.get("text_count", 0),
+        doc_info.get("title_count", 0),
+        doc_info.get("table_count", 0),
+        doc_info.get("picture_count", 0),
+        doc_info.get("formula_count", 0),
+        json.dumps(doc_info.get("metadata")) if doc_info.get("metadata") else None,
+        datetime.now().isoformat(),
+        datetime.now().isoformat(),
+    ))
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+
+def query_document_info(
+    document_id: Optional[str] = None,
+    document_code: Optional[str] = None,
+    series_id: Optional[str] = None,
+    processing_status: Optional[str] = None,
+    file_hash: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """
+    查询 document_info 记录
+
+    :param document_id: 文档 ID
+    :param document_code: 文档编号
+    :param series_id: 系列 ID
+    :param processing_status: 处理状态
+    :param file_hash: 文件哈希
+    :return: 查询结果列表
+    """
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    conditions = []
+    params = []
+
+    if document_id is not None:
+        conditions.append("id = %s")
+        params.append(document_id)
+    if document_code is not None:
+        conditions.append("document_code = %s")
+        params.append(document_code)
+    if series_id is not None:
+        conditions.append("series_id = %s")
+        params.append(series_id)
+    if processing_status is not None:
+        conditions.append("processing_status = %s")
+        params.append(processing_status)
+    if file_hash is not None:
+        conditions.append("file_hash = %s")
+        params.append(file_hash)
+
+    where_clause = " AND ".join(conditions) if conditions else "TRUE"
+    query = f"SELECT * FROM document_info WHERE {where_clause} ORDER BY created_at DESC"
+
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+
+    results = [dict(row) for row in rows]
+
+    cursor.close()
+    conn.close()
+    return results
+
+
+def update_document_info_stats(
+    document_id: str,
+    stats: Dict[str, int]
+) -> None:
+    """
+    更新文档统计信息（缓存字段）
+
+    :param document_id: 文档 ID
+    :param stats: 统计信息字典，例如 {"item_count": 48, "text_count": 13, ...}
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE document_info SET
+            item_count = %s,
+            text_count = %s,
+            title_count = %s,
+            table_count = %s,
+            picture_count = %s,
+            formula_count = %s,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = %s
+    """, (
+        stats.get("item_count", 0),
+        stats.get("text_count", 0),
+        stats.get("title_count", 0),
+        stats.get("table_count", 0),
+        stats.get("picture_count", 0),
+        stats.get("formula_count", 0),
+        document_id,
+    ))
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+
+def delete_document_info(document_id: str) -> int:
+    """
+    删除文档信息及其关联的 document_items
+
+    :param document_id: 文档 ID
+    :return: 删除的记录数
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # 先删除关联的 document_items
+    cursor.execute("DELETE FROM document_item WHERE document_id = %s", (document_id,))
+
+    # 再删除 document_info
+    cursor.execute("DELETE FROM document_info WHERE id = %s", (document_id,))
+    count = cursor.rowcount
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return count

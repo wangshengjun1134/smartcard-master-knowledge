@@ -2,9 +2,18 @@
 
 ## 概述
 
-本文档描述 SmartCard Master Knowledge Base 项目的数据库表结构。项目使用 SQLite 作为关系型数据库，存储 PDF 文档的结构化提取结果。
+本文档描述 SmartCard Master Knowledge Base 项目的数据库表结构。项目使用 PostgreSQL 作为关系型数据库，存储 PDF 文档的结构化提取结果。
 
-**数据库文件路径**: `data/knowledge.db`
+**数据库名称**: `smartcard_master_knowledge`
+
+项目包含以下两张核心表：
+
+| 表名              | 描述                                       |
+| ---------------- | ---------------------------------------- |
+| `document_info`  | 存储文档元数据、解析状态和统计信息（文档级）                  |
+| `document_item`  | 存储 PDF 解析后的每个结构化项（DocItem，段落/表格/图片级）     |
+
+两张表通过 `document_info.id` ↔ `document_item.document_id` 关联。
 
 ---
 
@@ -130,9 +139,95 @@
 
 ---
 
+## document_info 表
+
+存储文档的元数据、解析状态和统计信息。与 `document_item` 表通过 `id` ↔ `document_id` 关联。
+
+### 表结构
+
+| 字段                          | 类型        | 约束                  | 描述                                                              |
+| --------------------------- | --------- | ------------------- | --------------------------------------------------------------- |
+| `id`                        | TEXT      | PRIMARY KEY         | 文档唯一 ID（UUID / ULID / NanoID）                                      |
+| `document_code`             | TEXT      | 可空                  | 文档编号 / 标准编号，例如 `SGP-001`、`IEC-1234`                              |
+| `title`                     | TEXT      | 可空                  | 文档标题，例如 `Safety Requirements for ...`                           |
+| `series_id`                 | TEXT      | 可空                  | 文档系列 ID，用于关联同一标准的不同 revision                                   |
+| `file_name`                 | TEXT      | NOT NULL            | 原始文件名，例如 `SGP-001-Rev-A.pdf`                                     |
+| `file_path`                 | TEXT      | 可空                  | 原始文件路径（本地路径、对象存储路径等）                                        |
+| `file_hash`                 | TEXT      | 可空                  | 文件 SHA256，用于判断文件是否发生变化、去重                                      |
+| `file_size`                 | INTEGER   | 可空                  | 文件大小，单位：Byte                                                  |
+| `file_format`               | TEXT      | 可空                  | 文件格式，例如 `pdf`、`docx`、`html`                                    |
+| `page_count`                | INTEGER   | 可空                  | 页面数量                                                            |
+| `revision`                  | TEXT      | 可空                  | 修订版本，例如 `A`、`B`、`C`、`Rev.1`                                 |
+| `publication_date`          | TEXT      | 可空                  | 发布日期（ISO 8601 格式：`YYYY-MM-DD`）                                 |
+| `effective_date`            | TEXT      | 可空                  | 生效日期                                                             |
+| `issuer`                    | TEXT      | 可空                  | 发布机构 / 标准组织，例如 `GSMA`、`ISO`、`IEC`                            |
+| `language`                  | TEXT      | 可空                  | 文档语言，例如 `en`、`zh-CN`、`zh-TW`                                  |
+| `source_type`               | TEXT      | 可空                  | 文档来源类型，例如 `upload`、`url`、`api`、`scanner`、`manual`              |
+| `parser`                    | TEXT      | 可空                  | 使用的解析器，例如 `docling`                                         |
+| `parser_version`            | TEXT      | 可空                  | 解析器版本，例如 `2.50.0`                                           |
+| `processing_status`         | TEXT      | 可空                  | 当前处理状态：`pending`、`processing`、`completed`、`failed`                 |
+| `processing_started_at`     | TEXT      | 可空                  | 开始处理时间                                                          |
+| `processing_finished_at`    | TEXT      | 可空                  | 处理完成时间                                                          |
+| `processing_error`          | TEXT      | 可空                  | 解析失败时保存的错误信息                                                 |
+| `item_count`                | INTEGER   | DEFAULT 0           | DocItem 总数量（缓存数据）                                               |
+| `text_count`                | INTEGER   | DEFAULT 0           | 普通文本数量（缓存数据）                                                 |
+| `title_count`               | INTEGER   | DEFAULT 0           | 标题数量（缓存数据）                                                    |
+| `table_count`               | INTEGER   | DEFAULT 0           | 表格数量（缓存数据）                                                    |
+| `picture_count`             | INTEGER   | DEFAULT 0           | 图片数量（缓存数据）                                                    |
+| `formula_count`             | INTEGER   | DEFAULT 0           | 公式数量（缓存数据）                                                    |
+| `metadata`                  | TEXT/JSON | 可空                  | 扩展元数据（JSON 格式）                                               |
+| `created_at`                | TEXT      | DEFAULT CURRENT_TIMESTAMP | 数据创建时间                                                          |
+| `updated_at`                | TEXT      | DEFAULT CURRENT_TIMESTAMP | 数据最后更新时间                                                        |
+
+### 索引
+
+| 索引名称                                    | 字段                  | 类型   |
+| --------------------------------------- | ------------------- | ---- |
+| `idx_document_info_document_code`       | `document_code`     | 普通索引 |
+| `idx_document_info_series_id`           | `series_id`         | 普通索引 |
+| `idx_document_info_processing_status`   | `processing_status` | 普通索引 |
+| `idx_document_info_file_hash`           | `file_hash`         | 普通索引 |
+
+### processing_status 字段可选值
+
+| 值              | 描述    |
+| -------------- | ------ |
+| `pending`      | 等待处理  |
+| `processing`   | 正在处理  |
+| `completed`    | 处理完成  |
+| `failed`       | 处理失败  |
+
+### source_type 字段可选值
+
+| 值          | 描述    |
+| ---------- | ------ |
+| `upload`   | 用户上传  |
+| `url`      | URL 下载 |
+| `api`      | API 同步 |
+| `scanner`  | 扫描导入  |
+| `manual`   | 手动录入  |
+
+### JSON 字段示例
+
+#### metadata（扩展元数据）
+
+```json
+{
+  "author": "John Doe",
+  "department": "Security Engineering",
+  "source_url": "https://example.com/standards/SGP-001.pdf",
+  "document_type": "standard",
+  "keywords": ["eSIM", "Remote Provisioning", "Security"]
+}
+```
+
+---
+
 ## DDL（数据定义语言）
 
 ### 建表语句
+
+#### document_item 表
 
 ```sql
 CREATE TABLE IF NOT EXISTS document_item (
@@ -153,7 +248,47 @@ CREATE TABLE IF NOT EXISTS document_item (
 );
 ```
 
+#### document_info 表
+
+```sql
+CREATE TABLE IF NOT EXISTS document_info (
+    id TEXT PRIMARY KEY,
+    document_code TEXT,
+    title TEXT,
+    series_id TEXT,
+    file_name TEXT NOT NULL,
+    file_path TEXT,
+    file_hash TEXT,
+    file_size INTEGER,
+    file_format TEXT,
+    page_count INTEGER,
+    revision TEXT,
+    publication_date TEXT,
+    effective_date TEXT,
+    issuer TEXT,
+    language TEXT,
+    source_type TEXT,
+    parser TEXT,
+    parser_version TEXT,
+    processing_status TEXT,
+    processing_started_at TEXT,
+    processing_finished_at TEXT,
+    processing_error TEXT,
+    item_count INTEGER DEFAULT 0,
+    text_count INTEGER DEFAULT 0,
+    title_count INTEGER DEFAULT 0,
+    table_count INTEGER DEFAULT 0,
+    picture_count INTEGER DEFAULT 0,
+    formula_count INTEGER DEFAULT 0,
+    metadata TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+```
+
 ### 索引创建语句
+
+#### document_item 表索引
 
 ```sql
 -- 按文档 ID 查询索引
@@ -171,6 +306,26 @@ ON document_item(label);
 -- 按 RAG 启用状态查询索引
 CREATE INDEX IF NOT EXISTS idx_document_item_is_rag_enabled 
 ON document_item(is_rag_enabled);
+```
+
+#### document_info 表索引
+
+```sql
+-- 按文档编号查询索引
+CREATE INDEX IF NOT EXISTS idx_document_info_document_code 
+ON document_info(document_code);
+
+-- 按系列 ID 查询索引
+CREATE INDEX IF NOT EXISTS idx_document_info_series_id 
+ON document_info(series_id);
+
+-- 按处理状态查询索引
+CREATE INDEX IF NOT EXISTS idx_document_info_processing_status 
+ON document_info(processing_status);
+
+-- 按文件哈希查询索引（用于去重）
+CREATE INDEX IF NOT EXISTS idx_document_info_file_hash 
+ON document_info(file_hash);
 ```
 
 ---

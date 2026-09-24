@@ -7,6 +7,11 @@ from .database import (
     query_document_items,
     delete_document_items_by_document,
     get_document_stats,
+    # document_info 表操作
+    insert_document_info,
+    query_document_info,
+    update_document_info_stats,
+    delete_document_info,
 )
 from .pdf_parser import PDFParser
 from .extractors import (
@@ -25,13 +30,18 @@ from .extractors import (
 )
 
 __all__ = [
-    # database
+    # database - document_item
     "init_database",
     "insert_document_item",
     "insert_document_items",
     "query_document_items",
     "delete_document_items_by_document",
     "get_document_stats",
+    # database - document_info
+    "insert_document_info",
+    "query_document_info",
+    "update_document_info_stats",
+    "delete_document_info",
     # pdf_parser
     "PDFParser",
     # extractors
