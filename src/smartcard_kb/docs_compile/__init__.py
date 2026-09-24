@@ -7,6 +7,9 @@ from .database import (
     query_document_items,
     delete_document_items_by_document,
     get_document_stats,
+    # textualization 相关
+    update_item_textualization,
+    query_items_needing_textualization,
     # document_info 表操作
     insert_document_info,
     query_document_info,
@@ -28,6 +31,17 @@ from .extractors import (
     get_extractor,
     extract_item,
 )
+from .textualize import (
+    textualize_item,
+    textualize_all_items,
+    Textualizer,
+    TextTextualizer,
+    TableTextualizer,
+    PictureTextualizer,
+    FormulaTextualizer,
+    ListTextualizer,
+    ReferenceTextualizer,
+)
 
 __all__ = [
     # database - document_item
@@ -37,6 +51,9 @@ __all__ = [
     "query_document_items",
     "delete_document_items_by_document",
     "get_document_stats",
+    # database - textualization
+    "update_item_textualization",
+    "query_items_needing_textualization",
     # database - document_info
     "insert_document_info",
     "query_document_info",
@@ -57,4 +74,14 @@ __all__ = [
     "extractors",
     "get_extractor",
     "extract_item",
+    # textualize
+    "textualize_item",
+    "textualize_all_items",
+    "Textualizer",
+    "TextTextualizer",
+    "TableTextualizer",
+    "PictureTextualizer",
+    "FormulaTextualizer",
+    "ListTextualizer",
+    "ReferenceTextualizer",
 ]

@@ -97,6 +97,7 @@ def init_database():
             metadata JSONB,
             content JSONB,
             is_rag_enabled BOOLEAN DEFAULT TRUE,
+            textualization TEXT,
             raw_json JSONB,
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -119,6 +120,19 @@ def init_database():
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_document_item_is_rag_enabled
         ON document_item(is_rag_enabled)
+    """)
+
+    # 为已存在的表添加 textualization 字段（如果不存在）
+    cursor.execute("""
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_name = 'document_item' AND column_name = 'textualization'
+            ) THEN
+                ALTER TABLE document_item ADD COLUMN textualization TEXT;
+            END IF;
+        END $$;
     """)
 
     conn.commit()
@@ -274,7 +288,7 @@ def query_document_items(
 def delete_document_items_by_document(document_id: str) -> int:
     """
     删除指定文档的所有 item
-    
+
     :param document_id: 文档 ID
     :return: 删除的记录数
     """
@@ -289,6 +303,72 @@ def delete_document_items_by_document(document_id: str) -> int:
     conn.close()
 
     return count
+
+
+def update_item_textualization(item_id: str, textualization: str) -> None:
+    """
+    更新 item 的 textualization 字段
+
+    :param item_id: item ID
+    :param textualization: 文本化内容
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE document_item 
+        SET textualization = %s, updated_at = CURRENT_TIMESTAMP
+        WHERE id = %s
+    """, (textualization, item_id))
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+
+def query_items_needing_textualization(
+    document_id: Optional[str] = None,
+    label: Optional[str] = None,
+    limit: int = 100
+) -> List[Dict[str, Any]]:
+    """
+    查询需要文本化的 item（textualization 为 NULL 的记录）
+
+    :param document_id: 文档 ID（可选）
+    :param label: 类型（可选）
+    :param limit: 返回数量限制
+    :return: 需要文本化的 item 列表
+    """
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    conditions = ["textualization IS NULL"]
+    params = []
+
+    if document_id is not None:
+        conditions.append("document_id = %s")
+        params.append(document_id)
+    if label is not None:
+        conditions.append("label = %s")
+        params.append(label)
+
+    where_clause = " AND ".join(conditions)
+    query = f"""
+        SELECT * FROM document_item 
+        WHERE {where_clause} 
+        ORDER BY order_index 
+        LIMIT %s
+    """
+    params.append(limit)
+
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+
+    results = [dict(row) for row in rows]
+
+    cursor.close()
+    conn.close()
+    return results
 
 
 def get_document_stats(document_id: str) -> Dict[str, Any]:

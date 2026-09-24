@@ -36,6 +36,7 @@
 | `metadata`       | TEXT/JSON | 可空                  | 通用元数据，例如章节、标题层级、来源等（JSON 格式）                                    |
 | `content`        | TEXT/JSON | 可空                  | 当前类型特有的结构化内容（JSON 格式）                                           |
 | `is_rag_enabled` | BOOLEAN   | DEFAULT 1, INDEX    | 是否允许该 DocItem 参与 RAG（1=启用，0=禁用）                                  |
+| `textualization` | TEXT      | 可空                  | 文本化后的内容，用于 RAG 检索（将图片/VLM 等内容转换为文本）                           |
 | `raw_json`       | TEXT/JSON | 可空                  | Docling 原始 DocItem 数据，便于后续重新处理（JSON 格式）                          |
 | `created_at`     | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 数据创建时间                                                          |
 | `updated_at`     | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 数据最后更新时间                                                        |
@@ -242,6 +243,7 @@ CREATE TABLE IF NOT EXISTS document_item (
     metadata TEXT,
     content TEXT,
     is_rag_enabled BOOLEAN DEFAULT FALSE,
+    textualization TEXT,
     raw_json TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -329,6 +331,57 @@ ON document_info(file_hash);
 ```
 
 ---
+
+## textualization 字段说明
+
+`textualization` 字段用于将各种类型的 DocItem 转换为可用于 RAG 检索的纯文本格式。
+
+### 各类型的文本化规则
+
+| 类型               | 文本化输出格式                  | 说明                                      |
+| ----------------- | -------------------------- | --------------------------------------- |
+| `text`            | 纯文本                       | 直接返回 text 字段，附带标题路径信息                      |
+| `section_header`  | Markdown 标题                | 使用 `#` 标记层级，如 `## 标题内容`                    |
+| `table`           | Markdown 表格                | 返回 Markdown 格式的表格内容，附带位置信息                  |
+| `picture`         | VLM 生成的文本描述              | 调用视觉语言模型（VLM）生成图片描述，默认使用远程 API，预留本地方式 |
+| `formula`         | LaTeX/文本                   | 返回 `[公式] LaTeX内容` 格式                      |
+| `list_item`       | Markdown 列表项               | 返回 `- 列表内容` 格式                           |
+| `document_index`  | Markdown 索引                 | 返回 `[文档索引]\n索引内容` 格式                      |
+
+### VLM 图片描述
+
+图片类型的文本化需要调用 VLM（Vision Language Model）：
+
+```python
+from smartcard_kb.docs_compile import textualize_all_items, create_vlm_backend
+
+# 创建 VLM 后端（远程 API）
+vlm_backend = create_vlm_backend(
+    backend_type="openai",
+    api_key="your-api-key",
+    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+    model="qwen-vl-max"
+)
+
+# 文本化所有待处理的 item
+stats = textualize_all_items(
+    document_id="SGP.01-v1.12",
+    vlm_backend=vlm_backend,
+    batch_size=50
+)
+print(f"处理完成: {stats}")
+```
+
+### 预留本地方式
+
+本地 VLM 后端已预留接口，使用本地模型路径初始化：
+
+```python
+vlm_backend = create_vlm_backend(
+    backend_type="local",
+    model_path="/path/to/local/vlm/model"
+)
+```
 
 ---
 
