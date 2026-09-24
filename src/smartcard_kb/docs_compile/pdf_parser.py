@@ -122,21 +122,10 @@ class PDFParser:
             text = None
             content = None
             metadata = {}
-            raw_json = None
 
             # 尝试获取原始文本
             try:
                 text = item.text if hasattr(item, 'text') else None
-            except Exception:
-                pass
-
-            # 保存原始数据
-            try:
-                raw_json = {
-                    "label": label,
-                    "text": text,
-                    "level": level,
-                }
             except Exception:
                 pass
 
@@ -178,6 +167,13 @@ class PDFParser:
 
             # 添加层级信息到 metadata
             metadata["level"] = level
+
+            # 保存原始数据（在所有类型处理后，确保 text 是最终值）
+            raw_json = {
+                "label": label,
+                "text": text,
+                "level": level,
+            }
 
             # 构建 item 字典
             item_dict = {
