@@ -98,6 +98,59 @@ def list_document_items(
     return items[offset:offset + limit]
 
 
+@router.get("/{document_id}/items/stats")
+def get_item_statistics(document_id: str):
+    """
+    获取文档 item 统计信息
+
+    - **document_id**: 文档 ID
+    """
+    items = query_document_items(document_id=document_id)
+
+    # 按类型统计
+    type_stats = {}
+    for item in items:
+        label = item.get("label", "unknown")
+        type_stats[label] = type_stats.get(label, 0) + 1
+
+    # 文本化统计
+    textualized = sum(1 for i in items if i.get("textualization"))
+    needs_textualization = len(items) - textualized
+
+    return {
+        "document_id": document_id,
+        "total_items": len(items),
+        "textualized": textualized,
+        "needs_textualization": needs_textualization,
+        "type_distribution": type_stats,
+    }
+
+
+@router.get("/{document_id}/items/needs-textualization")
+def get_items_needing_textualization(
+    document_id: str,
+    label: Optional[str] = None,
+    limit: int = Query(default=100, le=1000),
+):
+    """
+    获取需要文本化的 item 列表
+
+    - **document_id**: 文档 ID
+    - **label**: 类型（可选）
+    - **limit**: 返回数量限制
+    """
+    items = query_items_needing_textualization(
+        document_id=document_id,
+        label=label,
+        limit=limit,
+    )
+
+    return {
+        "total": len(items),
+        "items": items,
+    }
+
+
 @router.get("/{document_id}/items/{item_id}", response_model=DocItemResponse)
 def get_document_item(document_id: str, item_id: str):
     """获取单个文档 item"""
@@ -196,56 +249,3 @@ def textualize_single_item(
         return updated_item
     else:
         raise HTTPException(status_code=500, detail="文本化失败")
-
-
-@router.get("/{document_id}/items/needs-textualization")
-def get_items_needing_textualization(
-    document_id: str,
-    label: Optional[str] = None,
-    limit: int = Query(default=100, le=1000),
-):
-    """
-    获取需要文本化的 item 列表
-
-    - **document_id**: 文档 ID
-    - **label**: 类型（可选）
-    - **limit**: 返回数量限制
-    """
-    items = query_items_needing_textualization(
-        document_id=document_id,
-        label=label,
-        limit=limit,
-    )
-
-    return {
-        "total": len(items),
-        "items": items,
-    }
-
-
-@router.get("/{document_id}/items/stats")
-def get_item_statistics(document_id: str):
-    """
-    获取文档 item 统计信息
-
-    - **document_id**: 文档 ID
-    """
-    items = query_document_items(document_id=document_id)
-
-    # 按类型统计
-    type_stats = {}
-    for item in items:
-        label = item.get("label", "unknown")
-        type_stats[label] = type_stats.get(label, 0) + 1
-
-    # 文本化统计
-    textualized = sum(1 for i in items if i.get("textualization"))
-    needs_textualization = len(items) - textualized
-
-    return {
-        "document_id": document_id,
-        "total_items": len(items),
-        "textualized": textualized,
-        "needs_textualization": needs_textualization,
-        "type_distribution": type_stats,
-    }
