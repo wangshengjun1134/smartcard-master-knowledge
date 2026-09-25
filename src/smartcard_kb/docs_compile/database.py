@@ -277,7 +277,17 @@ def query_document_items(
     results = []
     for row in rows:
         item = dict(row)
-        # PostgreSQL JSONB 字段会自动解析为 Python 对象
+        # 反序列化 JSON 字段
+        for json_field in ["bbox", "metadata", "content", "raw_json"]:
+            if item.get(json_field) and isinstance(item[json_field], str):
+                try:
+                    item[json_field] = json.loads(item[json_field])
+                except (json.JSONDecodeError, TypeError):
+                    item[json_field] = None
+        # 转换 datetime 为字符串
+        for dt_field in ["created_at", "updated_at", "processing_started_at", "processing_finished_at"]:
+            if item.get(dt_field) and hasattr(item[dt_field], 'isoformat'):
+                item[dt_field] = item[dt_field].isoformat()
         results.append(item)
 
     cursor.close()
