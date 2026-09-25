@@ -9,22 +9,25 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Progress } from '@/components/ui/progress'
+import { useToast } from '@/hooks/use-toast'
 import { formatDate, truncateText } from '@/lib/utils'
-import { ArrowLeft, FileText, Table2, Image, List, Hash, BookOpen } from 'lucide-react'
+import { ArrowLeft, FileText, Table2, Image, List, Hash, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react'
 
 export default function DocumentDetail() {
   const params = useParams()
   const router = useRouter()
+  const { toast } = useToast()
   const documentId = params.id as string
 
   const [document, setDocument] = useState<DocumentInfo | null>(null)
   const [items, setItems] = useState<DocItem[]>([])
   const [stats, setStats] = useState<ItemStatistics | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('items')
   const [filterLabel, setFilterLabel] = useState<string>('')
   const [textualizing, setTextualizing] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 20
 
   useEffect(() => {
     loadData()
@@ -42,6 +45,11 @@ export default function DocumentDetail() {
       setStats(docStats)
     } catch (error) {
       console.error('Failed to load document:', error)
+      toast({
+        title: '加载失败',
+        description: '无法加载文档详情',
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }
@@ -50,16 +58,24 @@ export default function DocumentDetail() {
   const handleTextualize = async () => {
     setTextualizing(true)
     try {
-      await textualizeItems({
+      const result = await textualizeItems({
         document_id: documentId,
         vlm_backend_type: 'openai',
         vlm_model: 'qwen-vl-max',
         dry_run: false,
       })
+      toast({
+        title: '文本化完成',
+        description: `成功: ${result.stats.success}, 失败: ${result.stats.failed}`,
+      })
       await loadData()
     } catch (error) {
       console.error('Failed to textualize:', error)
-      alert('文本化失败，请重试')
+      toast({
+        title: '文本化失败',
+        description: '请重试',
+        variant: 'destructive',
+      })
     } finally {
       setTextualizing(false)
     }
@@ -68,6 +84,13 @@ export default function DocumentDetail() {
   const filteredItems = filterLabel
     ? items.filter(item => item.label === filterLabel)
     : items
+
+  // 分页计算
+  const totalPages = Math.ceil(filteredItems.length / pageSize)
+  const paginatedItems = filteredItems.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  )
 
   const getLabelIcon = (label: string) => {
     const icons: Record<string, React.ReactNode> = {
@@ -83,14 +106,14 @@ export default function DocumentDetail() {
 
   const getLabelColor = (label: string) => {
     const colors: Record<string, string> = {
-      text: 'bg-blue-100 text-blue-800',
-      section_header: 'bg-purple-100 text-purple-800',
-      table: 'bg-green-100 text-green-800',
-      picture: 'bg-pink-100 text-pink-800',
-      list_item: 'bg-yellow-100 text-yellow-800',
-      document_index: 'bg-gray-100 text-gray-800',
+      text: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+      section_header: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+      table: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+      picture: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200',
+      list_item: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+      document_index: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
     }
-    return colors[label] || 'bg-gray-100 text-gray-800'
+    return colors[label] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
   }
 
   if (loading) {
@@ -114,6 +137,10 @@ export default function DocumentDetail() {
     )
   }
 
+  const textualizationProgress = stats
+    ? Math.round((stats.textualized / stats.total_items) * 100)
+    : 0
+
   return (
     <div className="min-h-screen bg-background">
       {/* 导航栏 */}
@@ -126,7 +153,7 @@ export default function DocumentDetail() {
                 返回
               </Button>
             </Link>
-            <h1 className="text-xl font-bold">{document.file_name}</h1>
+            <h1 className="text-xl font-bold truncate max-w-md">{document.file_name}</h1>
           </div>
           <Button onClick={handleTextualize} disabled={textualizing}>
             {textualizing ? '文本化中...' : '批量文本化'}
@@ -181,6 +208,17 @@ export default function DocumentDetail() {
                 <div className="font-medium">{stats?.needs_textualization || 0}</div>
               </div>
             </div>
+
+            {/* 文本化进度 */}
+            {stats && stats.total_items > 0 && (
+              <div className="mt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted-foreground">文本化进度</span>
+                  <span className="text-sm font-medium">{textualizationProgress}%</span>
+                </div>
+                <Progress value={textualizationProgress} className="h-2" />
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -241,18 +279,22 @@ export default function DocumentDetail() {
         {/* Item 列表 */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <CardTitle>文档内容</CardTitle>
                 <CardDescription>
                   共 {filteredItems.length} 个 Item
+                  {filterLabel && ` (过滤: ${filterLabel})`}
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
                 <select
                   value={filterLabel}
-                  onChange={(e) => setFilterLabel(e.target.value)}
-                  className="px-3 py-1 border rounded-md text-sm"
+                  onChange={(e) => {
+                    setFilterLabel(e.target.value)
+                    setCurrentPage(1)
+                  }}
+                  className="px-3 py-1 border rounded-md text-sm bg-background"
                 >
                   <option value="">所有类型</option>
                   <option value="text">文本</option>
@@ -277,7 +319,7 @@ export default function DocumentDetail() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredItems.map((item) => (
+                {paginatedItems.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-mono text-sm">{item.order_index}</TableCell>
                     <TableCell>
@@ -317,6 +359,56 @@ export default function DocumentDetail() {
                 ))}
               </TableBody>
             </Table>
+
+            {/* 分页控件 */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-muted-foreground">
+                  第 {currentPage} / {totalPages} 页，共 {filteredItems.length} 条
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let page: number
+                    if (totalPages <= 5) {
+                      page = i + 1
+                    } else if (currentPage <= 3) {
+                      page = i + 1
+                    } else if (currentPage >= totalPages - 2) {
+                      page = totalPages - 4 + i
+                    } else {
+                      page = currentPage - 2 + i
+                    }
+                    return (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setCurrentPage(page)}
+                        className="w-8 h-8 p-0"
+                      >
+                        {page}
+                      </Button>
+                    )
+                  })}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </main>
