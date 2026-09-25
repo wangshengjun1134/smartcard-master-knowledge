@@ -47,6 +47,7 @@ export default function Home() {
     issuer: '',
     language: 'en',
   })
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   useEffect(() => {
     loadDocuments()
@@ -68,14 +69,20 @@ export default function Home() {
     }
   }
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const handleUpload = async () => {
+    if (!selectedFile) {
+      toast({
+        title: '请选择文件',
+        description: '请先选择要上传的 PDF 文件',
+        variant: 'destructive',
+      })
+      return
+    }
 
     setUploading(true)
     try {
       const formData = new FormData()
-      formData.append('file', file)
+      formData.append('file', selectedFile)
       formData.append('document_code', uploadForm.document_code)
       formData.append('title', uploadForm.title)
       formData.append('issuer', uploadForm.issuer)
@@ -84,11 +91,12 @@ export default function Home() {
       await uploadDocument(formData)
       toast({
         title: '上传成功',
-        description: `${file.name} 已上传并开始解析`,
+        description: `${selectedFile.name} 已上传并开始解析`,
       })
       await loadDocuments()
       setUploadDialogOpen(false)
       setUploadForm({ document_code: '', title: '', issuer: '', language: 'en' })
+      setSelectedFile(null)
     } catch (error) {
       console.error('Failed to upload document:', error)
       toast({
@@ -207,9 +215,14 @@ export default function Home() {
                       id="file"
                       type="file"
                       accept=".pdf"
-                      onChange={handleUpload}
+                      onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
                       disabled={uploading}
                     />
+                    {selectedFile && (
+                      <p className="text-sm text-muted-foreground">
+                        已选择: {selectedFile.name} ({formatFileSize(selectedFile.size)})
+                      </p>
+                    )}
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="document_code">文档编号</Label>
@@ -256,8 +269,11 @@ export default function Home() {
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>
+                  <Button variant="outline" onClick={() => setUploadDialogOpen(false)} disabled={uploading}>
                     取消
+                  </Button>
+                  <Button onClick={handleUpload} disabled={uploading || !selectedFile}>
+                    {uploading ? '上传中...' : '上传'}
                   </Button>
                 </DialogFooter>
               </DialogContent>
