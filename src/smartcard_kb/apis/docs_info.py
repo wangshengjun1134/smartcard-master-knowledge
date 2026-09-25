@@ -155,6 +155,113 @@ def list_documents(
     )
 
 
+@router.get("/tree")
+def get_document_tree():
+    """
+    获取文档树（基于 specs 目录结构）
+    """
+    import os
+    from pathlib import Path
+
+    specs_dir = Path("specs")
+    if not specs_dir.exists():
+        return {"tree": [], "files": []}
+
+    # 扫描 specs 目录获取所有 PDF 文件
+    pdf_files = []
+    for root, dirs, files in os.walk(specs_dir):
+        for file in files:
+            if file.lower().endswith('.pdf'):
+                full_path = Path(root) / file
+                relative_path = full_path.relative_to(specs_dir)
+                pdf_files.append({
+                    "path": str(relative_path),
+                    "name": file,
+                    "directory": str(relative_path.parent) if str(relative_path.parent) != "." else "",
+                })
+
+    # 获取数据库中的文档信息
+    all_docs = query_document_info()
+    doc_map = {doc.get("file_name"): doc for doc in all_docs}
+
+    # 构建树形结构
+    def build_tree(files):
+        tree = {}
+        for file_info in files:
+            parts = file_info["directory"].split("/") if file_info["directory"] else []
+            current = tree
+            for part in parts:
+                if part not in current:
+                    current[part] = {"_dirs": {}, "_files": []}
+                current = current[part]["_dirs"]
+
+            # 添加文件
+            parent = tree
+            for part in parts:
+                parent = parent[part]["_dirs"] if part in parent else tree
+
+            # 找到正确的父节点
+            if parts:
+                node = tree
+                for part in parts[:-1]:
+                    node = node[part]["_dirs"]
+                parent_node = node[parts[-1]] if parts[-1] in node else None
+                if parent_node:
+                    parent_node["_files"].append(file_info)
+                else:
+                    # 创建新节点
+                    node[parts[-1]] = {"_dirs": {}, "_files": [file_info]}
+            else:
+                if "_files" not in tree:
+                    tree["_files"] = []
+                tree["_files"].append(file_info)
+
+        return tree
+
+    tree = build_tree(pdf_files)
+
+    # 转换为前端可用的格式
+    def tree_to_nodes(tree_node, path=""):
+        nodes = []
+
+        # 添加目录
+        dirs = tree_node.get("_dirs", {})
+        for dir_name in sorted(dirs.keys()):
+            dir_path = f"{path}/{dir_name}" if path else dir_name
+            dir_node = dirs[dir_name]
+            children = tree_to_nodes(dir_node, dir_path)
+            file_count = sum(1 for c in children if c.get("type") == "file")
+            nodes.append({
+                "id": dir_path,
+                "label": dir_name,
+                "type": "directory",
+                "count": file_count,
+                "children": children,
+            })
+
+        # 添加文件
+        files = tree_node.get("_files", [])
+        for file_info in sorted(files, key=lambda x: x["name"]):
+            file_name = file_info["name"]
+            doc_info = doc_map.get(file_name)
+            nodes.append({
+                "id": file_info["path"],
+                "label": file_name,
+                "type": "file",
+                "document": doc_info,
+                "path": file_info["path"],
+            })
+
+        return nodes
+
+    tree_nodes = tree_to_nodes(tree)
+
+    return {
+        "tree": tree_nodes,
+        "files": pdf_files,
+    }
+
+
 @router.get("/{document_id}", response_model=DocumentInfoResponse)
 def get_document(document_id: str):
     """获取单个文档信息"""

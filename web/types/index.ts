@@ -89,3 +89,14 @@ export interface ItemStatistics {
   needs_textualization: number
   type_distribution: Record<string, number>
 }
+
+// 文档树节点类型
+export interface TreeNode {
+  id: string
+  label: string
+  type: 'directory' | 'file'
+  count?: number
+  children?: TreeNode[]
+  document?: DocumentInfo
+  path?: string
+}

@@ -1,125 +1,121 @@
 "use client"
 
-import { useState } from 'react'
-import { ChevronRight, ChevronDown, FileText, Folder, Hash } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ChevronRight, ChevronDown, FileText, Folder } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { DocumentInfo } from '@/types'
+import { getDocumentTree } from '@/lib/api'
+import type { TreeNode } from '@/types'
+import Link from 'next/link'
 
-interface TreeNode {
-  id: string
-  label: string
-  type: 'series' | 'document'
-  children?: TreeNode[]
-  document?: DocumentInfo
-  count?: number
-}
+export function DocumentTree() {
+  const [treeNodes, setTreeNodes] = useState<TreeNode[]>([])
+  const [loading, setLoading] = useState(true)
+  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set())
 
-interface DocumentTreeProps {
-  documents: DocumentInfo[]
-  selectedId?: string
-  onSelect?: (doc: DocumentInfo) => void
-}
+  useEffect(() => {
+    loadTree()
+  }, [])
 
-export function DocumentTree({ documents, selectedId, onSelect }: DocumentTreeProps) {
-  // 构建树形结构
-  const treeNodes = buildTree(documents)
+  const loadTree = async () => {
+    try {
+      const result = await getDocumentTree()
+      setTreeNodes(result.tree)
+    } catch (error) {
+      console.error('Failed to load document tree:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const toggleDir = (dirId: string) => {
+    setExpandedDirs(prev => {
+      const next = new Set(prev)
+      if (next.has(dirId)) {
+        next.delete(dirId)
+      } else {
+        next.add(dirId)
+      }
+      return next
+    })
+  }
+
+  // 统计文件总数
+  const countFiles = (nodes: TreeNode[]): number => {
+    let count = 0
+    for (const node of nodes) {
+      if (node.type === 'file') {
+        count++
+      } else if (node.children) {
+        count += countFiles(node.children)
+      }
+    }
+    return count
+  }
+
+  const totalFiles = countFiles(treeNodes)
 
   return (
     <div className="space-y-1">
-      {treeNodes.map((node) => (
-        <TreeNodeItem
-          key={node.id}
-          node={node}
-          selectedId={selectedId}
-          onSelect={onSelect}
-        />
-      ))}
+      <div className="px-2 py-1.5 text-xs text-muted-foreground">
+        {totalFiles} 个文件
+      </div>
+      {loading ? (
+        <div className="px-2 py-4 text-sm text-muted-foreground text-center">
+          加载中...
+        </div>
+      ) : (
+        treeNodes.map((node) => (
+          <TreeNodeItem
+            key={node.id}
+            node={node}
+            expandedDirs={expandedDirs}
+            onToggle={toggleDir}
+          />
+        ))
+      )}
     </div>
   )
 }
 
-function buildTree(documents: DocumentInfo[]): TreeNode[] {
-  // 按 series_id 分组
-  const seriesMap = new Map<string, DocumentInfo[]>()
-
-  documents.forEach((doc) => {
-    const series = doc.series_id || 'uncategorized'
-    const docs = seriesMap.get(series) || []
-    docs.push(doc)
-    seriesMap.set(series, docs)
-  })
-
-  const nodes: TreeNode[] = []
-
-  seriesMap.forEach((docs, seriesId) => {
-    if (seriesId === 'uncategorized') {
-      // 没有 series_id 的文档直接作为节点
-      docs.forEach((doc) => {
-        nodes.push({
-          id: doc.id,
-          label: doc.document_code || doc.file_name,
-          type: 'document',
-          document: doc,
-        })
-      })
-    } else {
-      nodes.push({
-        id: seriesId,
-        label: seriesId,
-        type: 'series',
-        count: docs.length,
-        children: docs.map((doc) => ({
-          id: doc.id,
-          label: doc.document_code || doc.file_name,
-          type: 'document',
-          document: doc,
-        })),
-      })
-    }
-  })
-
-  return nodes
-}
-
 function TreeNodeItem({
   node,
-  selectedId,
-  onSelect,
+  expandedDirs,
+  onToggle,
 }: {
   node: TreeNode
-  selectedId?: string
-  onSelect?: (doc: DocumentInfo) => void
+  expandedDirs: Set<string>
+  onToggle: (dirId: string) => void
 }) {
-  const [expanded, setExpanded] = useState(node.type === 'series')
+  const isExpanded = expandedDirs.has(node.id)
 
-  if (node.type === 'series' && node.children) {
+  if (node.type === 'directory' && node.children) {
     return (
       <div>
         <button
-          onClick={() => setExpanded(!expanded)}
+          onClick={() => onToggle(node.id)}
           className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
         >
-          {expanded ? (
+          {isExpanded ? (
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
           ) : (
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           )}
           <Folder className="h-4 w-4 text-blue-500" />
-          <span className="font-medium">{node.label}</span>
+          <span className="font-medium truncate">{node.label}</span>
           {node.count !== undefined && (
-            <span className="ml-auto text-xs text-muted-foreground">
+            <span className="ml-auto text-xs text-muted-foreground shrink-0">
               {node.count}
             </span>
           )}
         </button>
-        {expanded && (
-          <div className="ml-4 mt-1 space-y-1">
+        {isExpanded && (
+          <div className="ml-4 mt-0.5 space-y-0.5">
             {node.children.map((child) => (
               <TreeNodeItem
                 key={child.id}
                 node={child}
-                selectedId={selectedId}
-                onSelect={onSelect}
+                expandedDirs={expandedDirs}
+                onToggle={onToggle}
               />
             ))}
           </div>
@@ -128,22 +124,44 @@ function TreeNodeItem({
     )
   }
 
-  if (node.type === 'document' && node.document) {
-    const isSelected = selectedId === node.id
+  if (node.type === 'file') {
+    const hasDoc = !!node.document
+    const status = node.document?.processing_status
 
     return (
-      <button
-        onClick={() => onSelect?.(node.document!)}
+      <Link
+        href={hasDoc ? `/docs/${node.document!.id}` : '#'}
         className={cn(
           'flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded-md transition-colors',
-          isSelected
-            ? 'bg-accent text-accent-foreground'
-            : 'hover:bg-accent hover:text-accent-foreground'
+          hasDoc
+            ? 'hover:bg-accent hover:text-accent-foreground cursor-pointer'
+            : 'text-muted-foreground cursor-default'
         )}
+        onClick={(e) => {
+          if (!hasDoc) {
+            e.preventDefault()
+          }
+        }}
       >
-        <FileText className="h-4 w-4 text-muted-foreground" />
+        <FileText className={cn(
+          "h-4 w-4 shrink-0",
+          hasDoc ? "text-muted-foreground" : "text-muted-foreground/50"
+        )} />
         <span className="truncate">{node.label}</span>
-      </button>
+        {hasDoc && status && (
+          <span className={cn(
+            "ml-auto text-xs shrink-0",
+            status === 'completed' ? "text-green-500" :
+            status === 'processing' ? "text-blue-500" :
+            status === 'failed' ? "text-red-500" :
+            "text-yellow-500"
+          )}>
+            {status === 'completed' ? '✓' :
+             status === 'processing' ? '⋯' :
+             status === 'failed' ? '✗' : '○'}
+          </span>
+        )}
+      </Link>
     )
   }
 

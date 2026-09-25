@@ -198,12 +198,7 @@ export default function Home() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-2">
-                <DocumentTree
-                  documents={documents}
-                  onSelect={(doc) => {
-                    // 可以在这里添加选中文档的逻辑
-                  }}
-                />
+                <DocumentTree />
               </CardContent>
             </Card>
           </div>

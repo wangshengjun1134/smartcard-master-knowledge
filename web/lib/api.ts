@@ -30,6 +30,14 @@ export async function listDocuments(params?: {
   return response.data
 }
 
+export async function getDocumentTree(): Promise<{
+  tree: TreeNode[]
+  files: { path: string; name: string; directory: string }[]
+}> {
+  const response = await api.get('/api/docs/tree')
+  return response.data
+}
+
 export async function getDocument(documentId: string): Promise<DocumentInfo> {
   const response = await api.get(`/api/docs/${documentId}`)
   return response.data
