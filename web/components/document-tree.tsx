@@ -19,7 +19,12 @@ export function DocumentTree() {
   const loadTree = async () => {
     try {
       const result = await getDocumentTree()
-      setTreeNodes(result.tree)
+      // API 现在返回单个树节点，需要提取 children
+      if (result.tree && result.tree.children) {
+        setTreeNodes(result.tree.children)
+      } else if (Array.isArray(result.tree)) {
+        setTreeNodes(result.tree)
+      }
     } catch (error) {
       console.error('Failed to load document tree:', error)
     } finally {

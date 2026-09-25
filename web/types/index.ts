@@ -95,8 +95,8 @@ export interface TreeNode {
   id: string
   label: string
   type: 'directory' | 'file'
+  path?: string
   count?: number
   children?: TreeNode[]
   document?: DocumentInfo
-  path?: string
 }

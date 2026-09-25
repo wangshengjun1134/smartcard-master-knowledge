@@ -158,113 +158,95 @@ def list_documents(
 @router.get("/tree")
 def get_document_tree():
     """
-    获取文档树（基于 specs 目录结构）
+    获取文档树（基于 specs 目录结构，显示所有目录包括空目录）
     """
     import os
     from pathlib import Path
 
     specs_dir = Path("specs")
     if not specs_dir.exists():
-        return {"tree": [], "files": []}
-
-    # 扫描 specs 目录获取所有 PDF 文件
-    pdf_files = []
-    for root, dirs, files in os.walk(specs_dir):
-        for file in files:
-            if file.lower().endswith('.pdf'):
-                full_path = Path(root) / file
-                relative_path = full_path.relative_to(specs_dir)
-                pdf_files.append({
-                    "path": str(relative_path),
-                    "name": file,
-                    "directory": str(relative_path.parent) if str(relative_path.parent) != "." else "",
-                })
+        return {"tree": [], "stats": {"directories": 0, "files": 0}}
 
     # 获取数据库中的文档信息
     all_docs = query_document_info()
     doc_map = {doc.get("file_name"): doc for doc in all_docs}
 
-    # 构建树形结构
-    def build_tree(files):
-        tree = {}
-        for file_info in files:
-            dir_path = file_info["directory"]
-            if not dir_path:
-                # 根目录文件
-                if "_root_files" not in tree:
-                    tree["_root_files"] = []
-                tree["_root_files"].append(file_info)
-            else:
-                parts = dir_path.replace("\\", "/").split("/")
-                current = tree
-                for part in parts:
-                    if part not in current:
-                        current[part] = {}
-                    current = current[part]
+    # 扫描目录结构（包括空目录）
+    def scan_directory(dir_path: Path, relative_path: str = "") -> dict:
+        """递归扫描目录，返回树形结构"""
+        node = {
+            "id": relative_path if relative_path else "root",
+            "label": dir_path.name if relative_path else "specs",
+            "type": "directory",
+            "path": relative_path,
+            "children": [],
+        }
 
-                # 在叶子节点添加文件
-                if "_files" not in current:
-                    current["_files"] = []
-                current["_files"].append(file_info)
+        # 获取目录下的所有条目
+        try:
+            entries = sorted(dir_path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower()))
+        except PermissionError:
+            return node
 
-        return tree
+        for entry in entries:
+            entry_relative = f"{relative_path}/{entry.name}" if relative_path else entry.name
 
-    tree = build_tree(pdf_files)
+            if entry.is_dir():
+                # 递归扫描子目录
+                child_node = scan_directory(entry, entry_relative)
+                node["children"].append(child_node)
+            elif entry.is_file() and entry.suffix.lower() == '.pdf':
+                # 添加 PDF 文件节点
+                file_name = entry.name
+                doc_info = doc_map.get(file_name)
+                file_node = {
+                    "id": entry_relative,
+                    "label": file_name,
+                    "type": "file",
+                    "path": entry_relative,
+                    "document": doc_info,
+                }
+                node["children"].append(file_node)
 
-    # 转换为前端可用的格式
-    def tree_to_nodes(tree_node, path=""):
-        nodes = []
+        # 统计文件数量
+        def count_files(n):
+            if n["type"] == "file":
+                return 1
+            return sum(count_files(c) for c in n.get("children", []))
 
-        # 添加根目录文件
-        root_files = tree_node.get("_root_files", [])
-        for file_info in sorted(root_files, key=lambda x: x["name"]):
-            file_name = file_info["name"]
-            doc_info = doc_map.get(file_name)
-            nodes.append({
-                "id": file_info["path"],
-                "label": file_name,
-                "type": "file",
-                "document": doc_info,
-                "path": file_info["path"],
-            })
+        node["count"] = count_files(node)
 
-        # 添加子目录
-        for key in sorted(tree_node.keys()):
-            if key.startswith("_"):
-                continue
+        return node
 
-            dir_path = f"{path}/{key}" if path else key
-            subdir = tree_node[key]
+    tree = scan_directory(specs_dir)
 
-            # 收集子目录中的所有文件
-            def collect_files(node):
-                files = node.get("_files", [])
-                for k, v in node.items():
-                    if not k.startswith("_") and isinstance(v, dict):
-                        files.extend(collect_files(v))
-                return files
+    # 移除空子目录（可选：保持树结构简洁）
+    def remove_empty_dirs(node):
+        if node["type"] == "directory":
+            node["children"] = [remove_empty_dirs(c) for c in node["children"]]
+            # 如果目录为空且没有子目录，可以考虑移除（但这里保留以显示结构）
+        return node
 
-            all_files = collect_files(subdir)
-            file_count = len(all_files)
+    tree = remove_empty_dirs(tree)
 
-            # 递归构建子节点
-            children = tree_to_nodes(subdir, dir_path)
+    # 统计信息
+    def count_all(node):
+        dirs = 1 if node["type"] == "directory" else 0
+        files = 1 if node["type"] == "file" else 0
+        for child in node.get("children", []):
+            d, f = count_all(child)
+            dirs += d
+            files += f
+        return dirs, files
 
-            nodes.append({
-                "id": dir_path,
-                "label": key,
-                "type": "directory",
-                "count": file_count,
-                "children": children,
-            })
-
-        return nodes
-
-    tree_nodes = tree_to_nodes(tree)
+    total_dirs, total_files = count_all(tree)
 
     return {
-        "tree": tree_nodes,
-        "files": pdf_files,
+        "tree": tree,
+        "stats": {
+            "directories": total_dirs,
+            "files": total_files,
+        },
     }
 
 
