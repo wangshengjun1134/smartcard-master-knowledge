@@ -188,33 +188,24 @@ def get_document_tree():
     def build_tree(files):
         tree = {}
         for file_info in files:
-            parts = file_info["directory"].split("/") if file_info["directory"] else []
-            current = tree
-            for part in parts:
-                if part not in current:
-                    current[part] = {"_dirs": {}, "_files": []}
-                current = current[part]["_dirs"]
-
-            # 添加文件
-            parent = tree
-            for part in parts:
-                parent = parent[part]["_dirs"] if part in parent else tree
-
-            # 找到正确的父节点
-            if parts:
-                node = tree
-                for part in parts[:-1]:
-                    node = node[part]["_dirs"]
-                parent_node = node[parts[-1]] if parts[-1] in node else None
-                if parent_node:
-                    parent_node["_files"].append(file_info)
-                else:
-                    # 创建新节点
-                    node[parts[-1]] = {"_dirs": {}, "_files": [file_info]}
+            dir_path = file_info["directory"]
+            if not dir_path:
+                # 根目录文件
+                if "_root_files" not in tree:
+                    tree["_root_files"] = []
+                tree["_root_files"].append(file_info)
             else:
-                if "_files" not in tree:
-                    tree["_files"] = []
-                tree["_files"].append(file_info)
+                parts = dir_path.replace("\\", "/").split("/")
+                current = tree
+                for part in parts:
+                    if part not in current:
+                        current[part] = {}
+                    current = current[part]
+
+                # 在叶子节点添加文件
+                if "_files" not in current:
+                    current["_files"] = []
+                current["_files"].append(file_info)
 
         return tree
 
@@ -224,24 +215,9 @@ def get_document_tree():
     def tree_to_nodes(tree_node, path=""):
         nodes = []
 
-        # 添加目录
-        dirs = tree_node.get("_dirs", {})
-        for dir_name in sorted(dirs.keys()):
-            dir_path = f"{path}/{dir_name}" if path else dir_name
-            dir_node = dirs[dir_name]
-            children = tree_to_nodes(dir_node, dir_path)
-            file_count = sum(1 for c in children if c.get("type") == "file")
-            nodes.append({
-                "id": dir_path,
-                "label": dir_name,
-                "type": "directory",
-                "count": file_count,
-                "children": children,
-            })
-
-        # 添加文件
-        files = tree_node.get("_files", [])
-        for file_info in sorted(files, key=lambda x: x["name"]):
+        # 添加根目录文件
+        root_files = tree_node.get("_root_files", [])
+        for file_info in sorted(root_files, key=lambda x: x["name"]):
             file_name = file_info["name"]
             doc_info = doc_map.get(file_name)
             nodes.append({
@@ -250,6 +226,36 @@ def get_document_tree():
                 "type": "file",
                 "document": doc_info,
                 "path": file_info["path"],
+            })
+
+        # 添加子目录
+        for key in sorted(tree_node.keys()):
+            if key.startswith("_"):
+                continue
+
+            dir_path = f"{path}/{key}" if path else key
+            subdir = tree_node[key]
+
+            # 收集子目录中的所有文件
+            def collect_files(node):
+                files = node.get("_files", [])
+                for k, v in node.items():
+                    if not k.startswith("_") and isinstance(v, dict):
+                        files.extend(collect_files(v))
+                return files
+
+            all_files = collect_files(subdir)
+            file_count = len(all_files)
+
+            # 递归构建子节点
+            children = tree_to_nodes(subdir, dir_path)
+
+            nodes.append({
+                "id": dir_path,
+                "label": key,
+                "type": "directory",
+                "count": file_count,
+                "children": children,
             })
 
         return nodes
