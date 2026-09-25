@@ -31,6 +31,7 @@ import { useToast } from '@/hooks/use-toast'
 import { formatFileSize, formatDate } from '@/lib/utils'
 import { Upload, FileText, Search, Moon, Sun, Plus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useTheme } from 'next-themes'
+import { DocumentTree } from '@/components/document-tree'
 
 export default function Home() {
   const { toast } = useToast()
@@ -186,6 +187,29 @@ export default function Home() {
 
       {/* 主内容 */}
       <main className="container mx-auto px-4 py-8">
+        <div className="flex gap-6">
+          {/* 左侧文档树 */}
+          <div className="w-64 flex-shrink-0">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">文档树</CardTitle>
+                <CardDescription>
+                  {totalDocs} 个文档
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-2">
+                <DocumentTree
+                  documents={documents}
+                  onSelect={(doc) => {
+                    // 可以在这里添加选中文档的逻辑
+                  }}
+                />
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* 右侧主内容区 */}
+          <div className="flex-1 min-w-0">
         {/* 页面标题和操作区 */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div>
@@ -457,6 +481,8 @@ export default function Home() {
             )}
           </CardContent>
         </Card>
+        </div>
+        </div>
       </main>
     </div>
   )
