@@ -17,7 +17,15 @@ export async function listDocuments(params?: {
   series_id?: string
   processing_status?: string
   file_hash?: string
-}): Promise<DocumentInfo[]> {
+  page?: number
+  page_size?: number
+}): Promise<{
+  items: DocumentInfo[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}> {
   const response = await api.get('/api/docs', { params })
   return response.data
 }

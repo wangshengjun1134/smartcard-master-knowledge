@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { formatFileSize, formatDate } from '@/lib/utils'
-import { Upload, FileText, Search, Moon, Sun, Plus } from 'lucide-react'
+import { Upload, FileText, Search, Moon, Sun, Plus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useTheme } from 'next-themes'
 
 export default function Home() {
@@ -48,15 +48,25 @@ export default function Home() {
     language: 'en',
   })
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalDocs, setTotalDocs] = useState(0)
+  const pageSize = 20
 
   useEffect(() => {
     loadDocuments()
-  }, [])
+  }, [currentPage, filterStatus])
 
   const loadDocuments = async () => {
     try {
-      const docs = await listDocuments()
-      setDocuments(docs)
+      const result = await listDocuments({
+        processing_status: filterStatus || undefined,
+        page: currentPage,
+        page_size: pageSize,
+      })
+      setDocuments(result.items)
+      setTotalDocs(result.total)
+      setTotalPages(result.total_pages)
     } catch (error) {
       console.error('Failed to load documents:', error)
       toast({
@@ -93,6 +103,7 @@ export default function Home() {
         title: '上传成功',
         description: `${selectedFile.name} 已上传并开始解析`,
       })
+      setCurrentPage(1)
       await loadDocuments()
       setUploadDialogOpen(false)
       setUploadForm({ document_code: '', title: '', issuer: '', language: 'en' })
@@ -109,15 +120,6 @@ export default function Home() {
     }
   }
 
-  const filteredDocuments = documents.filter(doc => {
-    const matchesSearch =
-      doc.file_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.document_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.title?.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = !filterStatus || doc.processing_status === filterStatus
-    return matchesSearch && matchesStatus
-  })
-
   const getStatusBadge = (status?: string) => {
     const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
       pending: { label: '等待处理', variant: 'secondary' },
@@ -127,6 +129,32 @@ export default function Home() {
     }
     const config = statusMap[status || 'pending'] || { label: status, variant: 'outline' as const }
     return <Badge variant={config.variant}>{config.label}</Badge>
+  }
+
+  // 生成分页页码
+  const getPageNumbers = () => {
+    const pages: number[] = []
+    const maxVisible = 5
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i)
+    } else {
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 4; i++) pages.push(i)
+        pages.push(0) // 省略号
+        pages.push(totalPages)
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1)
+        pages.push(0)
+        for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i)
+      } else {
+        pages.push(1)
+        pages.push(0)
+        for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i)
+        pages.push(0)
+        pages.push(totalPages)
+      }
+    }
+    return pages
   }
 
   return (
@@ -180,7 +208,10 @@ export default function Home() {
             </div>
 
             {/* 状态过滤 */}
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <Select value={filterStatus} onValueChange={(value) => {
+              setFilterStatus(value)
+              setCurrentPage(1)
+            }}>
               <SelectTrigger className="w-32">
                 <SelectValue placeholder="所有状态" />
               </SelectTrigger>
@@ -286,31 +317,25 @@ export default function Home() {
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>总文档数</CardDescription>
+              <CardTitle className="text-3xl">{totalDocs}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>当前页</CardDescription>
+              <CardTitle className="text-3xl">{currentPage}/{totalPages}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>每页数量</CardDescription>
+              <CardTitle className="text-3xl">{pageSize}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>当前页文档数</CardDescription>
               <CardTitle className="text-3xl">{documents.length}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>已完成</CardDescription>
-              <CardTitle className="text-3xl">
-                {documents.filter(d => d.processing_status === 'completed').length}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>处理中</CardDescription>
-              <CardTitle className="text-3xl">
-                {documents.filter(d => d.processing_status === 'processing').length}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>总 Item 数</CardDescription>
-              <CardTitle className="text-3xl">
-                {documents.reduce((sum, d) => sum + d.item_count, 0)}
-              </CardTitle>
             </CardHeader>
           </Card>
         </div>
@@ -320,8 +345,9 @@ export default function Home() {
           <CardHeader>
             <CardTitle>文档列表</CardTitle>
             <CardDescription>
-              共 {filteredDocuments.length} 个文档
+              共 {totalDocs} 个文档
               {filterStatus && ` (过滤: ${filterStatus})`}
+              {totalPages > 1 && ` - 第 ${currentPage}/${totalPages} 页`}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -329,59 +355,105 @@ export default function Home() {
               <div className="text-center py-8 text-muted-foreground">
                 加载中...
               </div>
-            ) : filteredDocuments.length === 0 ? (
+            ) : documents.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                {searchTerm || filterStatus ? '没有找到匹配的文档' : '暂无文档，请上传 PDF 文件'}
+                {filterStatus ? '没有找到匹配的文档' : '暂无文档，请上传 PDF 文件'}
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>文档编号</TableHead>
-                      <TableHead>文件名</TableHead>
-                      <TableHead className="hidden md:table-cell">标题</TableHead>
-                      <TableHead>状态</TableHead>
-                      <TableHead className="hidden sm:table-cell">Item 数</TableHead>
-                      <TableHead className="hidden lg:table-cell">文件大小</TableHead>
-                      <TableHead className="hidden lg:table-cell">创建时间</TableHead>
-                      <TableHead>操作</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredDocuments.map((doc) => (
-                      <TableRow key={doc.id}>
-                        <TableCell className="font-medium">
-                          {doc.document_code || '-'}
-                        </TableCell>
-                        <TableCell className="max-w-[200px] truncate">
-                          {doc.file_name}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell max-w-xs truncate">
-                          {doc.title || '-'}
-                        </TableCell>
-                        <TableCell>{getStatusBadge(doc.processing_status)}</TableCell>
-                        <TableCell className="hidden sm:table-cell">{doc.item_count}</TableCell>
-                        <TableCell className="hidden lg:table-cell">
-                          {doc.file_size ? formatFileSize(doc.file_size) : '-'}
-                        </TableCell>
-                        <TableCell className="hidden lg:table-cell">
-                          {doc.created_at ? formatDate(doc.created_at) : '-'}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Link href={`/docs/${doc.id}`}>
-                              <Button variant="outline" size="sm">
-                                查看
-                              </Button>
-                            </Link>
-                          </div>
-                        </TableCell>
+              <>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>文档编号</TableHead>
+                        <TableHead>文件名</TableHead>
+                        <TableHead className="hidden md:table-cell">标题</TableHead>
+                        <TableHead>状态</TableHead>
+                        <TableHead className="hidden sm:table-cell">Item 数</TableHead>
+                        <TableHead className="hidden lg:table-cell">文件大小</TableHead>
+                        <TableHead className="hidden lg:table-cell">创建时间</TableHead>
+                        <TableHead>操作</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {documents.map((doc) => (
+                        <TableRow key={doc.id}>
+                          <TableCell className="font-medium">
+                            {doc.document_code || '-'}
+                          </TableCell>
+                          <TableCell className="max-w-[200px] truncate">
+                            {doc.file_name}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell max-w-xs truncate">
+                            {doc.title || '-'}
+                          </TableCell>
+                          <TableCell>{getStatusBadge(doc.processing_status)}</TableCell>
+                          <TableCell className="hidden sm:table-cell">{doc.item_count}</TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            {doc.file_size ? formatFileSize(doc.file_size) : '-'}
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            {doc.created_at ? formatDate(doc.created_at) : '-'}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Link href={`/docs/${doc.id}`}>
+                                <Button variant="outline" size="sm">
+                                  查看
+                                </Button>
+                              </Link>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* 分页控件 */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                    <div className="text-sm text-muted-foreground">
+                      第 {currentPage} / {totalPages} 页，共 {totalDocs} 条
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      {getPageNumbers().map((page, idx) =>
+                        page === 0 ? (
+                          <span key={`ellipsis-${idx}`} className="px-2 text-muted-foreground">
+                            ...
+                          </span>
+                        ) : (
+                          <Button
+                            key={page}
+                            variant={currentPage === page ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setCurrentPage(page)}
+                            className="w-8 h-8 p-0"
+                          >
+                            {page}
+                          </Button>
+                        )
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>

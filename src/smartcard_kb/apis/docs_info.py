@@ -102,31 +102,57 @@ class ApiResponse(BaseModel):
     data: Optional[dict] = None
 
 
+class PaginatedResponse(BaseModel):
+    """分页响应"""
+    items: List[DocumentInfoResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
 # ==================== API 接口 ====================
 
 
-@router.get("", response_model=List[DocumentInfoResponse])
+@router.get("", response_model=PaginatedResponse)
 def list_documents(
     document_code: Optional[str] = None,
     series_id: Optional[str] = None,
     processing_status: Optional[str] = None,
     file_hash: Optional[str] = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
 ):
     """
-    获取文档列表
+    获取文档列表（支持分页）
 
     - **document_code**: 文档编号（可选）
     - **series_id**: 系列 ID（可选）
     - **processing_status**: 处理状态（可选）
     - **file_hash**: 文件哈希（可选）
+    - **page**: 页码（默认 1）
+    - **page_size**: 每页数量（默认 20，最大 100）
     """
-    docs = query_document_info(
+    all_docs = query_document_info(
         document_code=document_code,
         series_id=series_id,
         processing_status=processing_status,
         file_hash=file_hash,
     )
-    return docs
+
+    total = len(all_docs)
+    total_pages = (total + page_size - 1) // page_size if total > 0 else 1
+    start = (page - 1) * page_size
+    end = start + page_size
+    items = all_docs[start:end]
+
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+    )
 
 
 @router.get("/{document_id}", response_model=DocumentInfoResponse)
