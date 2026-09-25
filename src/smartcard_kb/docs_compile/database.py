@@ -537,7 +537,16 @@ def query_document_info(
     cursor.execute(query, params)
     rows = cursor.fetchall()
 
-    results = [dict(row) for row in rows]
+    results = []
+    for row in rows:
+        item = dict(row)
+        # 反序列化 JSON 字段
+        if item.get("metadata"):
+            try:
+                item["metadata"] = json.loads(item["metadata"])
+            except (json.JSONDecodeError, TypeError):
+                pass
+        results.append(item)
 
     cursor.close()
     conn.close()
