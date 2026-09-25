@@ -128,7 +128,7 @@ export default function Home() {
       completed: { label: '已完成', variant: 'default' },
       failed: { label: '失败', variant: 'destructive' },
     }
-    const config = statusMap[status || 'pending'] || { label: status, variant: 'outline' as const }
+    const config = statusMap[status || 'pending'] || { label: status || 'unknown', variant: 'outline' as const }
     return <Badge variant={config.variant}>{config.label}</Badge>
   }
 
