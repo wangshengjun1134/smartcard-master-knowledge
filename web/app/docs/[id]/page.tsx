@@ -30,19 +30,6 @@ export default function DocumentDetail() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
   const pageSize = 20
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
-
-  const toggleItem = (itemId: string) => {
-    setExpandedItems(prev => {
-      const next = new Set(prev)
-      if (next.has(itemId)) {
-        next.delete(itemId)
-      } else {
-        next.add(itemId)
-      }
-      return next
-    })
-  }
 
   useEffect(() => {
     loadData()
@@ -360,15 +347,9 @@ export default function DocumentDetail() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((item) => {
-                  const isExpanded = expandedItems.has(item.id)
-                  return (
-                    <TableRow
-                      key={item.id}
-                      className="cursor-pointer"
-                      onClick={() => toggleItem(item.id)}
-                    >
-                      <TableCell className="font-mono text-sm">{item.order_index}</TableCell>
+                {items.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-mono text-sm">{item.order_index}</TableCell>
                       <TableCell>
                         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${getLabelColor(item.label)}`}>
                           {getLabelIcon(item.label)}
@@ -376,54 +357,23 @@ export default function DocumentDetail() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <div className="max-w-xl flex items-start gap-2">
-                          <div className="flex-1 min-w-0">
-                            {item.textualization ? (
-                              <div
-                                className="text-sm whitespace-nowrap overflow-hidden text-ellipsis"
-                                style={!isExpanded ? {
-                                  display: 'block',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                } : {
-                                  whiteSpace: 'pre-wrap',
-                                }}
-                                title={isExpanded ? undefined : item.textualization}
-                              >
-                                {isExpanded ? item.textualization : item.textualization}
-                              </div>
-                            ) : item.text ? (
-                              <div
-                                className="text-sm text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis"
-                                style={!isExpanded ? {
-                                  display: 'block',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                } : {
-                                  whiteSpace: 'pre-wrap',
-                                }}
-                                title={isExpanded ? undefined : item.text}
-                              >
-                                {isExpanded ? item.text : item.text}
-                              </div>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">-</span>
-                            )}
-                          </div>
-                          {(item.textualization || item.text) && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 px-2 text-xs shrink-0"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                toggleItem(item.id)
-                              }}
+                        <div className="max-w-xl">
+                          {item.textualization ? (
+                            <div
+                              className="text-sm whitespace-nowrap overflow-hidden text-ellipsis"
+                              title={item.textualization}
                             >
-                              {isExpanded ? '收起' : '展开'}
-                            </Button>
+                              {item.textualization}
+                            </div>
+                          ) : item.text ? (
+                            <div
+                              className="text-sm text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis"
+                              title={item.text}
+                            >
+                              {item.text}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">-</span>
                           )}
                         </div>
                       </TableCell>
