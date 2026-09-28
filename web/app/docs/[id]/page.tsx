@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getDocument, listDocumentItems, getItemStatistics, textualizeItems } from '@/lib/api'
-import type { DocumentInfo, DocItem, ItemStatistics } from '@/types'
+import type { DocumentInfo, DocItem, ItemStatistics, PaginatedItemsResponse } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -27,21 +27,30 @@ export default function DocumentDetail() {
   const [filterLabel, setFilterLabel] = useState<string>('')
   const [textualizing, setTextualizing] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
   const pageSize = 20
 
   useEffect(() => {
     loadData()
-  }, [documentId])
+  }, [documentId, currentPage, filterLabel])
 
   const loadData = async () => {
+    setLoading(true)
     try {
-      const [doc, docItems, docStats] = await Promise.all([
+      const [doc, paginatedItems, docStats] = await Promise.all([
         getDocument(documentId),
-        listDocumentItems(documentId, { limit: 1000 }),
+        listDocumentItems(documentId, {
+          label: filterLabel || undefined,
+          page: currentPage,
+          page_size: pageSize,
+        }),
         getItemStatistics(documentId),
       ])
       setDocument(doc)
-      setItems(docItems)
+      setItems(paginatedItems.items)
+      setTotalPages(paginatedItems.total_pages)
+      setTotalItems(paginatedItems.total)
       setStats(docStats)
     } catch (error) {
       console.error('Failed to load document:', error)
@@ -85,12 +94,31 @@ export default function DocumentDetail() {
     ? items.filter(item => item.label === filterLabel)
     : items
 
-  // 分页计算
-  const totalPages = Math.ceil(filteredItems.length / pageSize)
-  const paginatedItems = filteredItems.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  )
+  // 生成分页页码
+  const getPageNumbers = () => {
+    const pages: number[] = []
+    const maxVisible = 5
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i)
+    } else {
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 4; i++) pages.push(i)
+        pages.push(0) // 省略号
+        pages.push(totalPages)
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1)
+        pages.push(0)
+        for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i)
+      } else {
+        pages.push(1)
+        pages.push(0)
+        for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i)
+        pages.push(0)
+        pages.push(totalPages)
+      }
+    }
+    return pages
+  }
 
   const getLabelIcon = (label: string) => {
     const icons: Record<string, React.ReactNode> = {
@@ -319,7 +347,7 @@ export default function DocumentDetail() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedItems.map((item) => (
+                {items.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-mono text-sm">{item.order_index}</TableCell>
                     <TableCell>
@@ -362,9 +390,9 @@ export default function DocumentDetail() {
 
             {/* 分页控件 */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between mt-4">
+              <div className="flex items-center justify-between mt-4 pt-4 border-t">
                 <div className="text-sm text-muted-foreground">
-                  第 {currentPage} / {totalPages} 页，共 {filteredItems.length} 条
+                  第 {currentPage} / {totalPages} 页，共 {totalItems} 条
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
@@ -375,18 +403,12 @@ export default function DocumentDetail() {
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let page: number
-                    if (totalPages <= 5) {
-                      page = i + 1
-                    } else if (currentPage <= 3) {
-                      page = i + 1
-                    } else if (currentPage >= totalPages - 2) {
-                      page = totalPages - 4 + i
-                    } else {
-                      page = currentPage - 2 + i
-                    }
-                    return (
+                  {getPageNumbers().map((page, idx) =>
+                    page === 0 ? (
+                      <span key={`ellipsis-${idx}`} className="px-2 text-muted-foreground">
+                        ...
+                      </span>
+                    ) : (
                       <Button
                         key={page}
                         variant={currentPage === page ? 'default' : 'outline'}
@@ -397,7 +419,7 @@ export default function DocumentDetail() {
                         {page}
                       </Button>
                     )
-                  })}
+                  )}
                   <Button
                     variant="outline"
                     size="sm"

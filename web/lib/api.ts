@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { DocumentInfo, DocItem, ApiResponse, TextualizeRequest, TextualizeResponse, ItemStatistics } from '@/types'
+import type { DocumentInfo, DocItem, ApiResponse, TextualizeRequest, TextualizeResponse, ItemStatistics, PaginatedItemsResponse } from '@/types'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -79,10 +79,10 @@ export async function listDocumentItems(
     label?: string
     is_rag_enabled?: boolean
     order_by?: string
-    limit?: number
-    offset?: number
+    page?: number
+    page_size?: number
   }
-): Promise<DocItem[]> {
+): Promise<PaginatedItemsResponse> {
   const response = await api.get(`/api/docs/${documentId}/items`, { params })
   return response.data
 }

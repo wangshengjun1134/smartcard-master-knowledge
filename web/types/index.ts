@@ -90,6 +90,15 @@ export interface ItemStatistics {
   type_distribution: Record<string, number>
 }
 
+// 分页响应类型
+export interface PaginatedItemsResponse {
+  items: DocItem[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
 // 文档树节点类型
 export interface TreeNode {
   id: string

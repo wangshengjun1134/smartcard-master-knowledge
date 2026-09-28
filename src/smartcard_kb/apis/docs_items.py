@@ -62,29 +62,38 @@ class TextualizeResponse(BaseModel):
     stats: dict
 
 
+class PaginatedItemResponse(BaseModel):
+    """分页响应"""
+    items: List[DocItemResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
 # ==================== API 接口 ====================
 
 
-@router.get("/{document_id}/items", response_model=List[DocItemResponse])
+@router.get("/{document_id}/items", response_model=PaginatedItemResponse)
 def list_document_items(
     document_id: str,
     page_id: Optional[str] = None,
     label: Optional[str] = None,
     is_rag_enabled: Optional[bool] = None,
     order_by: str = "order_index",
-    limit: int = Query(default=100, le=1000),
-    offset: int = Query(default=0, ge=0),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
 ):
     """
-    获取文档的 item 列表
+    获取文档的 item 列表（支持分页）
 
     - **document_id**: 文档 ID
     - **page_id**: 页面 ID（可选）
     - **label**: 类型（可选）
     - **is_rag_enabled**: 是否启用 RAG（可选）
     - **order_by**: 排序字段（默认 order_index）
-    - **limit**: 返回数量限制（默认 100，最大 1000）
-    - **offset**: 偏移量（默认 0）
+    - **page**: 页码（默认 1）
+    - **page_size**: 每页数量（默认 20，最大 100）
     """
     items = query_document_items(
         document_id=document_id,
@@ -94,8 +103,18 @@ def list_document_items(
         order_by=order_by,
     )
 
-    # 分页
-    return items[offset:offset + limit]
+    total = len(items)
+    total_pages = (total + page_size - 1) // page_size if total > 0 else 1
+    start = (page - 1) * page_size
+    end = start + page_size
+
+    return PaginatedItemResponse(
+        items=items[start:end],
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+    )
 
 
 @router.get("/{document_id}/items/stats")
