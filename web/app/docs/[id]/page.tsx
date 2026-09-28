@@ -376,38 +376,54 @@ export default function DocumentDetail() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <div className="max-w-xl">
-                          {item.textualization ? (
-                            <div
-                              className="text-sm whitespace-pre-wrap"
-                              style={!isExpanded ? {
-                                display: '-webkit-box',
-                                WebkitLineClamp: '2',
-                                WebkitBoxOrient: 'vertical',
-                                overflow: 'hidden',
-                              } : {}}
-                            >
-                              {isExpanded ? item.textualization : truncateText(item.textualization, 100)}
-                            </div>
-                          ) : item.text ? (
-                            <div
-                              className="text-sm text-muted-foreground whitespace-pre-wrap"
-                              style={!isExpanded ? {
-                                display: '-webkit-box',
-                                WebkitLineClamp: '2',
-                                WebkitBoxOrient: 'vertical',
-                                overflow: 'hidden',
-                              } : {}}
-                            >
-                              {isExpanded ? item.text : truncateText(item.text, 100)}
-                            </div>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">-</span>
-                          )}
+                        <div className="max-w-xl flex items-start gap-2">
+                          <div className="flex-1 min-w-0">
+                            {item.textualization ? (
+                              <div
+                                className="text-sm whitespace-nowrap overflow-hidden text-ellipsis"
+                                style={!isExpanded ? {
+                                  display: 'block',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                } : {
+                                  whiteSpace: 'pre-wrap',
+                                }}
+                                title={isExpanded ? undefined : item.textualization}
+                              >
+                                {isExpanded ? item.textualization : item.textualization}
+                              </div>
+                            ) : item.text ? (
+                              <div
+                                className="text-sm text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis"
+                                style={!isExpanded ? {
+                                  display: 'block',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                } : {
+                                  whiteSpace: 'pre-wrap',
+                                }}
+                                title={isExpanded ? undefined : item.text}
+                              >
+                                {isExpanded ? item.text : item.text}
+                              </div>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">-</span>
+                            )}
+                          </div>
                           {(item.textualization || item.text) && (
-                            <span className="text-xs text-muted-foreground mt-1 block">
-                              {isExpanded ? '点击收起' : '点击展开'}
-                            </span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs shrink-0"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleItem(item.id)
+                              }}
+                            >
+                              {isExpanded ? '收起' : '展开'}
+                            </Button>
                           )}
                         </div>
                       </TableCell>
