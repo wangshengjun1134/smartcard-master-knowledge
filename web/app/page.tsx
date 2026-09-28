@@ -186,18 +186,18 @@ export default function Home() {
       </header>
 
       {/* 主内容 */}
-      <main className="container mx-auto px-4 py-8">
-        <div className="flex gap-6">
+      <main className="container mx-auto px-4 py-4 h-[calc(100vh-80px)]">
+        <div className="flex gap-6 h-full">
           {/* 左侧文档树 */}
-          <div className="w-64 flex-shrink-0">
-            <Card>
-              <CardHeader className="pb-3">
+          <div className="w-64 flex-shrink-0 flex flex-col h-full">
+            <Card className="flex-1 flex flex-col overflow-hidden">
+              <CardHeader className="pb-3 flex-shrink-0">
                 <CardTitle className="text-lg">文档树</CardTitle>
                 <CardDescription>
                   {totalDocs} 个文档
                 </CardDescription>
               </CardHeader>
-              <CardContent className="p-2">
+              <CardContent className="p-2 flex-1 overflow-y-auto min-h-0">
                 <DocumentTree />
               </CardContent>
             </Card>
