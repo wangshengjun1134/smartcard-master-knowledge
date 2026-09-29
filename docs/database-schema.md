@@ -6,18 +6,19 @@
 
 **数据库名称**: `smartcard_master_knowledge`
 
-项目包含以下两张核心表：
+项目包含以下三张核心表：
 
 | 表名              | 描述                                       |
 | ---------------- | ---------------------------------------- |
-| `document_info`  | 存储文档元数据、解析状态和统计信息（文档级）                  |
-| `document_item`  | 存储 PDF 解析后的每个结构化项（DocItem，段落/表格/图片级）     |
+| `doc_info`       | 存储文档元数据、解析状态和统计信息（文档级）                  |
+| `doc_items`      | 存储 PDF 解析后的每个结构化项（DocItem，段落/表格/图片级）     |
+| `doc_chunks`     | 存储面向 RAG 检索的语义块（HybridChunker 分块结果）          |
 
-两张表通过 `document_info.id` ↔ `document_item.document_id` 关联。
+三张表通过 `doc_info.id` ↔ `doc_items.document_id` ↔ `doc_chunks.document_id` 关联。
 
 ---
 
-## document_item 表
+## doc_items 表
 
 存储 PDF 文档解析后的每个结构化项（DocItem）。
 
@@ -38,6 +39,7 @@
 | `is_rag_enabled` | BOOLEAN   | DEFAULT 1, INDEX    | 是否允许该 DocItem 参与 RAG（1=启用，0=禁用）                                  |
 | `textualization` | TEXT      | 可空                  | 文本化后的内容，用于 RAG 检索（将图片/VLM 等内容转换为文本）                           |
 | `raw_json`       | TEXT/JSON | 可空                  | Docling 原始 DocItem 数据，便于后续重新处理（JSON 格式）                          |
+| `self_ref`       | TEXT      | 可空                  | Docling 内部稳定引用（如 #/texts/12），用于与 chunks 关联                        |
 | `created_at`     | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 数据创建时间                                                          |
 | `updated_at`     | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 数据最后更新时间                                                        |
 
@@ -45,10 +47,10 @@
 
 | 索引名称                                    | 字段                  | 类型   |
 | --------------------------------------- | ------------------- | ---- |
-| `idx_document_item_document_id`         | `document_id`       | 普通索引 |
-| `idx_document_item_page_id`             | `page_id`           | 普通索引 |
-| `idx_document_item_label`               | `label`             | 普通索引 |
-| `idx_document_item_is_rag_enabled`      | `is_rag_enabled`    | 普通索引 |
+| `idx_doc_items_document_id`         | `document_id`       | 普通索引 |
+| `idx_doc_items_page_id`             | `page_id`           | 普通索引 |
+| `idx_doc_items_label`               | `label`             | 普通索引 |
+| `idx_doc_items_is_rag_enabled`      | `is_rag_enabled`    | 普通索引 |
 
 ### label 字段可选值
 
@@ -100,13 +102,15 @@
 {
   "level": 2,
   "heading_path": ["1. 概述", "1.1 系统架构"],
-  "caption": "表1-1 系统组件列表"
+  "caption": "表1-1 系统组件列表",
+  "vlm_description": "这是一张系统架构图，展示了..."
 }
 ```
 
 - `level`: 标题层级（1-5）
 - `heading_path`: 父级标题路径
 - `caption`: 图片/表格的标题说明
+- `vlm_description`: VLM 生成的图片描述（仅 PICTURE 类型，需启用 VLM）
 
 #### content（类型特有内容）
 
@@ -140,9 +144,9 @@
 
 ---
 
-## document_info 表
+## doc_info 表
 
-存储文档的元数据、解析状态和统计信息。与 `document_item` 表通过 `id` ↔ `document_id` 关联。
+存储文档的元数据、解析状态和统计信息。与 `doc_items` 表通过 `id` ↔ `document_id` 关联。
 
 ### 表结构
 
@@ -184,10 +188,10 @@
 
 | 索引名称                                    | 字段                  | 类型   |
 | --------------------------------------- | ------------------- | ---- |
-| `idx_document_info_document_code`       | `document_code`     | 普通索引 |
-| `idx_document_info_series_id`           | `series_id`         | 普通索引 |
-| `idx_document_info_processing_status`   | `processing_status` | 普通索引 |
-| `idx_document_info_file_hash`           | `file_hash`         | 普通索引 |
+| `idx_doc_info_document_code`       | `document_code`     | 普通索引 |
+| `idx_doc_info_series_id`           | `series_id`         | 普通索引 |
+| `idx_doc_info_processing_status`   | `processing_status` | 普通索引 |
+| `idx_doc_info_file_hash`           | `file_hash`         | 普通索引 |
 
 ### processing_status 字段可选值
 
@@ -228,10 +232,10 @@
 
 ### 建表语句
 
-#### document_item 表
+#### doc_items 表
 
 ```sql
-CREATE TABLE IF NOT EXISTS document_item (
+CREATE TABLE IF NOT EXISTS doc_items (
     id TEXT PRIMARY KEY,
     document_id TEXT NOT NULL,
     page_id TEXT NOT NULL,
@@ -245,15 +249,16 @@ CREATE TABLE IF NOT EXISTS document_item (
     is_rag_enabled BOOLEAN DEFAULT FALSE,
     textualization TEXT,
     raw_json TEXT,
+    self_ref TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
-#### document_info 表
+#### doc_info 表
 
 ```sql
-CREATE TABLE IF NOT EXISTS document_info (
+CREATE TABLE IF NOT EXISTS doc_info (
     id TEXT PRIMARY KEY,
     document_code TEXT,
     title TEXT,
@@ -290,44 +295,44 @@ CREATE TABLE IF NOT EXISTS document_info (
 
 ### 索引创建语句
 
-#### document_item 表索引
+#### doc_items 表索引
 
 ```sql
 -- 按文档 ID 查询索引
-CREATE INDEX IF NOT EXISTS idx_document_item_document_id 
-ON document_item(document_id);
+CREATE INDEX IF NOT EXISTS idx_doc_items_document_id
+ON doc_items(document_id);
 
 -- 按页面 ID 查询索引
-CREATE INDEX IF NOT EXISTS idx_document_item_page_id 
-ON document_item(page_id);
+CREATE INDEX IF NOT EXISTS idx_doc_items_page_id
+ON doc_items(page_id);
 
 -- 按 DocItemLabel 类型查询索引
-CREATE INDEX IF NOT EXISTS idx_document_item_label 
-ON document_item(label);
+CREATE INDEX IF NOT EXISTS idx_doc_items_label
+ON doc_items(label);
 
 -- 按 RAG 启用状态查询索引
-CREATE INDEX IF NOT EXISTS idx_document_item_is_rag_enabled 
-ON document_item(is_rag_enabled);
+CREATE INDEX IF NOT EXISTS idx_doc_items_is_rag_enabled
+ON doc_items(is_rag_enabled);
 ```
 
-#### document_info 表索引
+#### doc_info 表索引
 
 ```sql
 -- 按文档编号查询索引
-CREATE INDEX IF NOT EXISTS idx_document_info_document_code 
-ON document_info(document_code);
+CREATE INDEX IF NOT EXISTS idx_doc_info_document_code
+ON doc_info(document_code);
 
 -- 按系列 ID 查询索引
-CREATE INDEX IF NOT EXISTS idx_document_info_series_id 
-ON document_info(series_id);
+CREATE INDEX IF NOT EXISTS idx_doc_info_series_id
+ON doc_info(series_id);
 
 -- 按处理状态查询索引
-CREATE INDEX IF NOT EXISTS idx_document_info_processing_status 
-ON document_info(processing_status);
+CREATE INDEX IF NOT EXISTS idx_doc_info_processing_status
+ON doc_info(processing_status);
 
 -- 按文件哈希查询索引（用于去重）
-CREATE INDEX IF NOT EXISTS idx_document_info_file_hash 
-ON document_info(file_hash);
+CREATE INDEX IF NOT EXISTS idx_doc_info_file_hash
+ON doc_info(file_hash);
 ```
 
 ---
@@ -491,6 +496,69 @@ document_id: spec_001
 └── id: uuid-4, label: section_header, text: "2. 详细设计", parent_id: NULL
     └── id: uuid-5, label: text, text: "...", parent_id: uuid-4
 ```
+
+---
+
+## doc_chunks 表
+
+存储面向 RAG 检索的语义块，由 HybridChunker 生成。
+
+### 表结构
+
+| 字段               | 类型        | 约束                  | 描述                                                              |
+| ---------------- | --------- | ------------------- | --------------------------------------------------------------- |
+| `id`             | TEXT      | PRIMARY KEY         | Chunk 唯一 ID（UUID）                                              |
+| `document_id`    | TEXT      | NOT NULL, INDEX     | 所属文档 ID                                                         |
+| `chunk_index`    | INTEGER   | 可空                  | Chunk 在文档中的顺序索引                                            |
+| `text`           | TEXT      | 可空                  | Chunk 的文本内容，用于向量嵌入和检索                                     |
+| `headings`       | TEXT/JSON | 可空                  | 章节标题列表（JSON 数组格式）                                         |
+| `heading_path`   | TEXT      | 可空                  | 标题路径，用 " > " 连接，例如 "1. 概述 > 1.1 系统架构"                     |
+| `linked_item_ids`| TEXT/JSON | 可空                  | 关联的 doc_items ID 列表（JSON 数组格式）                          |
+| `page_nos`       | TEXT/JSON | 可空                  | 涉及的页码列表（JSON 数组格式）                                       |
+| `token_count`    | INTEGER   | 可空                  | 文本的 token 数量（与 embedding 模型一致）                             |
+| `is_rag_enabled` | BOOLEAN   | DEFAULT TRUE, INDEX | 是否允许该 Chunk 参与 RAG（1=启用，0=禁用）                            |
+| `embedding`      | BYTEA     | 可空                  | 向量嵌入（后续写入）                                                 |
+| `created_at`     | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 数据创建时间                                                          |
+
+### 索引
+
+| 索引名称                                    | 字段                  | 类型   |
+| --------------------------------------- | ------------------- | ---- |
+| `idx_doc_chunks_document_id`                | `document_id`       | 普通索引 |
+| `idx_doc_chunks_is_rag_enabled`             | `is_rag_enabled`    | 普通索引 |
+
+### JSON 字段示例
+
+#### headings（章节标题列表）
+
+```json
+["1. 概述", "1.1 系统架构"]
+```
+
+#### linked_item_ids（关联的 item ID）
+
+```json
+["uuid-1", "uuid-2", "uuid-3"]
+```
+
+#### page_nos（页码列表）
+
+```json
+[1, 2, 3]
+```
+
+### 关联关系
+
+- `doc_chunks.document_id` ↔ `doc_info.id`：标识 chunk 所属文档
+- `doc_chunks.linked_item_ids` ↔ `doc_items.id`：多对多关系，一个 chunk 可对应多个 items，一个 item 也可属于多个 chunks
+- 通过 `doc_items.self_ref` 建立 items 与 chunks 的映射关系
+
+### 分块策略
+
+- 使用 HybridChunker 进行结构 + token 双重约束的分块
+- `merge_peers=True`：合并同一标题下的相邻小项，避免碎片块
+- 默认最大 token 数：512（与 BAAI/bge-m3 embedding 模型一致）
+- 空 chunk 会被过滤（`if not chunk.text.strip(): continue`）
 
 ---
 

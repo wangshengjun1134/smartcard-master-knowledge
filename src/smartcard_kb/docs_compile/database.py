@@ -24,13 +24,13 @@ def get_connection():
 
 
 def init_database():
-    """初始化数据库，创建 document_item 和 document_info 表"""
+    """初始化数据库，创建 document_item、document_info 和 chunks 表"""
     conn = get_connection()
     cursor = conn.cursor()
 
-    # 创建 document_info 表
+    # 创建 doc_info 表
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS document_info (
+        CREATE TABLE IF NOT EXISTS doc_info (
             id TEXT PRIMARY KEY,
             document_code TEXT,
             title TEXT,
@@ -65,27 +65,27 @@ def init_database():
         )
     """)
 
-    # document_info 表索引
+    # doc_info 表索引
     cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_document_info_document_code
-        ON document_info(document_code)
+        CREATE INDEX IF NOT EXISTS idx_doc_info_document_code
+        ON doc_info(document_code)
     """)
     cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_document_info_series_id
-        ON document_info(series_id)
+        CREATE INDEX IF NOT EXISTS idx_doc_info_series_id
+        ON doc_info(series_id)
     """)
     cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_document_info_processing_status
-        ON document_info(processing_status)
+        CREATE INDEX IF NOT EXISTS idx_doc_info_processing_status
+        ON doc_info(processing_status)
     """)
     cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_document_info_file_hash
-        ON document_info(file_hash)
+        CREATE INDEX IF NOT EXISTS idx_doc_info_file_hash
+        ON doc_info(file_hash)
     """)
 
-    # 创建 document_item 表
+    # 创建 doc_items 表
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS document_item (
+        CREATE TABLE IF NOT EXISTS doc_items (
             id TEXT PRIMARY KEY,
             document_id TEXT NOT NULL,
             page_id TEXT NOT NULL,
@@ -99,40 +99,82 @@ def init_database():
             is_rag_enabled BOOLEAN DEFAULT TRUE,
             textualization TEXT,
             raw_json JSONB,
+            self_ref TEXT,
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
-    # 创建 document_item 表索引以提高查询性能
+    # 创建 doc_items 表索引以提高查询性能
     cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_document_item_document_id
-        ON document_item(document_id)
+        CREATE INDEX IF NOT EXISTS idx_doc_items_document_id
+        ON doc_items(document_id)
     """)
     cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_document_item_page_id
-        ON document_item(page_id)
+        CREATE INDEX IF NOT EXISTS idx_doc_items_page_id
+        ON doc_items(page_id)
     """)
     cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_document_item_label
-        ON document_item(label)
+        CREATE INDEX IF NOT EXISTS idx_doc_items_label
+        ON doc_items(label)
     """)
     cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_document_item_is_rag_enabled
-        ON document_item(is_rag_enabled)
+        CREATE INDEX IF NOT EXISTS idx_doc_items_is_rag_enabled
+        ON doc_items(is_rag_enabled)
     """)
 
     # 为已存在的表添加 textualization 字段（如果不存在）
     cursor.execute("""
-        DO $$ 
+        DO $$
         BEGIN
             IF NOT EXISTS (
-                SELECT 1 FROM information_schema.columns 
-                WHERE table_name = 'document_item' AND column_name = 'textualization'
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'doc_items' AND column_name = 'textualization'
             ) THEN
-                ALTER TABLE document_item ADD COLUMN textualization TEXT;
+                ALTER TABLE doc_items ADD COLUMN textualization TEXT;
             END IF;
         END $$;
+    """)
+
+    # 为已存在的表添加 self_ref 字段（如果不存在）
+    cursor.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'doc_items' AND column_name = 'self_ref'
+            ) THEN
+                ALTER TABLE doc_items ADD COLUMN self_ref TEXT;
+            END IF;
+        END $$;
+    """)
+
+    # 创建 doc_chunks 表
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS doc_chunks (
+            id TEXT PRIMARY KEY,
+            document_id TEXT NOT NULL,
+            chunk_index INTEGER,
+            text TEXT,
+            headings JSONB,
+            heading_path TEXT,
+            linked_item_ids JSONB,
+            page_nos JSONB,
+            token_count INTEGER,
+            is_rag_enabled BOOLEAN DEFAULT TRUE,
+            embedding BYTEA,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # doc_chunks 表索引
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_doc_chunks_document_id
+        ON doc_chunks(document_id)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_doc_chunks_is_rag_enabled
+        ON doc_chunks(is_rag_enabled)
     """)
 
     conn.commit()
@@ -150,14 +192,15 @@ def insert_document_item(item: Dict[str, Any]) -> None:
     cursor = conn.cursor()
 
     cursor.execute("""
-        INSERT INTO document_item (
+        INSERT INTO doc_items (
             id, document_id, page_id, parent_id, label, text,
             order_index, bbox, metadata, content, is_rag_enabled,
-            raw_json, created_at, updated_at
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            raw_json, self_ref, created_at, updated_at
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (id) DO UPDATE SET
             text = EXCLUDED.text,
             content = EXCLUDED.content,
+            self_ref = EXCLUDED.self_ref,
             updated_at = CURRENT_TIMESTAMP
     """, (
         item.get("id"),
@@ -172,6 +215,7 @@ def insert_document_item(item: Dict[str, Any]) -> None:
         json.dumps(item.get("content")) if item.get("content") else None,
         item.get("is_rag_enabled", True),
         json.dumps(item.get("raw_json")) if item.get("raw_json") else None,
+        item.get("self_ref"),
         datetime.now().isoformat(),
         datetime.now().isoformat(),
     ))
@@ -206,6 +250,7 @@ def insert_document_items(items: List[Dict[str, Any]]) -> None:
             json.dumps(item.get("content")) if item.get("content") else None,
             item.get("is_rag_enabled", True),
             json.dumps(item.get("raw_json")) if item.get("raw_json") else None,
+            item.get("self_ref"),
             now,
             now,
         ))
@@ -213,18 +258,19 @@ def insert_document_items(items: List[Dict[str, Any]]) -> None:
     execute_values(
         cursor,
         """
-        INSERT INTO document_item (
+        INSERT INTO doc_items (
             id, document_id, page_id, parent_id, label, text,
             order_index, bbox, metadata, content, is_rag_enabled,
-            raw_json, created_at, updated_at
+            raw_json, self_ref, created_at, updated_at
         ) VALUES %s
         ON CONFLICT (id) DO UPDATE SET
             text = EXCLUDED.text,
             content = EXCLUDED.content,
+            self_ref = EXCLUDED.self_ref,
             updated_at = CURRENT_TIMESTAMP
         """,
         data,
-        template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+        template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
     )
 
     conn.commit()
@@ -269,7 +315,7 @@ def query_document_items(
         params.append(is_rag_enabled)
 
     where_clause = " AND ".join(conditions) if conditions else "TRUE"
-    query = f"SELECT * FROM document_item WHERE {where_clause} ORDER BY {order_by}"
+    query = f"SELECT * FROM doc_items WHERE {where_clause} ORDER BY {order_by}"
 
     cursor.execute(query, params)
     rows = cursor.fetchall()
@@ -305,7 +351,7 @@ def delete_document_items_by_document(document_id: str) -> int:
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM document_item WHERE document_id = %s", (document_id,))
+    cursor.execute("DELETE FROM doc_items WHERE document_id = %s", (document_id,))
     count = cursor.rowcount
 
     conn.commit()
@@ -326,7 +372,7 @@ def update_item_textualization(item_id: str, textualization: str) -> None:
     cursor = conn.cursor()
 
     cursor.execute("""
-        UPDATE document_item 
+        UPDATE doc_items
         SET textualization = %s, updated_at = CURRENT_TIMESTAMP
         WHERE id = %s
     """, (textualization, item_id))
@@ -364,9 +410,9 @@ def query_items_needing_textualization(
 
     where_clause = " AND ".join(conditions)
     query = f"""
-        SELECT * FROM document_item 
-        WHERE {where_clause} 
-        ORDER BY order_index 
+        SELECT * FROM doc_items
+        WHERE {where_clause}
+        ORDER BY order_index
         LIMIT %s
     """
     params.append(limit)
@@ -395,7 +441,7 @@ def get_document_stats(document_id: str) -> Dict[str, Any]:
         SELECT
             label,
             COUNT(*) as count
-        FROM document_item
+        FROM doc_items
         WHERE document_id = %s
         GROUP BY label
         ORDER BY count DESC
@@ -411,12 +457,12 @@ def get_document_stats(document_id: str) -> Dict[str, Any]:
     return stats
 
 
-# ==================== document_info 表操作 ====================
+# ==================== doc_info 表操作 ====================
 
 
 def insert_document_info(doc_info: Dict[str, Any]) -> None:
     """
-    插入或更新 document_info 记录
+    插入或更新 doc_info 记录
 
     :param doc_info: 包含所有字段的字典
     """
@@ -424,7 +470,7 @@ def insert_document_info(doc_info: Dict[str, Any]) -> None:
     cursor = conn.cursor()
 
     cursor.execute("""
-        INSERT INTO document_info (
+        INSERT INTO doc_info (
             id, document_code, title, series_id,
             file_name, file_path, file_hash, file_size, file_format, page_count,
             revision, publication_date, effective_date, issuer, language,
@@ -510,7 +556,7 @@ def query_document_info(
     file_hash: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
-    查询 document_info 记录
+    查询 doc_info 记录
 
     :param document_id: 文档 ID
     :param document_code: 文档编号
@@ -542,7 +588,7 @@ def query_document_info(
         params.append(file_hash)
 
     where_clause = " AND ".join(conditions) if conditions else "TRUE"
-    query = f"SELECT * FROM document_info WHERE {where_clause} ORDER BY created_at DESC"
+    query = f"SELECT * FROM doc_info WHERE {where_clause} ORDER BY created_at DESC"
 
     cursor.execute(query, params)
     rows = cursor.fetchall()
@@ -577,7 +623,7 @@ def update_document_info_stats(
     cursor = conn.cursor()
 
     cursor.execute("""
-        UPDATE document_info SET
+        UPDATE doc_info SET
             item_count = %s,
             text_count = %s,
             title_count = %s,
@@ -603,7 +649,7 @@ def update_document_info_stats(
 
 def delete_document_info(document_id: str) -> int:
     """
-    删除文档信息及其关联的 document_items
+    删除文档信息及其关联的 doc_items
 
     :param document_id: 文档 ID
     :return: 删除的记录数
@@ -611,11 +657,133 @@ def delete_document_info(document_id: str) -> int:
     conn = get_connection()
     cursor = conn.cursor()
 
-    # 先删除关联的 document_items
-    cursor.execute("DELETE FROM document_item WHERE document_id = %s", (document_id,))
+    # 先删除关联的 doc_items
+    cursor.execute("DELETE FROM doc_items WHERE document_id = %s", (document_id,))
 
-    # 再删除 document_info
-    cursor.execute("DELETE FROM document_info WHERE id = %s", (document_id,))
+    # 再删除 doc_info
+    cursor.execute("DELETE FROM doc_info WHERE id = %s", (document_id,))
+    count = cursor.rowcount
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return count
+
+
+# ==================== doc_chunks 表操作 ====================
+
+
+def insert_chunks(chunks: List[Dict[str, Any]]) -> None:
+    """
+    批量插入 doc_chunks
+
+    :param chunks: chunk 字典列表
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    now = datetime.now().isoformat()
+    data = []
+    for chunk in chunks:
+        data.append((
+            chunk.get("id"),
+            chunk.get("document_id"),
+            chunk.get("chunk_index"),
+            chunk.get("text"),
+            json.dumps(chunk.get("headings")) if chunk.get("headings") else None,
+            chunk.get("heading_path"),
+            json.dumps(chunk.get("linked_item_ids")) if chunk.get("linked_item_ids") else None,
+            json.dumps(chunk.get("page_nos")) if chunk.get("page_nos") else None,
+            chunk.get("token_count"),
+            chunk.get("is_rag_enabled", True),
+            None,  # embedding 字段后续写入
+            now,
+        ))
+
+    execute_values(
+        cursor,
+        """
+        INSERT INTO doc_chunks (
+            id, document_id, chunk_index, text, headings, heading_path,
+            linked_item_ids, page_nos, token_count, is_rag_enabled,
+            embedding, created_at
+        ) VALUES %s
+        ON CONFLICT (id) DO UPDATE SET
+            text = EXCLUDED.text
+        """,
+        data,
+        template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+    )
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+
+def query_chunks(
+    document_id: Optional[str] = None,
+    is_rag_enabled: Optional[bool] = None,
+    order_by: str = "chunk_index"
+) -> List[Dict[str, Any]]:
+    """
+    查询 doc_chunks
+
+    :param document_id: 文档 ID
+    :param is_rag_enabled: 是否启用 RAG
+    :param order_by: 排序字段
+    :return: 查询结果列表
+    """
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    conditions = []
+    params = []
+
+    if document_id is not None:
+        conditions.append("document_id = %s")
+        params.append(document_id)
+    if is_rag_enabled is not None:
+        conditions.append("is_rag_enabled = %s")
+        params.append(is_rag_enabled)
+
+    where_clause = " AND ".join(conditions) if conditions else "TRUE"
+    query = f"SELECT * FROM doc_chunks WHERE {where_clause} ORDER BY {order_by}"
+
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+
+    results = []
+    for row in rows:
+        chunk = dict(row)
+        # 反序列化 JSON 字段
+        for json_field in ["headings", "linked_item_ids", "page_nos"]:
+            if chunk.get(json_field) and isinstance(chunk[json_field], str):
+                try:
+                    chunk[json_field] = json.loads(chunk[json_field])
+                except (json.JSONDecodeError, TypeError):
+                    chunk[json_field] = None
+        # 转换 datetime 为字符串
+        if chunk.get("created_at") and hasattr(chunk["created_at"], 'isoformat'):
+            chunk["created_at"] = chunk["created_at"].isoformat()
+        results.append(chunk)
+
+    cursor.close()
+    conn.close()
+    return results
+
+
+def delete_chunks_by_document(document_id: str) -> int:
+    """
+    删除指定文档的所有 doc_chunks
+
+    :param document_id: 文档 ID
+    :return: 删除的记录数
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM doc_chunks WHERE document_id = %s", (document_id,))
     count = cursor.rowcount
 
     conn.commit()
