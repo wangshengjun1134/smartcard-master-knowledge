@@ -30,6 +30,19 @@ export default function DocumentDetail() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
   const pageSize = 20
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
+
+  const toggleItem = (itemId: string) => {
+    setExpandedItems(prev => {
+      const next = new Set(prev)
+      if (next.has(itemId)) {
+        next.delete(itemId)
+      } else {
+        next.add(itemId)
+      }
+      return next
+    })
+  }
 
   useEffect(() => {
     loadData()
@@ -347,44 +360,59 @@ export default function DocumentDetail() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-mono text-sm">{item.order_index}</TableCell>
-                    <TableCell>
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${getLabelColor(item.label)}`}>
-                        {getLabelIcon(item.label)}
-                        {item.label}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="max-w-xl">
+                {items.map((item) => {
+                  const isExpanded = expandedItems.has(item.id)
+                  const content = item.textualization || item.text || ''
+                  const isLongContent = content.length > 200
+
+                  return (
+                    <TableRow
+                      key={item.id}
+                      className={isLongContent ? 'cursor-pointer' : ''}
+                      onClick={() => isLongContent && toggleItem(item.id)}
+                    >
+                      <TableCell className="font-mono text-sm">{item.order_index}</TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${getLabelColor(item.label)}`}>
+                          {getLabelIcon(item.label)}
+                          {item.label}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="max-w-xl">
+                          {item.textualization ? (
+                            <div className={`text-sm ${isExpanded ? 'whitespace-pre-wrap' : 'line-clamp-1 whitespace-nowrap overflow-hidden text-ellipsis'}`}>
+                              {item.textualization}
+                            </div>
+                          ) : item.text ? (
+                            <div className={`text-sm text-muted-foreground ${isExpanded ? 'whitespace-pre-wrap' : 'line-clamp-1 whitespace-nowrap overflow-hidden text-ellipsis'}`}>
+                              {item.text}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">-</span>
+                          )}
+                          {isLongContent && (
+                            <span className="text-xs text-muted-foreground mt-1 block">
+                              {isExpanded ? '点击收起' : '点击展开'}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         {item.textualization ? (
-                          <div className="text-sm whitespace-pre-wrap">
-                            {truncateText(item.textualization, 200)}
-                          </div>
-                        ) : item.text ? (
-                          <div className="text-sm text-muted-foreground">
-                            {truncateText(item.text, 200)}
-                          </div>
+                          <Badge variant="default">已文本化</Badge>
                         ) : (
-                          <span className="text-sm text-muted-foreground">-</span>
+                          <Badge variant="secondary">待文本化</Badge>
                         )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {item.textualization ? (
-                        <Badge variant="default">已文本化</Badge>
-                      ) : (
-                        <Badge variant="secondary">待文本化</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={item.is_rag_enabled ? 'default' : 'outline'}>
-                        {item.is_rag_enabled ? '启用' : '禁用'}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={item.is_rag_enabled ? 'default' : 'outline'}>
+                          {item.is_rag_enabled ? '启用' : '禁用'}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
 
