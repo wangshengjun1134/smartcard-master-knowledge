@@ -381,20 +381,15 @@ export default function DocumentDetail() {
                       <TableCell>
                         <div className="max-w-xl">
                           {item.textualization ? (
-                            <div className={`text-sm ${isExpanded ? 'whitespace-pre-wrap' : 'line-clamp-1 whitespace-nowrap overflow-hidden text-ellipsis'}`}>
+                            <div className={`text-sm ${isExpanded ? 'whitespace-pre-wrap' : 'line-clamp-1 whitespace-nowrap overflow-hidden text-ellipsis'}`} title={isExpanded ? undefined : item.textualization}>
                               {item.textualization}
                             </div>
                           ) : item.text ? (
-                            <div className={`text-sm text-muted-foreground ${isExpanded ? 'whitespace-pre-wrap' : 'line-clamp-1 whitespace-nowrap overflow-hidden text-ellipsis'}`}>
+                            <div className={`text-sm text-muted-foreground ${isExpanded ? 'whitespace-pre-wrap' : 'line-clamp-1 whitespace-nowrap overflow-hidden text-ellipsis'}`} title={isExpanded ? undefined : item.text}>
                               {item.text}
                             </div>
                           ) : (
                             <span className="text-sm text-muted-foreground">-</span>
-                          )}
-                          {isLongContent && (
-                            <span className="text-xs text-muted-foreground mt-1 block">
-                              {isExpanded ? '点击收起' : '点击展开'}
-                            </span>
                           )}
                         </div>
                       </TableCell>
