@@ -371,14 +371,14 @@ export default function DocumentDetail() {
                       className={isLongContent ? 'cursor-pointer' : ''}
                       onClick={() => isLongContent && toggleItem(item.id)}
                     >
-                      <TableCell className="font-mono text-sm">{item.order_index}</TableCell>
-                      <TableCell>
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${getLabelColor(item.label)}`}>
+                      <TableCell className="py-1.5 px-2 font-mono text-sm">{item.order_index}</TableCell>
+                      <TableCell className="py-1.5 px-2">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${getLabelColor(item.label)}`}>
                           {getLabelIcon(item.label)}
                           {item.label}
                         </span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-1.5 px-2">
                         <div className="max-w-xl">
                           {item.textualization ? (
                             <div className={`text-sm ${isExpanded ? 'whitespace-pre-wrap' : 'line-clamp-1 whitespace-nowrap overflow-hidden text-ellipsis'}`} title={isExpanded ? undefined : item.textualization}>
@@ -393,15 +393,15 @@ export default function DocumentDetail() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-1.5 px-2">
                         {item.textualization ? (
-                          <Badge variant="default">已文本化</Badge>
+                          <Badge variant="default" className="text-xs px-2 py-0">已文本化</Badge>
                         ) : (
-                          <Badge variant="secondary">待文本化</Badge>
+                          <Badge variant="secondary" className="text-xs px-2 py-0">待文本化</Badge>
                         )}
                       </TableCell>
-                      <TableCell>
-                        <Badge variant={item.is_rag_enabled ? 'default' : 'outline'}>
+                      <TableCell className="py-1.5 px-2">
+                        <Badge variant={item.is_rag_enabled ? 'default' : 'outline'} className="text-xs px-2 py-0">
                           {item.is_rag_enabled ? '启用' : '禁用'}
                         </Badge>
                       </TableCell>
