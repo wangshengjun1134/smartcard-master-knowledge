@@ -350,48 +350,41 @@ export default function DocumentDetail() {
                 {items.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-mono text-sm">{item.order_index}</TableCell>
-                      <TableCell>
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${getLabelColor(item.label)}`}>
-                          {getLabelIcon(item.label)}
-                          {item.label}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="max-w-xl">
-                          {item.textualization ? (
-                            <div
-                              className="text-sm whitespace-nowrap overflow-hidden text-ellipsis"
-                              title={item.textualization}
-                            >
-                              {item.textualization}
-                            </div>
-                          ) : item.text ? (
-                            <div
-                              className="text-sm text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis"
-                              title={item.text}
-                            >
-                              {item.text}
-                            </div>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">-</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${getLabelColor(item.label)}`}>
+                        {getLabelIcon(item.label)}
+                        {item.label}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="max-w-xl">
                         {item.textualization ? (
-                          <Badge variant="default">已文本化</Badge>
+                          <div className="text-sm whitespace-pre-wrap">
+                            {truncateText(item.textualization, 200)}
+                          </div>
+                        ) : item.text ? (
+                          <div className="text-sm text-muted-foreground">
+                            {truncateText(item.text, 200)}
+                          </div>
                         ) : (
-                          <Badge variant="secondary">待文本化</Badge>
+                          <span className="text-sm text-muted-foreground">-</span>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={item.is_rag_enabled ? 'default' : 'outline'}>
-                          {item.is_rag_enabled ? '启用' : '禁用'}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {item.textualization ? (
+                        <Badge variant="default">已文本化</Badge>
+                      ) : (
+                        <Badge variant="secondary">待文本化</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={item.is_rag_enabled ? 'default' : 'outline'}>
+                        {item.is_rag_enabled ? '启用' : '禁用'}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
 
