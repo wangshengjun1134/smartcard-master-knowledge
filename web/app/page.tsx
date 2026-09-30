@@ -21,6 +21,12 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -29,7 +35,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { formatFileSize, formatDate } from '@/lib/utils'
-import { Upload, FileText, Search, Moon, Sun, Plus, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Upload, FileText, Search, Moon, Sun, Plus, ChevronLeft, ChevronRight, MoreHorizontal, Eye, FileUp, Image, Layers } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { DocumentTree } from '@/components/document-tree'
 
@@ -494,37 +500,33 @@ export default function Home() {
                             {doc.created_at ? formatDate(doc.created_at) : '-'}
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <Link href={`/docs/${doc.id}`}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
                                 <Button variant="outline" size="sm">
-                                  查看
+                                  <MoreHorizontal className="h-4 w-4" />
                                 </Button>
-                              </Link>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleParse(doc)}
-                                disabled={processingDoc === doc.id}
-                              >
-                                {processingDoc === doc.id && processingType === 'parse' ? '解析中...' : '解析'}
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleVLM(doc)}
-                                disabled={processingDoc === doc.id}
-                              >
-                                {processingDoc === doc.id && processingType === 'vlm' ? 'VLM中...' : 'VLM'}
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleChunk(doc)}
-                                disabled={processingDoc === doc.id}
-                              >
-                                {processingDoc === doc.id && processingType === 'chunk' ? '分块中...' : '分块'}
-                              </Button>
-                            </div>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-40">
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/docs/${doc.id}`}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    查看
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleParse(doc)} disabled={processingDoc === doc.id}>
+                                  <FileUp className="h-4 w-4 mr-2" />
+                                  {processingDoc === doc.id && processingType === 'parse' ? '解析中...' : '解析'}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleVLM(doc)} disabled={processingDoc === doc.id}>
+                                  <Image className="h-4 w-4 mr-2" />
+                                  {processingDoc === doc.id && processingType === 'vlm' ? 'VLM中...' : 'VLM 增强'}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleChunk(doc)} disabled={processingDoc === doc.id}>
+                                  <Layers className="h-4 w-4 mr-2" />
+                                  {processingDoc === doc.id && processingType === 'chunk' ? '分块中...' : '分块'}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
                       ))}
