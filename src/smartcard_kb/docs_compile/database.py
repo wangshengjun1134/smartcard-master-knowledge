@@ -602,6 +602,12 @@ def query_document_info(
                 item["metadata"] = json.loads(item["metadata"])
             except (json.JSONDecodeError, TypeError):
                 pass
+        
+        # 转换 datetime 为字符串
+        for dt_field in ("created_at", "updated_at"):
+            if item.get(dt_field) and hasattr(item[dt_field], 'isoformat'):
+                item[dt_field] = item[dt_field].isoformat()
+                
         results.append(item)
 
     cursor.close()
