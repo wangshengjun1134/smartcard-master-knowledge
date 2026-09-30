@@ -295,6 +295,9 @@ export default function Home() {
               <Link href="/" className="text-sm font-medium hover:underline">
                 文档管理
               </Link>
+              <Link href="/search" className="text-sm font-medium hover:underline">
+                文档检索
+              </Link>
             </nav>
             <Button
               variant="outline"

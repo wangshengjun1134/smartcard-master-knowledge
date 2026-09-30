@@ -194,3 +194,34 @@ export async function generateEmbeddings(request: {
   const response = await api.post('/api/docs/process/embedding', request)
   return response.data
 }
+
+// ==================== 文档检索 API ====================
+
+export async function searchDocuments(request: {
+  query: string
+  document_id?: string
+  search_type?: string
+  top_k?: number
+  rerank_top_k?: number
+  threshold?: number
+  enable_rerank?: boolean
+}): Promise<{
+  query: string
+  total: number
+  results: Array<{
+    id: string
+    document_id: string
+    chunk_index: number
+    text: string
+    score: number
+    headings: string[]
+    heading_path: string
+    page_nos: number[]
+    token_count: number
+    linked_item_ids: string[]
+  }>
+  reranked: boolean
+}> {
+  const response = await api.post('/api/search', request)
+  return response.data
+}

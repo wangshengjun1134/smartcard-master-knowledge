@@ -62,4 +62,5 @@ dmypy.json
 output/
 
 smartcard_master_knowledge.egg-info/
--e "\n# ╡Бйтнд╪Ч\nspecs/*.pdf\n\n# ╩╥╬Ё╠Да©\n.env"  
+-e "\n# О©╫О©╫О©╫О©╫О©╫д╪О©╫\nspecs/*.pdf\n\n# О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫\n.env"  
+.env

@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     embedding_openai_model: str = "text-embedding-3-small"
     embedding_model: str = "D:/softdata/workspaces/ai-models/bge-m3"
 
+    # 重排模型配置
+    reranker_model: str = "D:/softdata/workspaces/ai-models/bge-reranker-v2-m3"
+
     # Docling 模型路径
     docling_models_path: str = ""
 
