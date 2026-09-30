@@ -38,7 +38,7 @@ class VLMRequest(BaseModel):
     backend_type: str = "openai"
     api_key: Optional[str] = None
     base_url: Optional[str] = None
-    model: str = "qwen-vl-max"
+    model: Optional[str] = None
     prompt: str = "请详细描述这张图片的内容，包括所有技术细节、图表数据、流程步骤等。如果是流程图或架构图，请说明各个组件之间的关系。"
     max_new_tokens: int = 512
 
