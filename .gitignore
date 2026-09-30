@@ -32,6 +32,7 @@ dist/
 downloads/
 eggs/
 .eggs/
+!web/lib/
 lib/
 lib64/
 parts/

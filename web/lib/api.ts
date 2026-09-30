@@ -143,3 +143,42 @@ export async function listDocumentChunks(
   const response = await api.get(`/api/docs/${documentId}/chunks`, { params })
   return response.data
 }
+
+// ==================== 文档处理流程 API ====================
+
+export async function parseDocument(request: {
+  pdf_path: string
+  document_id: string
+  page_range?: [number, number]
+  output_dir?: string
+  do_ocr?: boolean
+}): Promise<{ success: boolean; message: string; item_count: number }> {
+  const response = await api.post('/api/docs/process/parse', request)
+  return response.data
+}
+
+export async function generateVLMDocuments(request: {
+  document_id: string
+  output_dir?: string
+  backend_type?: string
+  api_key?: string
+  base_url?: string
+  model?: string
+  prompt?: string
+  max_new_tokens?: number
+}): Promise<{ success: boolean; message: string; processed: number; failed: number }> {
+  const response = await api.post('/api/docs/process/vlm', request)
+  return response.data
+}
+
+export async function chunkDocument(request: {
+  pdf_path: string
+  document_id: string
+  page_range?: [number, number]
+  max_tokens?: number
+  tokenizer_name?: string
+  do_ocr?: boolean
+}): Promise<{ success: boolean; message: string; chunk_count: number }> {
+  const response = await api.post('/api/docs/process/chunk', request)
+  return response.data
+}

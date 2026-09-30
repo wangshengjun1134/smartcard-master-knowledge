@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { listDocuments, uploadDocument } from '@/lib/api'
+import { listDocuments, uploadDocument, parseDocument, generateVLMDocuments, chunkDocument } from '@/lib/api'
 import type { DocumentInfo } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -52,6 +52,8 @@ export default function Home() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalDocs, setTotalDocs] = useState(0)
+  const [processingDoc, setProcessingDoc] = useState<string | null>(null)
+  const [processingType, setProcessingType] = useState<string | null>(null)
   const pageSize = 20
 
   useEffect(() => {
@@ -118,6 +120,83 @@ export default function Home() {
       })
     } finally {
       setUploading(false)
+    }
+  }
+
+  const handleParse = async (doc: DocumentInfo) => {
+    setProcessingDoc(doc.id)
+    setProcessingType('parse')
+    try {
+      const result = await parseDocument({
+        pdf_path: doc.file_path || '',
+        document_id: doc.id,
+        do_ocr: true,
+      })
+      toast({
+        title: '解析成功',
+        description: `已提取 ${result.item_count} 个 Items`,
+      })
+      await loadDocuments()
+    } catch (error: any) {
+      toast({
+        title: '解析失败',
+        description: error.response?.data?.detail || '请重试',
+        variant: 'destructive',
+      })
+    } finally {
+      setProcessingDoc(null)
+      setProcessingType(null)
+    }
+  }
+
+  const handleVLM = async (doc: DocumentInfo) => {
+    setProcessingDoc(doc.id)
+    setProcessingType('vlm')
+    try {
+      const result = await generateVLMDocuments({
+        document_id: doc.id,
+        backend_type: 'openai',
+      })
+      toast({
+        title: 'VLM 完成',
+        description: `成功 ${result.processed} 个，失败 ${result.failed} 个`,
+      })
+      await loadDocuments()
+    } catch (error: any) {
+      toast({
+        title: 'VLM 失败',
+        description: error.response?.data?.detail || '请重试',
+        variant: 'destructive',
+      })
+    } finally {
+      setProcessingDoc(null)
+      setProcessingType(null)
+    }
+  }
+
+  const handleChunk = async (doc: DocumentInfo) => {
+    setProcessingDoc(doc.id)
+    setProcessingType('chunk')
+    try {
+      const result = await chunkDocument({
+        pdf_path: doc.file_path || '',
+        document_id: doc.id,
+        max_tokens: 512,
+      })
+      toast({
+        title: '分块成功',
+        description: `已生成 ${result.chunk_count} 个 Chunks`,
+      })
+      await loadDocuments()
+    } catch (error: any) {
+      toast({
+        title: '分块失败',
+        description: error.response?.data?.detail || '请重试',
+        variant: 'destructive',
+      })
+    } finally {
+      setProcessingDoc(null)
+      setProcessingType(null)
     }
   }
 
@@ -415,12 +494,36 @@ export default function Home() {
                             {doc.created_at ? formatDate(doc.created_at) : '-'}
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <Link href={`/docs/${doc.id}`}>
                                 <Button variant="outline" size="sm">
                                   查看
                                 </Button>
                               </Link>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleParse(doc)}
+                                disabled={processingDoc === doc.id}
+                              >
+                                {processingDoc === doc.id && processingType === 'parse' ? '解析中...' : '解析'}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleVLM(doc)}
+                                disabled={processingDoc === doc.id}
+                              >
+                                {processingDoc === doc.id && processingType === 'vlm' ? 'VLM中...' : 'VLM'}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleChunk(doc)}
+                                disabled={processingDoc === doc.id}
+                              >
+                                {processingDoc === doc.id && processingType === 'chunk' ? '分块中...' : '分块'}
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
