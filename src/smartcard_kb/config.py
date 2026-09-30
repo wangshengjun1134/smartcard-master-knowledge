@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     embedding_openai_api_key: str = ""
     embedding_openai_base_url: str = ""
     embedding_openai_model: str = "text-embedding-3-small"
-    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    embedding_model: str = "D:/softdata/workspaces/ai-models/bge-m3"
 
     # Docling 模型路径
     docling_models_path: str = ""
