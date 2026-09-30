@@ -212,7 +212,7 @@ export default function Home() {
     try {
       const result = await generateEmbeddings({
         document_id: doc.id,
-        backend_type: 'openai',
+        backend_type: 'local',
       })
       toast({
         title: 'Embedding 任务已提交',

@@ -70,7 +70,7 @@ class ChunkResponse(BaseModel):
 class EmbeddingRequest(BaseModel):
     """Embedding 请求"""
     document_id: str
-    backend_type: str = "openai"
+    backend_type: str = "local"
     api_key: Optional[str] = None
     base_url: Optional[str] = None
     model: Optional[str] = None
