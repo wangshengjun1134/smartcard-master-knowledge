@@ -23,6 +23,7 @@ class Settings(BaseSettings):
 
     # OpenAI 配置
     openai_api_key: str = ""
+    openai_base_url: str = ""
     openai_model: str = "gpt-4"
 
     # 嵌入模型配置
