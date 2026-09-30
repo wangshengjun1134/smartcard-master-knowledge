@@ -163,7 +163,8 @@ def init_database():
             token_count INTEGER,
             is_rag_enabled BOOLEAN DEFAULT TRUE,
             embedding BYTEA,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
@@ -175,6 +176,19 @@ def init_database():
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_doc_chunks_is_rag_enabled
         ON doc_chunks(is_rag_enabled)
+    """)
+
+    # 为已存在的 doc_chunks 表添加 updated_at 字段（如果不存在）
+    cursor.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'doc_chunks' AND column_name = 'updated_at'
+            ) THEN
+                ALTER TABLE doc_chunks ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+            END IF;
+        END $$;
     """)
 
     conn.commit()

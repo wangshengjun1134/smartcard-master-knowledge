@@ -111,7 +111,7 @@ class EmbeddingService:
         
         cursor.execute("""
             UPDATE doc_chunks
-            SET embedding = %s
+            SET embedding = %s, updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
         """, (embedding_bytes, chunk_id))
         conn.commit()
