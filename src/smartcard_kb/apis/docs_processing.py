@@ -120,7 +120,13 @@ def generate_vlm_descriptions(request: VLMRequest):
             "openai_base_url": request.base_url or settings.vlm_openai_base_url,
             "openai_model": request.model or settings.vlm_openai_model,
         }
-        
+
+        if not vlm_config.get("openai_api_key"):
+            raise HTTPException(
+                status_code=400,
+                detail="VLM API Key 未配置。请设置环境变量 VLM_OPENAI_API_KEY 或在请求中传入 api_key。"
+            )
+
         service = VLMService(vlm_config=vlm_config)
         result = service.generate_vlm_descriptions(
             document_id=request.document_id,
