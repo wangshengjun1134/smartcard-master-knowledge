@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { listDocuments, uploadDocument, parseDocument, generateVLMDocuments, chunkDocument } from '@/lib/api'
+import { listDocuments, uploadDocument, parseDocument, generateVLMDocuments, chunkDocument, generateEmbeddings } from '@/lib/api'
 import type { DocumentInfo } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { formatFileSize, formatDate } from '@/lib/utils'
-import { Upload, FileText, Search, Moon, Sun, Plus, ChevronLeft, ChevronRight, MoreHorizontal, Eye, FileUp, Image, Layers } from 'lucide-react'
+import { Upload, FileText, Search, Moon, Sun, Plus, ChevronLeft, ChevronRight, MoreHorizontal, Eye, FileUp, Image, Layers, Database } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { DocumentTree } from '@/components/document-tree'
 
@@ -197,6 +197,31 @@ export default function Home() {
     } catch (error: any) {
       toast({
         title: '分块失败',
+        description: error.response?.data?.detail || '请重试',
+        variant: 'destructive',
+      })
+    } finally {
+      setProcessingDoc(null)
+      setProcessingType(null)
+    }
+  }
+
+  const handleEmbedding = async (doc: DocumentInfo) => {
+    setProcessingDoc(doc.id)
+    setProcessingType('embedding')
+    try {
+      const result = await generateEmbeddings({
+        document_id: doc.id,
+        backend_type: 'openai',
+      })
+      toast({
+        title: 'Embedding 完成',
+        description: `成功 ${result.processed} 个，失败 ${result.failed} 个`,
+      })
+      await loadDocuments()
+    } catch (error: any) {
+      toast({
+        title: 'Embedding 失败',
         description: error.response?.data?.detail || '请重试',
         variant: 'destructive',
       })
@@ -524,6 +549,10 @@ export default function Home() {
                                 <DropdownMenuItem onClick={() => handleChunk(doc)} disabled={processingDoc === doc.id}>
                                   <Layers className="h-4 w-4 mr-2" />
                                   {processingDoc === doc.id && processingType === 'chunk' ? '分块中...' : '分块'}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleEmbedding(doc)} disabled={processingDoc === doc.id}>
+                                  <Database className="h-4 w-4 mr-2" />
+                                  {processingDoc === doc.id && processingType === 'embedding' ? 'Embedding中...' : 'Embedding'}
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>

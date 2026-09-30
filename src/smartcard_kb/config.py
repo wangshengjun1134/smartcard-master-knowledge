@@ -29,9 +29,12 @@ class Settings(BaseSettings):
     # VLM 配置
     vlm_openai_api_key: str = ""
     vlm_openai_base_url: str = ""
-    vlm_openai_model: str = "qwen-vl-max"
+    vlm_openai_model: str = "qwen-vl-plus"
 
-    # 嵌入模型配置
+    # Embedding 配置
+    embedding_openai_api_key: str = ""
+    embedding_openai_base_url: str = ""
+    embedding_openai_model: str = "text-embedding-3-small"
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
 
     # Docling 模型路径

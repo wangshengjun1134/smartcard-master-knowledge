@@ -182,3 +182,15 @@ export async function chunkDocument(request: {
   const response = await api.post('/api/docs/process/chunk', request)
   return response.data
 }
+
+export async function generateEmbeddings(request: {
+  document_id: string
+  backend_type?: string
+  api_key?: string
+  base_url?: string
+  model?: string
+  model_name?: string
+}): Promise<{ success: boolean; message: string; processed: number; failed: number }> {
+  const response = await api.post('/api/docs/process/embedding', request)
+  return response.data
+}

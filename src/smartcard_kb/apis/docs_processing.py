@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from smartcard_kb.docs_compile.pdf_parser import PDFParser
 from smartcard_kb.docs_compile.vlm_service import VLMService
+from smartcard_kb.docs_compile.embedding_service import EmbeddingService
 from smartcard_kb.docs_compile.chunker import Chunker
 from smartcard_kb.config import settings
 
@@ -66,6 +67,24 @@ class ChunkResponse(BaseModel):
     success: bool
     message: str
     chunk_count: int
+
+
+class EmbeddingRequest(BaseModel):
+    """Embedding 请求"""
+    document_id: str
+    backend_type: str = "openai"
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    model: Optional[str] = None
+    model_name: Optional[str] = None  # 本地模型名称
+
+
+class EmbeddingResponse(BaseModel):
+    """Embedding 响应"""
+    success: bool
+    message: str
+    processed: int
+    failed: int
 
 
 # ==================== API 接口 ====================
@@ -176,3 +195,45 @@ def chunk_document(request: ChunkRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"分块失败: {str(e)}")
+
+
+@router.post("/process/embedding", response_model=EmbeddingResponse)
+def generate_embeddings(request: EmbeddingRequest):
+    """
+    为文档的 Chunks 生成向量嵌入
+
+    - **document_id**: 文档 ID
+    - **backend_type**: Embedding 后端类型（openai / local）
+    - **api_key**: Embedding API Key
+    - **base_url**: Embedding API 基础 URL
+    - **model**: Embedding 模型名称（OpenAI 后端）
+    - **model_name**: 本地模型名称（local 后端）
+    """
+    try:
+        if not request.api_key and request.backend_type == "openai":
+            raise HTTPException(
+                status_code=400,
+                detail="Embedding API Key 未配置。请设置环境变量 EMBEDDING_OPENAI_API_KEY 或在请求中传入 api_key。"
+            )
+
+        embedding_config = {
+            "backend_type": request.backend_type,
+            "openai_api_key": request.api_key or settings.embedding_openai_api_key,
+            "openai_base_url": request.base_url or settings.embedding_openai_base_url,
+            "openai_model": request.model or settings.embedding_openai_model,
+            "model_name": request.model_name or settings.embedding_model,
+        }
+
+        service = EmbeddingService(embedding_config=embedding_config)
+        result = service.generate_embeddings(
+            document_id=request.document_id,
+        )
+
+        return EmbeddingResponse(
+            success=True,
+            message="Embedding 生成完成",
+            processed=result["processed"],
+            failed=result["failed"],
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Embedding 生成失败: {str(e)}")
