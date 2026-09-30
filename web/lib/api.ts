@@ -152,7 +152,7 @@ export async function parseDocument(request: {
   page_range?: [number, number]
   output_dir?: string
   do_ocr?: boolean
-}): Promise<{ success: boolean; message: string; item_count: number }> {
+}): Promise<{ success: boolean; message: string }> {
   const response = await api.post('/api/docs/process/parse', request)
   return response.data
 }
@@ -166,7 +166,7 @@ export async function generateVLMDocuments(request: {
   model?: string
   prompt?: string
   max_new_tokens?: number
-}): Promise<{ success: boolean; message: string; processed: number; failed: number }> {
+}): Promise<{ success: boolean; message: string }> {
   const response = await api.post('/api/docs/process/vlm', request)
   return response.data
 }
@@ -178,7 +178,7 @@ export async function chunkDocument(request: {
   max_tokens?: number
   tokenizer_name?: string
   do_ocr?: boolean
-}): Promise<{ success: boolean; message: string; chunk_count: number }> {
+}): Promise<{ success: boolean; message: string }> {
   const response = await api.post('/api/docs/process/chunk', request)
   return response.data
 }
@@ -190,7 +190,7 @@ export async function generateEmbeddings(request: {
   base_url?: string
   model?: string
   model_name?: string
-}): Promise<{ success: boolean; message: string; processed: number; failed: number }> {
+}): Promise<{ success: boolean; message: string }> {
   const response = await api.post('/api/docs/process/embedding', request)
   return response.data
 }

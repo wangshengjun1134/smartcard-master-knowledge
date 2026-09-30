@@ -139,8 +139,8 @@ export default function Home() {
         do_ocr: true,
       })
       toast({
-        title: '解析成功',
-        description: `已提取 ${result.item_count} 个 Items`,
+        title: '解析任务已提交',
+        description: result.message || '正在后台处理，请稍后刷新查看',
       })
       await loadDocuments()
     } catch (error: any) {
@@ -164,8 +164,8 @@ export default function Home() {
         backend_type: 'openai',
       })
       toast({
-        title: 'VLM 完成',
-        description: `成功 ${result.processed} 个，失败 ${result.failed} 个`,
+        title: 'VLM 任务已提交',
+        description: result.message || '正在后台处理，请稍后刷新查看',
       })
       await loadDocuments()
     } catch (error: any) {
@@ -190,8 +190,8 @@ export default function Home() {
         max_tokens: 512,
       })
       toast({
-        title: '分块成功',
-        description: `已生成 ${result.chunk_count} 个 Chunks`,
+        title: '分块任务已提交',
+        description: result.message || '正在后台处理，请稍后刷新查看',
       })
       await loadDocuments()
     } catch (error: any) {
@@ -215,8 +215,8 @@ export default function Home() {
         backend_type: 'openai',
       })
       toast({
-        title: 'Embedding 完成',
-        description: `成功 ${result.processed} 个，失败 ${result.failed} 个`,
+        title: 'Embedding 任务已提交',
+        description: result.message || '正在后台处理，请稍后刷新查看',
       })
       await loadDocuments()
     } catch (error: any) {
@@ -233,10 +233,23 @@ export default function Home() {
 
   const getStatusBadge = (status?: string) => {
     const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-      pending: { label: '等待处理', variant: 'secondary' },
-      processing: { label: '处理中', variant: 'default' },
+      uploaded: { label: '已上传', variant: 'secondary' },
+      parsing: { label: '解析中', variant: 'default' },
+      parsed: { label: '已解析', variant: 'outline' },
+      vlm_processing: { label: 'VLM处理中', variant: 'default' },
+      vlm_completed: { label: 'VLM已完成', variant: 'outline' },
+      chunking: { label: '分块中', variant: 'default' },
+      chunked: { label: '已分块', variant: 'outline' },
+      embedding: { label: 'Embedding中', variant: 'default' },
+      embedded: { label: '已嵌入', variant: 'outline' },
+      parse_failed: { label: '解析失败', variant: 'destructive' },
+      vlm_failed: { label: 'VLM失败', variant: 'destructive' },
+      chunk_failed: { label: '分块失败', variant: 'destructive' },
+      embedding_failed: { label: 'Embedding失败', variant: 'destructive' },
       completed: { label: '已完成', variant: 'default' },
       failed: { label: '失败', variant: 'destructive' },
+      pending: { label: '等待处理', variant: 'secondary' },
+      processing: { label: '处理中', variant: 'default' },
     }
     const config = statusMap[status || 'pending'] || { label: status || 'unknown', variant: 'outline' as const }
     return <Badge variant={config.variant}>{config.label}</Badge>

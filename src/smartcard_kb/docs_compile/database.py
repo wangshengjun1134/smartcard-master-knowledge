@@ -653,6 +653,49 @@ def update_document_info_stats(
     conn.close()
 
 
+def update_document_info(doc_info: Dict[str, Any]) -> None:
+    """
+    更新文档信息（只更新传入的字段）
+
+    :param doc_info: 包含 id 和需要更新的字段的字典
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # 构建动态 SET 子句
+    allowed_fields = [
+        "document_code", "title", "series_id", "file_name", "file_path",
+        "file_hash", "file_size", "file_format", "page_count",
+        "revision", "publication_date", "effective_date", "issuer", "language",
+        "source_type", "parser", "parser_version",
+        "processing_status", "processing_started_at", "processing_finished_at", "processing_error",
+        "item_count", "text_count", "title_count", "table_count", "picture_count", "formula_count",
+        "metadata",
+    ]
+
+    set_clauses = []
+    values = []
+    for field in allowed_fields:
+        if field in doc_info:
+            set_clauses.append(f"{field} = %s")
+            values.append(doc_info[field])
+
+    if not set_clauses:
+        cursor.close()
+        conn.close()
+        return
+
+    set_clauses.append("updated_at = CURRENT_TIMESTAMP")
+    values.append(doc_info["id"])
+
+    query = f"UPDATE doc_info SET {', '.join(set_clauses)} WHERE id = %s"
+    cursor.execute(query, values)
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+
 def delete_document_info(document_id: str) -> int:
     """
     删除文档信息及其关联的 doc_items

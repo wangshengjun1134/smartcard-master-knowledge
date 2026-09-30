@@ -1,13 +1,15 @@
-"""文档处理 API 接口 - 解析、VLM 增强、分块"""
+"""文档处理 API 接口 - 解析、VLM 增强、分块、Embedding（异步）"""
 
+import asyncio
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 
 from smartcard_kb.docs_compile.pdf_parser import PDFParser
 from smartcard_kb.docs_compile.vlm_service import VLMService
 from smartcard_kb.docs_compile.embedding_service import EmbeddingService
 from smartcard_kb.docs_compile.chunker import Chunker
+from smartcard_kb.docs_compile.database import update_document_info, get_document_stats
 from smartcard_kb.config import settings
 
 router = APIRouter(prefix="/api/docs", tags=["文档处理流程"])
@@ -29,7 +31,6 @@ class ParseResponse(BaseModel):
     """解析响应"""
     success: bool
     message: str
-    item_count: int
 
 
 class VLMRequest(BaseModel):
@@ -48,8 +49,6 @@ class VLMResponse(BaseModel):
     """VLM 响应"""
     success: bool
     message: str
-    processed: int
-    failed: int
 
 
 class ChunkRequest(BaseModel):
@@ -66,7 +65,6 @@ class ChunkResponse(BaseModel):
     """分块响应"""
     success: bool
     message: str
-    chunk_count: int
 
 
 class EmbeddingRequest(BaseModel):
@@ -76,24 +74,201 @@ class EmbeddingRequest(BaseModel):
     api_key: Optional[str] = None
     base_url: Optional[str] = None
     model: Optional[str] = None
-    model_name: Optional[str] = None  # 本地模型名称
+    model_name: Optional[str] = None
 
 
 class EmbeddingResponse(BaseModel):
     """Embedding 响应"""
     success: bool
     message: str
-    processed: int
-    failed: int
+
+
+# ==================== 后台任务函数 ====================
+
+
+async def _async_parse(
+    pdf_path: str,
+    document_id: str,
+    page_range: Optional[tuple],
+    output_dir: str,
+    do_ocr: bool,
+):
+    """异步解析 PDF"""
+    try:
+        update_document_info({
+            "id": document_id,
+            "processing_status": "parsing",
+            "processing_started_at": "NOW()",
+        })
+
+        parser = PDFParser(do_ocr=do_ocr)
+        result = parser.parse_pdf(
+            pdf_path=pdf_path,
+            document_id=document_id,
+            page_range=page_range,
+            output_dir=output_dir,
+        )
+
+        # 更新统计信息
+        stats = get_document_stats(document_id)
+        type_counts = {
+            "item_count": len(result.get("items", [])),
+            "text_count": stats.get("text", 0),
+            "title_count": stats.get("section_header", 0),
+            "table_count": stats.get("table", 0),
+            "picture_count": stats.get("picture", 0),
+            "formula_count": stats.get("formula", 0),
+        }
+        update_document_info({
+            "id": document_id,
+            "processing_status": "parsed",
+            **type_counts,
+        })
+    except Exception as e:
+        print(f"Error: Parse failed for {document_id}: {e}")
+        update_document_info({
+            "id": document_id,
+            "processing_status": "parse_failed",
+            "processing_error": str(e),
+        })
+
+
+async def _async_vlm(
+    document_id: str,
+    output_dir: str,
+    backend_type: str,
+    api_key: Optional[str],
+    base_url: Optional[str],
+    model: Optional[str],
+    prompt: str,
+    max_new_tokens: int,
+):
+    """异步生成 VLM 描述"""
+    try:
+        update_document_info({
+            "id": document_id,
+            "processing_status": "vlm_processing",
+        })
+
+        vlm_config = {
+            "backend_type": backend_type,
+            "openai_api_key": api_key or settings.vlm_openai_api_key,
+            "openai_base_url": base_url or settings.vlm_openai_base_url,
+            "openai_model": model or settings.vlm_openai_model,
+        }
+
+        if not vlm_config.get("openai_api_key"):
+            raise ValueError("VLM API Key 未配置")
+
+        service = VLMService(vlm_config=vlm_config)
+        result = service.generate_vlm_descriptions(
+            document_id=document_id,
+            output_dir=output_dir,
+            prompt=prompt,
+            max_new_tokens=max_new_tokens,
+        )
+
+        update_document_info({
+            "id": document_id,
+            "processing_status": "vlm_completed",
+        })
+        print(f"VLM completed for {document_id}: {result}")
+    except Exception as e:
+        print(f"Error: VLM failed for {document_id}: {e}")
+        update_document_info({
+            "id": document_id,
+            "processing_status": "vlm_failed",
+            "processing_error": str(e),
+        })
+
+
+async def _async_chunk(
+    pdf_path: str,
+    document_id: str,
+    page_range: Optional[tuple],
+    max_tokens: int,
+    tokenizer_name: str,
+    do_ocr: bool,
+):
+    """异步分块"""
+    try:
+        update_document_info({
+            "id": document_id,
+            "processing_status": "chunking",
+        })
+
+        chunker = Chunker(
+            do_ocr=do_ocr,
+            max_tokens=max_tokens,
+            tokenizer_name=tokenizer_name,
+        )
+        result = chunker.generate_chunks(
+            pdf_path=pdf_path,
+            document_id=document_id,
+            page_range=page_range,
+        )
+
+        update_document_info({
+            "id": document_id,
+            "processing_status": "chunked",
+        })
+        print(f"Chunking completed for {document_id}: {len(result.get('chunks', []))} chunks")
+    except Exception as e:
+        print(f"Error: Chunking failed for {document_id}: {e}")
+        update_document_info({
+            "id": document_id,
+            "processing_status": "chunk_failed",
+            "processing_error": str(e),
+        })
+
+
+async def _async_embedding(
+    document_id: str,
+    backend_type: str,
+    api_key: Optional[str],
+    base_url: Optional[str],
+    model: Optional[str],
+    model_name: Optional[str],
+):
+    """异步生成 Embedding"""
+    try:
+        update_document_info({
+            "id": document_id,
+            "processing_status": "embedding",
+        })
+
+        embedding_config = {
+            "backend_type": backend_type,
+            "openai_api_key": api_key or settings.embedding_openai_api_key,
+            "openai_base_url": base_url or settings.embedding_openai_base_url,
+            "openai_model": model or settings.embedding_openai_model,
+            "model_name": model_name or settings.embedding_model,
+        }
+
+        service = EmbeddingService(embedding_config=embedding_config)
+        result = service.generate_embeddings(document_id=document_id)
+
+        update_document_info({
+            "id": document_id,
+            "processing_status": "embedded",
+        })
+        print(f"Embedding completed for {document_id}: {result}")
+    except Exception as e:
+        print(f"Error: Embedding failed for {document_id}: {e}")
+        update_document_info({
+            "id": document_id,
+            "processing_status": "embedding_failed",
+            "processing_error": str(e),
+        })
 
 
 # ==================== API 接口 ====================
 
 
 @router.post("/process/parse", response_model=ParseResponse)
-def parse_document(request: ParseRequest):
+async def parse_document(request: ParseRequest, background_tasks: BackgroundTasks):
     """
-    解析 PDF 文档并保存 Items
+    异步解析 PDF 文档并保存 Items
 
     - **pdf_path**: PDF 文件路径
     - **document_id**: 文档 ID
@@ -101,27 +276,24 @@ def parse_document(request: ParseRequest):
     - **output_dir**: 图片保存目录
     - **do_ocr**: 是否启用 OCR
     """
-    try:
-        parser = PDFParser(do_ocr=request.do_ocr)
-        result = parser.parse_pdf(
-            pdf_path=request.pdf_path,
-            document_id=request.document_id,
-            page_range=request.page_range,
-            output_dir=request.output_dir,
-        )
-        return ParseResponse(
-            success=True,
-            message="PDF 解析完成",
-            item_count=len(result.get("items", [])),
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"解析失败: {str(e)}")
+    background_tasks.add_task(
+        _async_parse,
+        request.pdf_path,
+        request.document_id,
+        request.page_range,
+        request.output_dir,
+        request.do_ocr,
+    )
+    return ParseResponse(
+        success=True,
+        message="PDF 解析任务已提交，正在后台处理",
+    )
 
 
 @router.post("/process/vlm", response_model=VLMResponse)
-def generate_vlm_descriptions(request: VLMRequest):
+async def generate_vlm_descriptions(request: VLMRequest, background_tasks: BackgroundTasks):
     """
-    为文档的图片 Items 生成 VLM 描述
+    异步为文档的图片 Items 生成 VLM 描述
 
     - **document_id**: 文档 ID
     - **output_dir**: 图片保存目录
@@ -132,42 +304,33 @@ def generate_vlm_descriptions(request: VLMRequest):
     - **prompt**: VLM 提示词
     - **max_new_tokens**: 最大生成 token 数
     """
-    try:
-        vlm_config = {
-            "backend_type": request.backend_type,
-            "openai_api_key": request.api_key or settings.vlm_openai_api_key,
-            "openai_base_url": request.base_url or settings.vlm_openai_base_url,
-            "openai_model": request.model or settings.vlm_openai_model,
-        }
-
-        if not vlm_config.get("openai_api_key"):
-            raise HTTPException(
-                status_code=400,
-                detail="VLM API Key 未配置。请设置环境变量 VLM_OPENAI_API_KEY 或在请求中传入 api_key。"
-            )
-
-        service = VLMService(vlm_config=vlm_config)
-        result = service.generate_vlm_descriptions(
-            document_id=request.document_id,
-            output_dir=request.output_dir,
-            prompt=request.prompt,
-            max_new_tokens=request.max_new_tokens,
+    if not request.api_key and not settings.vlm_openai_api_key:
+        raise HTTPException(
+            status_code=400,
+            detail="VLM API Key 未配置。请设置环境变量 VLM_OPENAI_API_KEY 或在请求中传入 api_key。"
         )
-        
-        return VLMResponse(
-            success=True,
-            message="VLM 描述生成完成",
-            processed=result["processed"],
-            failed=result["failed"],
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"VLM 生成失败: {str(e)}")
+
+    background_tasks.add_task(
+        _async_vlm,
+        request.document_id,
+        request.output_dir,
+        request.backend_type,
+        request.api_key,
+        request.base_url,
+        request.model,
+        request.prompt,
+        request.max_new_tokens,
+    )
+    return VLMResponse(
+        success=True,
+        message="VLM 增强任务已提交，正在后台处理",
+    )
 
 
 @router.post("/process/chunk", response_model=ChunkResponse)
-def chunk_document(request: ChunkRequest):
+async def chunk_document(request: ChunkRequest, background_tasks: BackgroundTasks):
     """
-    对文档进行语义分块（自动注入 VLM 描述）
+    异步对文档进行语义分块（自动注入 VLM 描述）
 
     - **pdf_path**: PDF 文件路径
     - **document_id**: 文档 ID
@@ -176,31 +339,25 @@ def chunk_document(request: ChunkRequest):
     - **tokenizer_name**: tokenizer 名称
     - **do_ocr**: 是否启用 OCR
     """
-    try:
-        chunker = Chunker(
-            do_ocr=request.do_ocr,
-            max_tokens=request.max_tokens,
-            tokenizer_name=request.tokenizer_name,
-        )
-        result = chunker.generate_chunks(
-            pdf_path=request.pdf_path,
-            document_id=request.document_id,
-            page_range=request.page_range,
-        )
-        
-        return ChunkResponse(
-            success=True,
-            message="文档分块完成",
-            chunk_count=len(result.get("chunks", [])),
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"分块失败: {str(e)}")
+    background_tasks.add_task(
+        _async_chunk,
+        request.pdf_path,
+        request.document_id,
+        request.page_range,
+        request.max_tokens,
+        request.tokenizer_name,
+        request.do_ocr,
+    )
+    return ChunkResponse(
+        success=True,
+        message="文档分块任务已提交，正在后台处理",
+    )
 
 
 @router.post("/process/embedding", response_model=EmbeddingResponse)
-def generate_embeddings(request: EmbeddingRequest):
+async def generate_embeddings(request: EmbeddingRequest, background_tasks: BackgroundTasks):
     """
-    为文档的 Chunks 生成向量嵌入
+    异步为文档的 Chunks 生成向量嵌入
 
     - **document_id**: 文档 ID
     - **backend_type**: Embedding 后端类型（openai / local）
@@ -209,31 +366,22 @@ def generate_embeddings(request: EmbeddingRequest):
     - **model**: Embedding 模型名称（OpenAI 后端）
     - **model_name**: 本地模型名称（local 后端）
     """
-    try:
-        if not request.api_key and request.backend_type == "openai":
-            raise HTTPException(
-                status_code=400,
-                detail="Embedding API Key 未配置。请设置环境变量 EMBEDDING_OPENAI_API_KEY 或在请求中传入 api_key。"
-            )
-
-        embedding_config = {
-            "backend_type": request.backend_type,
-            "openai_api_key": request.api_key or settings.embedding_openai_api_key,
-            "openai_base_url": request.base_url or settings.embedding_openai_base_url,
-            "openai_model": request.model or settings.embedding_openai_model,
-            "model_name": request.model_name or settings.embedding_model,
-        }
-
-        service = EmbeddingService(embedding_config=embedding_config)
-        result = service.generate_embeddings(
-            document_id=request.document_id,
+    if not request.api_key and not settings.embedding_openai_api_key and request.backend_type == "openai":
+        raise HTTPException(
+            status_code=400,
+            detail="Embedding API Key 未配置。请设置环境变量 EMBEDDING_OPENAI_API_KEY 或在请求中传入 api_key。"
         )
 
-        return EmbeddingResponse(
-            success=True,
-            message="Embedding 生成完成",
-            processed=result["processed"],
-            failed=result["failed"],
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Embedding 生成失败: {str(e)}")
+    background_tasks.add_task(
+        _async_embedding,
+        request.document_id,
+        request.backend_type,
+        request.api_key,
+        request.base_url,
+        request.model,
+        request.model_name,
+    )
+    return EmbeddingResponse(
+        success=True,
+        message="Embedding 生成任务已提交，正在后台处理",
+    )

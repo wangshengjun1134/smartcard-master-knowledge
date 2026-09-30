@@ -400,7 +400,7 @@ async def upload_document(
         "language": language,
         "source_type": "upload",
         "parser": "docling",
-        "processing_status": "pending",
+        "processing_status": "uploaded",
         "processing_started_at": datetime.now().isoformat(),
     }
 
