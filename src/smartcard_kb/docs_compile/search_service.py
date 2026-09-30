@@ -103,12 +103,16 @@ class SearchService:
 
             # 解析 embedding（JSON 字节格式）
             try:
+                # PostgreSQL bytea 返回 memoryview，需要转换
+                if isinstance(embedding_bytes, memoryview):
+                    embedding_bytes = embedding_bytes.tobytes()
                 if isinstance(embedding_bytes, bytes):
                     embedding_json = embedding_bytes.decode('utf-8')
                 else:
-                    embedding_json = embedding_bytes
+                    embedding_json = str(embedding_bytes)
                 chunk_embedding = json.loads(embedding_json)
-            except (json.JSONDecodeError, UnicodeDecodeError):
+            except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
+                print(f"Warning: Failed to parse embedding for chunk {chunk.get('id')}: {e}")
                 continue
 
             chunk_vec = np.array(chunk_embedding)
