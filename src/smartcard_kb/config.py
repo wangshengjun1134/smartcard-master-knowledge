@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     embedding_model: str = "D:/softdata/workspaces/ai-models/bge-m3"
 
     # 重排模型配置
-    reranker_model: str = "D:/softdata/workspaces/ai-models/bge-reranker-v2-m3"
+    reranker_model: str = "BAAI/bge-reranker-v2-m3"
 
     # Docling 模型路径
     docling_models_path: str = ""

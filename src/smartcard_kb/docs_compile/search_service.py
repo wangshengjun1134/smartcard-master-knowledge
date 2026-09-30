@@ -18,7 +18,7 @@ class SearchService:
         embedding_backend: Optional[LocalEmbeddingBackend] = None,
         reranker_backend: Optional[LocalRerankerBackend] = None,
         embedding_model_path: str = "D:/softdata/workspaces/ai-models/bge-m3",
-        reranker_model_path: str = "D:/softdata/workspaces/ai-models/bge-reranker-v2-m3",
+        reranker_model_path: str = "BAAI/bge-reranker-v2-m3",
     ):
         """
         初始化检索服务
@@ -29,7 +29,16 @@ class SearchService:
         :param reranker_model_path: 重排模型路径
         """
         self.embedding_backend = embedding_backend or LocalEmbeddingBackend(model_name=embedding_model_path)
-        self.reranker_backend = reranker_backend or LocalRerankerBackend(model_path=reranker_model_path)
+        
+        # 尝试加载重排模型，如果失败则禁用重排功能
+        try:
+            self.reranker_backend = reranker_backend or LocalRerankerBackend(model_path=reranker_model_path)
+            self.reranker_available = True
+        except Exception as e:
+            print(f"Warning: 重排模型加载失败: {e}")
+            print("重排功能将不可用，系统将使用向量检索")
+            self.reranker_backend = None
+            self.reranker_available = False
 
     def search(
         self,
@@ -179,6 +188,10 @@ class SearchService:
     ) -> Tuple[List[Dict[str, Any]], bool]:
         """重排"""
         if len(results) <= 1:
+            return results, False
+        
+        # 如果重排模型不可用，返回原始结果
+        if not self.reranker_available or self.reranker_backend is None:
             return results, False
 
         # 提取文档文本
