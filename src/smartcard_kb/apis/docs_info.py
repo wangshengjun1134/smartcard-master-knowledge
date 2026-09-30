@@ -15,7 +15,6 @@ from smartcard_kb.docs_compile.database import (
     get_document_stats,
     query_chunks,
 )
-from smartcard_kb.docs_compile.pdf_parser import PDFParser
 
 router = APIRouter(prefix="/api/docs", tags=["文档管理"])
 
@@ -340,17 +339,16 @@ def delete_document(document_id: str):
 
 
 @router.post("/upload", response_model=DocumentInfoResponse)
-async def upload_and_parse_document(
+async def upload_document(
     file: UploadFile = File(...),
     document_code: Optional[str] = Form(None),
     title: Optional[str] = Form(None),
     series_id: Optional[str] = Form(None),
     issuer: Optional[str] = Form(None),
     language: Optional[str] = Form("en"),
-    parse_pages: Optional[str] = Form(None),
 ):
     """
-    上传 PDF 文件并自动解析
+    上传 PDF 文件并保存文档信息
 
     - **file**: PDF 文件
     - **document_code**: 文档编号（可选）
@@ -358,7 +356,6 @@ async def upload_and_parse_document(
     - **series_id**: 系列 ID（可选）
     - **issuer**: 发布机构（可选）
     - **language**: 语言（默认 en）
-    - **parse_pages**: 解析页码范围，如 "1-10"（可选，默认全部）
     """
     import uuid
     import hashlib
@@ -403,56 +400,13 @@ async def upload_and_parse_document(
         "language": language,
         "source_type": "upload",
         "parser": "docling",
-        "processing_status": "processing",
+        "processing_status": "pending",
         "processing_started_at": datetime.now().isoformat(),
     }
 
     insert_document_info(doc_data)
 
-    # 解析 PDF
-    try:
-        # 解析页码范围
-        page_range = None
-        if parse_pages:
-            parts = parse_pages.split("-")
-            if len(parts) == 2:
-                page_range = (int(parts[0]), int(parts[1]))
-
-        parser = PDFParser(do_ocr=True)
-        items = parser.parse_pdf(
-            pdf_path=str(file_path),
-            document_id=doc_id,
-            page_range=page_range,
-            output_dir="output/pictures"
-        )
-
-        # 更新统计信息
-        stats = get_document_stats(doc_id)
-        type_counts = {
-            "item_count": len(items),
-            "text_count": stats.get("text", 0),
-            "title_count": stats.get("section_header", 0),
-            "table_count": stats.get("table", 0),
-            "picture_count": stats.get("picture", 0),
-            "formula_count": stats.get("formula", 0),
-        }
-        update_document_info_stats(doc_id, type_counts)
-
-        # 更新文档信息
-        doc_data["page_count"] = len(set(i["page_id"] for i in items))
-        doc_data["processing_status"] = "completed"
-        doc_data["processing_finished_at"] = datetime.now().isoformat()
-        insert_document_info(doc_data)
-
-    except Exception as e:
-        # 更新错误状态
-        doc_data["processing_status"] = "failed"
-        doc_data["processing_error"] = str(e)
-        doc_data["processing_finished_at"] = datetime.now().isoformat()
-        insert_document_info(doc_data)
-        raise HTTPException(status_code=500, detail=f"解析失败: {str(e)}")
-
-    # 返回更新后的文档信息
+    # 返回文档信息
     docs = query_document_info(document_id=doc_id)
     return docs[0]
 
