@@ -112,15 +112,6 @@ class PaginatedResponse(BaseModel):
     total_pages: int
 
 
-class PaginatedChunksResponse(BaseModel):
-    """Chunk 分页响应"""
-    items: List[ChunkInfoResponse]
-    total: int
-    page: int
-    page_size: int
-    total_pages: int
-
-
 class ChunkInfoResponse(BaseModel):
     """Chunk 信息响应"""
     id: str
@@ -137,6 +128,15 @@ class ChunkInfoResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PaginatedChunksResponse(BaseModel):
+    """Chunk 分页响应"""
+    items: List[ChunkInfoResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
 
 
 # ==================== API 接口 ====================
