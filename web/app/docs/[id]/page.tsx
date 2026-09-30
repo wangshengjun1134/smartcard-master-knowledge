@@ -341,60 +341,6 @@ export default function DocumentDetail() {
           </CardContent>
         </Card>
 
-        {/* 统计卡片 */}
-        {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{stats.total_items}</div>
-                  <div className="text-sm text-muted-foreground">总 Item</div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{stats.type_distribution.text || 0}</div>
-                  <div className="text-sm text-muted-foreground">文本</div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{stats.type_distribution.section_header || 0}</div>
-                  <div className="text-sm text-muted-foreground">标题</div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{stats.type_distribution.table || 0}</div>
-                  <div className="text-sm text-muted-foreground">表格</div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{stats.type_distribution.picture || 0}</div>
-                  <div className="text-sm text-muted-foreground">图片</div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{stats.textualized}/{stats.total_items}</div>
-                  <div className="text-sm text-muted-foreground">已文本化</div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
         {/* Tab 切换 */}
         <div className="mb-6">
           <div className="flex gap-2 border-b">
@@ -456,6 +402,58 @@ export default function DocumentDetail() {
               </div>
             </CardHeader>
             <CardContent>
+              {stats && (
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-4">
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold">{stats.total_items}</div>
+                        <div className="text-sm text-muted-foreground">总 Item</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold">{stats.type_distribution.text || 0}</div>
+                        <div className="text-sm text-muted-foreground">文本</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold">{stats.type_distribution.section_header || 0}</div>
+                        <div className="text-sm text-muted-foreground">标题</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold">{stats.type_distribution.table || 0}</div>
+                        <div className="text-sm text-muted-foreground">表格</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold">{stats.type_distribution.picture || 0}</div>
+                        <div className="text-sm text-muted-foreground">图片</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold">{stats.textualized}/{stats.total_items}</div>
+                        <div className="text-sm text-muted-foreground">已文本化</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
               <Table>
                 <TableHeader>
                   <TableRow>
