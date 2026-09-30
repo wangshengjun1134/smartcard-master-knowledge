@@ -93,6 +93,7 @@ class Chunker:
         # 3. 设置全局 VLM 映射（供 Serializer 读取）
         from .serializers import VLMPictureSerializer
         VLMPictureSerializer.vlm_map = vlm_map
+        t2 = time.time()
 
         # 4. 执行分块
         chunks = self._extract_chunks(result.document, document_id, picture_items)
