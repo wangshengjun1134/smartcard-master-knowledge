@@ -89,10 +89,10 @@ class Chunker:
         # 2. 从 DB 加载 VLM 描述
         picture_items = query_document_items(document_id=document_id, label="picture")
         vlm_map = self._build_vlm_map(picture_items)
-        
-        # 3. 注入 VLM 描述到 PictureItem
-        self._inject_vlm_to_picture_items(result.document, vlm_map)
-        t2 = time.time()
+
+        # 3. 设置全局 VLM 映射（供 Serializer 读取）
+        from .serializers import VLMPictureSerializer
+        VLMPictureSerializer.vlm_map = vlm_map
 
         # 4. 执行分块
         chunks = self._extract_chunks(result.document, document_id, picture_items)
@@ -120,30 +120,6 @@ class Chunker:
                 vlm_map[self_ref] = vlm_desc
         
         return vlm_map
-
-    def _inject_vlm_to_picture_items(
-        self,
-        doc,
-        vlm_map: Dict[str, str],
-    ) -> None:
-        """
-        将 VLM 描述注入到 Docling PictureItem 的 metadata 中
-
-        :param doc: DoclingDocument
-        :param vlm_map: self_ref -> vlm_description 映射
-        """
-        injected_count = 0
-        for item, _ in doc.iterate_items():
-            if item.label == DocItemLabel.PICTURE:
-                self_ref = item.self_ref
-                if self_ref in vlm_map:
-                    # 注入到 metadata 字典中（Pydantic 模型不支持动态属性）
-                    if item.metadata is None:
-                        item.metadata = {}
-                    item.metadata["vlm_description"] = vlm_map[self_ref]
-                    injected_count += 1
-
-        print(f"Injected VLM descriptions for {injected_count} picture items")
 
     def _extract_chunks(
         self,

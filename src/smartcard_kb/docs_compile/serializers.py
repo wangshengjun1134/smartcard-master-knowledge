@@ -1,6 +1,6 @@
 """自定义 Docling Serializer - 支持 VLM 描述注入"""
 
-from typing import Any
+from typing import Any, Dict
 from docling_core.transforms.serializer.base import (
     BasePictureSerializer,
     SerializationResult,
@@ -17,11 +17,9 @@ class VLMPictureSerializer(BasePictureSerializer):
     """
     自定义 Picture Serializer，输出 VLM 描述而非空占位符
     
-    优先级：
-    1. item.vlm_description (直接属性，由注入器设置)
-    2. item.metadata.get("vlm_description") (metadata 属性)
-    3. 回退到默认行为（空占位符）
+    通过类属性 vlm_map 从数据库加载 VLM 描述（由 Chunker 设置）
     """
+    vlm_map: Dict[str, str] = {}  # self_ref -> vlm_description
     
     def serialize(
         self,
@@ -72,18 +70,17 @@ class VLMPictureSerializer(BasePictureSerializer):
     
     def _get_vlm_description(self, item: PictureItem) -> str | None:
         """
-        获取 VLM 描述，按优先级查找
+        从类属性 vlm_map 中获取 VLM 描述
         
         :param item: PictureItem
         :return: VLM 描述字符串或 None
         """
-        # 优先级 1: 直接属性
-        if hasattr(item, 'vlm_description') and item.vlm_description:
-            return item.vlm_description
+        if not hasattr(VLMPictureSerializer, 'vlm_map') or not VLMPictureSerializer.vlm_map:
+            return None
         
-        # 优先级 2: metadata 字典
-        if hasattr(item, 'metadata') and item.metadata:
-            return item.metadata.get('vlm_description')
+        self_ref = getattr(item, 'self_ref', None)
+        if self_ref and self_ref in VLMPictureSerializer.vlm_map:
+            return VLMPictureSerializer.vlm_map[self_ref]
         
         return None
 
