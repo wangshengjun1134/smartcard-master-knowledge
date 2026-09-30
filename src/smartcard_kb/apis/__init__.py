@@ -2,5 +2,6 @@
 
 from .docs_info import router as docs_info_router
 from .docs_items import router as docs_items_router
+from .docs_processing import router as docs_processing_router
 
-__all__ = ["docs_info_router", "docs_items_router"]
+__all__ = ["docs_info_router", "docs_items_router", "docs_processing_router"]

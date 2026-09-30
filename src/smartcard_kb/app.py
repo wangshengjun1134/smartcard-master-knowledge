@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from smartcard_kb.config import settings
 from smartcard_kb.docs_compile.database import init_database
-from smartcard_kb.apis import docs_info_router, docs_items_router
+from smartcard_kb.apis import docs_info_router, docs_items_router, docs_processing_router
 
 # 设置 Docling 模型路径
 if settings.docling_models_path:
@@ -34,6 +34,7 @@ app.add_middleware(
 # 注册 API 路由
 app.include_router(docs_info_router)
 app.include_router(docs_items_router)
+app.include_router(docs_processing_router)
 
 
 @app.get("/")
