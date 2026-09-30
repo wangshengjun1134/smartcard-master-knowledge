@@ -11,6 +11,7 @@ from docling_core.transforms.chunker.hierarchical_chunker import (
     ChunkingSerializerProvider,
 )
 from docling_core.types.doc import PictureItem, DoclingDocument
+from docling_core.transforms.serializer.common import create_ser_result
 
 
 class VLMPictureSerializer(BasePictureSerializer):
@@ -50,7 +51,8 @@ class VLMPictureSerializer(BasePictureSerializer):
         if vlm_description:
             # 3. 使用 VLM 描述替代空占位符
             vlm_text = f"\n\n[VLM Image Description]:\n{vlm_description}\n"
-            vlm_res = SerializationResult(text=vlm_text, spans=[])
+            # 关键：使用 create_ser_result 自动处理 spans
+            vlm_res = create_ser_result(text=vlm_text, span_source=item)
             res_parts.append(vlm_res)
         else:
             # 4. 回退：检查是否有图片 URI
@@ -64,7 +66,11 @@ class VLMPictureSerializer(BasePictureSerializer):
         # 5. 合并结果
         if res_parts:
             combined_text = "\n".join([r.text for r in res_parts if r.text])
-            return SerializationResult(text=combined_text, spans=[])
+            # 合并所有 spans
+            all_spans = []
+            for r in res_parts:
+                all_spans.extend(r.spans)
+            return SerializationResult(text=combined_text, spans=all_spans)
         else:
             return SerializationResult(text="", spans=[])
     
@@ -76,12 +82,18 @@ class VLMPictureSerializer(BasePictureSerializer):
         :return: VLM 描述字符串或 None
         """
         if not hasattr(VLMPictureSerializer, 'vlm_map') or not VLMPictureSerializer.vlm_map:
+            print(f"[DEBUG] VLMPictureSerializer.vlm_map is empty")
             return None
         
         self_ref = getattr(item, 'self_ref', None)
-        if self_ref and self_ref in VLMPictureSerializer.vlm_map:
-            return VLMPictureSerializer.vlm_map[self_ref]
+        print(f"[DEBUG] PictureItem self_ref: {self_ref}, vlm_map keys: {list(VLMPictureSerializer.vlm_map.keys())}")
         
+        if self_ref and self_ref in VLMPictureSerializer.vlm_map:
+            vlm_desc = VLMPictureSerializer.vlm_map[self_ref]
+            print(f"[DEBUG] Found VLM description for {self_ref}, length: {len(vlm_desc)}")
+            return vlm_desc
+        
+        print(f"[DEBUG] No VLM description found for {self_ref}")
         return None
 
 
