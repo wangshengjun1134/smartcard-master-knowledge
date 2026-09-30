@@ -86,8 +86,9 @@ class Chunker:
         result = self.converter.convert(pdf_path, **kwargs)
         t1 = time.time()
 
-        # 2. 从 DB 加载 VLM 描述
-        picture_items = query_document_items(document_id=document_id, label="picture")
+        # 2. 从 DB 加载所有 items（用于关联）和 VLM 描述
+        all_items = query_document_items(document_id=document_id)
+        picture_items = [item for item in all_items if item.get("label") == "picture"]
         vlm_map = self._build_vlm_map(picture_items)
 
         # 3. 设置全局 VLM 映射（供 Serializer 读取）
@@ -96,7 +97,7 @@ class Chunker:
         t2 = time.time()
 
         # 4. 执行分块
-        chunks = self._extract_chunks(result.document, document_id, picture_items)
+        chunks = self._extract_chunks(result.document, document_id, all_items)
         insert_chunks(chunks)
         t3 = time.time()
 
@@ -112,14 +113,18 @@ class Chunker:
         :return: 映射字典
         """
         vlm_map = {}
+        print(f"[DEBUG] Building vlm_map from {len(picture_items)} picture items")
         for item in picture_items:
             metadata = item.get("metadata") or {}
             self_ref = item.get("self_ref")
             vlm_desc = metadata.get("vlm_description")
             
+            print(f"[DEBUG] Item {item.get('id')}: self_ref={self_ref}, has_vlm={bool(vlm_desc)}")
+            
             if self_ref and vlm_desc:
                 vlm_map[self_ref] = vlm_desc
         
+        print(f"[DEBUG] vlm_map built with {len(vlm_map)} entries: {list(vlm_map.keys())}")
         return vlm_map
 
     def _extract_chunks(
