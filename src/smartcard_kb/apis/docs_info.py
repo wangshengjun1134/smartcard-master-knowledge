@@ -13,6 +13,7 @@ from smartcard_kb.docs_compile.database import (
     update_document_info_stats,
     delete_document_info,
     get_document_stats,
+    query_chunks,
 )
 from smartcard_kb.docs_compile.pdf_parser import PDFParser
 
@@ -109,6 +110,24 @@ class PaginatedResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+
+class ChunkInfoResponse(BaseModel):
+    """Chunk 信息响应"""
+    id: str
+    document_id: str
+    chunk_index: int
+    text: str
+    headings: Optional[list] = None
+    heading_path: Optional[str] = None
+    linked_item_ids: Optional[list] = None
+    page_nos: Optional[list] = None
+    token_count: Optional[int] = None
+    is_rag_enabled: bool = True
+    created_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 
 # ==================== API 接口 ====================
@@ -442,3 +461,22 @@ def get_document_statistics(document_id: str):
         "item_counts_by_type": stats,
         "total_items": sum(stats.values()),
     }
+
+
+@router.get("/{document_id}/chunks", response_model=List[ChunkInfoResponse])
+def list_document_chunks(
+    document_id: str,
+    is_rag_enabled: Optional[bool] = None,
+):
+    """获取文档的所有 Chunk"""
+    # 检查文档是否存在
+    docs = query_document_info(document_id=document_id)
+    if not docs:
+        raise HTTPException(status_code=404, detail="文档不存在")
+
+    chunks = query_chunks(
+        document_id=document_id,
+        is_rag_enabled=is_rag_enabled,
+        order_by="chunk_index",
+    )
+    return chunks

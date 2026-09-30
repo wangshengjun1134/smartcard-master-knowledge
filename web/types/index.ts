@@ -48,8 +48,24 @@ export interface DocItem {
   is_rag_enabled: boolean
   textualization?: string
   raw_json?: Record<string, any>
+  self_ref?: string
   created_at?: string
   updated_at?: string
+}
+
+// Chunk 类型
+export interface Chunk {
+  id: string
+  document_id: string
+  chunk_index: number
+  text: string
+  headings?: string[]
+  heading_path?: string
+  linked_item_ids?: string[]
+  page_nos?: number[]
+  token_count?: number
+  is_rag_enabled: boolean
+  created_at?: string
 }
 
 // API 响应类型
