@@ -116,9 +116,9 @@ def generate_vlm_descriptions(request: VLMRequest):
     try:
         vlm_config = {
             "backend_type": request.backend_type,
-            "openai_api_key": request.api_key or settings.openai_api_key,
-            "openai_base_url": request.base_url or settings.openai_base_url,
-            "openai_model": request.model,
+            "openai_api_key": request.api_key or settings.vlm_openai_api_key,
+            "openai_base_url": request.base_url or settings.vlm_openai_base_url,
+            "openai_model": request.model or settings.vlm_openai_model,
         }
         
         service = VLMService(vlm_config=vlm_config)

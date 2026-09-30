@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     openai_base_url: str = ""
     openai_model: str = "gpt-4"
 
+    # VLM 配置
+    vlm_openai_api_key: str = ""
+    vlm_openai_base_url: str = ""
+    vlm_openai_model: str = "qwen-vl-max"
+
     # 嵌入模型配置
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
 
