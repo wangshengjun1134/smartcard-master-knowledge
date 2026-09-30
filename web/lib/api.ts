@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { DocumentInfo, DocItem, Chunk, ApiResponse, TextualizeRequest, TextualizeResponse, ItemStatistics, PaginatedItemsResponse } from '@/types'
+import type { DocumentInfo, DocItem, Chunk, ApiResponse, TextualizeRequest, TextualizeResponse, ItemStatistics, PaginatedItemsResponse, PaginatedChunksResponse } from '@/types'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -136,8 +136,10 @@ export async function listDocumentChunks(
   documentId: string,
   params?: {
     is_rag_enabled?: boolean
+    page?: number
+    page_size?: number
   }
-): Promise<Chunk[]> {
+): Promise<PaginatedChunksResponse> {
   const response = await api.get(`/api/docs/${documentId}/chunks`, { params })
   return response.data
 }

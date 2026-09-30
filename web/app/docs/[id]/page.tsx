@@ -38,6 +38,10 @@ export default function DocumentDetail() {
   const [chunksLoading, setChunksLoading] = useState(false)
   const [expandedChunks, setExpandedChunks] = useState<Set<string>>(new Set())
   const [chunkFilterRag, setChunkFilterRag] = useState<boolean | undefined>(undefined)
+  const [chunkPage, setChunkPage] = useState(1)
+  const [chunkTotalPages, setChunkTotalPages] = useState(1)
+  const [chunkTotalItems, setChunkTotalItems] = useState(0)
+  const chunkPageSize = 20
 
   const toggleItem = (itemId: string) => {
     setExpandedItems(prev => {
@@ -101,8 +105,12 @@ export default function DocumentDetail() {
     try {
       const data = await listDocumentChunks(documentId, {
         is_rag_enabled: chunkFilterRag,
+        page: chunkPage,
+        page_size: chunkPageSize,
       })
-      setChunks(data)
+      setChunks(data.items)
+      setChunkTotalPages(data.total_pages)
+      setChunkTotalItems(data.total)
     } catch (error) {
       console.error('Failed to load chunks:', error)
       toast({
@@ -119,7 +127,7 @@ export default function DocumentDetail() {
     if (activeTab === 'chunks') {
       loadChunks()
     }
-  }, [documentId, chunkFilterRag, activeTab])
+  }, [documentId, chunkFilterRag, chunkPage, activeTab])
 
   const handleTextualize = async () => {
     setTextualizing(true)
@@ -172,6 +180,32 @@ export default function DocumentDetail() {
         for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i)
         pages.push(0)
         pages.push(totalPages)
+      }
+    }
+    return pages
+  }
+
+  // 生成 Chunk 分页页码
+  const getPageNumbersForChunks = () => {
+    const pages: number[] = []
+    const maxVisible = 5
+    if (chunkTotalPages <= maxVisible) {
+      for (let i = 1; i <= chunkTotalPages; i++) pages.push(i)
+    } else {
+      if (chunkPage <= 3) {
+        for (let i = 1; i <= 4; i++) pages.push(i)
+        pages.push(0) // 省略号
+        pages.push(chunkTotalPages)
+      } else if (chunkPage >= chunkTotalPages - 2) {
+        pages.push(1)
+        pages.push(0)
+        for (let i = chunkTotalPages - 3; i <= chunkTotalPages; i++) pages.push(i)
+      } else {
+        pages.push(1)
+        pages.push(0)
+        for (let i = chunkPage - 1; i <= chunkPage + 1; i++) pages.push(i)
+        pages.push(0)
+        pages.push(chunkTotalPages)
       }
     }
     return pages
@@ -539,7 +573,7 @@ export default function DocumentDetail() {
                 <div>
                   <CardTitle>Chunk 信息</CardTitle>
                   <CardDescription>
-                    共 {chunks.length} 个 Chunk
+                    共 {chunkTotalItems} 个 Chunk
                     {chunkFilterRag !== undefined && ` (RAG: ${chunkFilterRag ? '启用' : '禁用'})`}
                   </CardDescription>
                 </div>
@@ -549,6 +583,7 @@ export default function DocumentDetail() {
                     onChange={(e) => {
                       const val = e.target.value
                       setChunkFilterRag(val === 'all' ? undefined : val === 'enabled')
+                      setChunkPage(1)
                     }}
                     className="px-3 py-1 border rounded-md text-sm bg-background"
                   >
@@ -575,7 +610,7 @@ export default function DocumentDetail() {
                     <Card>
                       <CardContent className="pt-4">
                         <div className="text-center">
-                          <div className="text-2xl font-bold">{chunks.length}</div>
+                          <div className="text-2xl font-bold">{chunkTotalItems}</div>
                           <div className="text-sm text-muted-foreground">总 Chunk</div>
                         </div>
                       </CardContent>
@@ -586,7 +621,7 @@ export default function DocumentDetail() {
                           <div className="text-2xl font-bold">
                             {chunks.filter(c => c.is_rag_enabled).length}
                           </div>
-                          <div className="text-sm text-muted-foreground">RAG 启用</div>
+                          <div className="text-sm text-muted-foreground">当前页 RAG 启用</div>
                         </div>
                       </CardContent>
                     </Card>
@@ -596,7 +631,7 @@ export default function DocumentDetail() {
                           <div className="text-2xl font-bold">
                             {chunks.reduce((sum, c) => sum + (c.token_count || 0), 0)}
                           </div>
-                          <div className="text-sm text-muted-foreground">总 Token</div>
+                          <div className="text-sm text-muted-foreground">当前页总 Token</div>
                         </div>
                       </CardContent>
                     </Card>
@@ -664,6 +699,50 @@ export default function DocumentDetail() {
                       )
                     })}
                   </div>
+
+                  {/* 分页控件 */}
+                  {chunkTotalPages > 1 && (
+                    <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                      <div className="text-sm text-muted-foreground">
+                        第 {chunkPage} / {chunkTotalPages} 页，共 {chunkTotalItems} 条
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setChunkPage(p => Math.max(1, p - 1))}
+                          disabled={chunkPage === 1}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        {getPageNumbersForChunks().map((page, idx) =>
+                          page === 0 ? (
+                            <span key={`chunk-ellipsis-${idx}`} className="px-2 text-muted-foreground">
+                              ...
+                            </span>
+                          ) : (
+                            <Button
+                              key={`chunk-page-${page}`}
+                              variant={chunkPage === page ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() => setChunkPage(page)}
+                              className="w-8 h-8 p-0"
+                            >
+                              {page}
+                            </Button>
+                          )
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setChunkPage(p => Math.min(chunkTotalPages, p + 1))}
+                          disabled={chunkPage === chunkTotalPages}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

@@ -115,6 +115,15 @@ export interface PaginatedItemsResponse {
   total_pages: number
 }
 
+// 分页 Chunk 响应类型
+export interface PaginatedChunksResponse {
+  items: Chunk[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
 // 文档树节点类型
 export interface TreeNode {
   id: string

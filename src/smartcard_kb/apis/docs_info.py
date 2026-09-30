@@ -112,6 +112,15 @@ class PaginatedResponse(BaseModel):
     total_pages: int
 
 
+class PaginatedChunksResponse(BaseModel):
+    """Chunk 分页响应"""
+    items: List[ChunkInfoResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
 class ChunkInfoResponse(BaseModel):
     """Chunk 信息响应"""
     id: str
@@ -463,20 +472,35 @@ def get_document_statistics(document_id: str):
     }
 
 
-@router.get("/{document_id}/chunks", response_model=List[ChunkInfoResponse])
+@router.get("/{document_id}/chunks", response_model=PaginatedChunksResponse)
 def list_document_chunks(
     document_id: str,
     is_rag_enabled: Optional[bool] = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
 ):
-    """获取文档的所有 Chunk"""
+    """获取文档的 Chunk 列表（支持分页）"""
     # 检查文档是否存在
     docs = query_document_info(document_id=document_id)
     if not docs:
         raise HTTPException(status_code=404, detail="文档不存在")
 
-    chunks = query_chunks(
+    all_chunks = query_chunks(
         document_id=document_id,
         is_rag_enabled=is_rag_enabled,
         order_by="chunk_index",
     )
-    return chunks
+
+    total = len(all_chunks)
+    total_pages = (total + page_size - 1) // page_size if total > 0 else 1
+    start = (page - 1) * page_size
+    end = start + page_size
+    items = all_chunks[start:end]
+
+    return PaginatedChunksResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+    )
