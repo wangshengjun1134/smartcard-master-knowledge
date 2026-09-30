@@ -164,7 +164,7 @@ def process_full_pdf():
 
 if __name__ == "__main__":
     # 清空数据库
-    clear_database()
+    # clear_database()
     
     # 处理完整 PDF
     process_full_pdf()

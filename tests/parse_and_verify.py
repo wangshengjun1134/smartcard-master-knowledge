@@ -199,7 +199,7 @@ def main():
     init_database()
 
     # 1. 清空数据库
-    clear_database()
+    # clear_database()
 
     # 2. 解析 PDF 文件
     pdfs_to_parse = [
