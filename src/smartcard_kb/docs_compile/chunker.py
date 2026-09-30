@@ -127,7 +127,7 @@ class Chunker:
         vlm_map: Dict[str, str],
     ) -> None:
         """
-        将 VLM 描述注入到 Docling PictureItem 中
+        将 VLM 描述注入到 Docling PictureItem 的 metadata 中
 
         :param doc: DoclingDocument
         :param vlm_map: self_ref -> vlm_description 映射
@@ -137,10 +137,12 @@ class Chunker:
             if item.label == DocItemLabel.PICTURE:
                 self_ref = item.self_ref
                 if self_ref in vlm_map:
-                    # 动态注入属性
-                    item.vlm_description = vlm_map[self_ref]
+                    # 注入到 metadata 字典中（Pydantic 模型不支持动态属性）
+                    if item.metadata is None:
+                        item.metadata = {}
+                    item.metadata["vlm_description"] = vlm_map[self_ref]
                     injected_count += 1
-        
+
         print(f"Injected VLM descriptions for {injected_count} picture items")
 
     def _extract_chunks(
