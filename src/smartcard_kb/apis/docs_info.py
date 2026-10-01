@@ -190,7 +190,15 @@ def get_document_tree():
     import os
     from pathlib import Path
 
-    specs_dir = Path("specs")
+    # 使用项目根目录的 specs 路径
+    # __file__ = src/smartcard_kb/apis/docs_info.py
+    # .parent = src/smartcard_kb/apis
+    # .parent.parent = src/smartcard_kb
+    # .parent.parent.parent = project_root (smartcard-master-knowledge)
+    current_dir = Path(__file__).parent
+    project_root = current_dir.parent.parent.parent
+    specs_dir = project_root / "specs"
+    
     if not specs_dir.exists():
         return {"tree": [], "stats": {"directories": 0, "files": 0}}
 
