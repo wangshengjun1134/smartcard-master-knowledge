@@ -5,6 +5,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from smartcard_kb.docs_compile.search_service import SearchService
+from smartcard_kb.docs_compile.embedding_service import EmbeddingService
+from smartcard_kb.llms.reranker_local import LocalRerankerBackend
 from smartcard_kb.config import settings
 
 router = APIRouter(prefix="/api", tags=["文档检索"])
@@ -53,7 +55,7 @@ class SearchResponse(BaseModel):
 def search_documents(request: SearchRequest):
     """
     检索文档
-    
+
     - **query**: 查询文本
     - **document_id**: 文档 ID（可选，限定检索范围）
     - **search_type**: 检索类型 (vector/keyword/hybrid)
@@ -63,11 +65,26 @@ def search_documents(request: SearchRequest):
     - **enable_rerank**: 是否启用重排
     """
     try:
-        service = SearchService(
-            embedding_model_path=settings.embedding_model,
-            reranker_model_path=settings.reranker_model,
+        # 创建 Embedding 后端（使用本地模型）
+        embedding_backend = EmbeddingService.create_backend(
+            backend_type="local",
+            model_name=settings.embedding_model,
         )
-        
+
+        # 创建重排后端（可选）
+        reranker_backend = None
+        if request.enable_rerank:
+            try:
+                reranker_backend = LocalRerankerBackend(model_path=settings.reranker_model)
+            except Exception as e:
+                print(f"Warning: 重排模型加载失败: {e}")
+
+        # 初始化检索服务
+        service = SearchService(
+            embedding_backend=embedding_backend,
+            reranker_backend=reranker_backend,
+        )
+
         result = service.search(
             query=request.query,
             document_id=request.document_id,
@@ -77,7 +94,7 @@ def search_documents(request: SearchRequest):
             threshold=request.threshold,
             enable_rerank=request.enable_rerank,
         )
-        
+
         return SearchResponse(
             query=result["query"],
             total=result["total"],

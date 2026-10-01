@@ -106,25 +106,16 @@ class Chunker:
         return {"chunks": chunks}
 
     def _build_vlm_map(self, picture_items: List[Dict[str, Any]]) -> Dict[str, str]:
-        """
-        构建 self_ref -> vlm_description 映射
-
-        :param picture_items: 图片 Item 列表
-        :return: 映射字典
-        """
+        """构建 self_ref -> vlm_description 映射"""
         vlm_map = {}
-        print(f"[DEBUG] Building vlm_map from {len(picture_items)} picture items")
         for item in picture_items:
             metadata = item.get("metadata") or {}
             self_ref = item.get("self_ref")
             vlm_desc = metadata.get("vlm_description")
-            
-            print(f"[DEBUG] Item {item.get('id')}: self_ref={self_ref}, has_vlm={bool(vlm_desc)}")
-            
+
             if self_ref and vlm_desc:
                 vlm_map[self_ref] = vlm_desc
-        
-        print(f"[DEBUG] vlm_map built with {len(vlm_map)} entries: {list(vlm_map.keys())}")
+
         return vlm_map
 
     def _extract_chunks(

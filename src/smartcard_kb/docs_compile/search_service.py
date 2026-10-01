@@ -1,13 +1,12 @@
 """检索服务模块 - 支持向量检索、关键词检索、混合检索和重排"""
 
 import json
-import struct
 from typing import List, Dict, Any, Optional, Tuple
 import numpy as np
 
 from .database import query_chunks
-from ..llms.embedding_local import LocalEmbeddingBackend
-from ..llms.reranker_local import LocalRerankerBackend
+from ..llms.embedding_base import EmbeddingBackend
+from ..llms.reranker_base import RerankerBackend
 
 
 class SearchService:
@@ -15,30 +14,18 @@ class SearchService:
 
     def __init__(
         self,
-        embedding_backend: Optional[LocalEmbeddingBackend] = None,
-        reranker_backend: Optional[LocalRerankerBackend] = None,
-        embedding_model_path: str = "D:/softdata/workspaces/ai-models/bge-m3",
-        reranker_model_path: str = "D:/softdata/workspaces/ai-models/bge-reranker-v2-m3",
+        embedding_backend: EmbeddingBackend,
+        reranker_backend: Optional[RerankerBackend] = None,
     ):
         """
         初始化检索服务
-        
-        :param embedding_backend: Embedding 后端
-        :param reranker_backend: 重排后端
-        :param embedding_model_path: Embedding模型路径
-        :param reranker_model_path: 重排模型路径
+
+        :param embedding_backend: Embedding 后端（必需）
+        :param reranker_backend: 重排后端（可选）
         """
-        self.embedding_backend = embedding_backend or LocalEmbeddingBackend(model_name=embedding_model_path)
-        
-        # 尝试加载重排模型，如果失败则禁用重排功能
-        try:
-            self.reranker_backend = reranker_backend or LocalRerankerBackend(model_path=reranker_model_path)
-            self.reranker_available = True
-        except Exception as e:
-            print(f"Warning: 重排模型加载失败: {e}")
-            print("重排功能将不可用，系统将使用向量检索")
-            self.reranker_backend = None
-            self.reranker_available = False
+        self.embedding_backend = embedding_backend
+        self.reranker_backend = reranker_backend
+        self.reranker_available = reranker_backend is not None
 
     def search(
         self,

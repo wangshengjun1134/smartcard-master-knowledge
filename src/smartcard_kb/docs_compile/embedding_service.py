@@ -12,29 +12,32 @@ from ..llms.embedding_local import LocalEmbeddingBackend
 class EmbeddingService:
     """负责为 Chunk 生成向量嵌入"""
 
-    def __init__(self, embedding_backend: Optional[EmbeddingBackend] = None, embedding_config: Optional[Dict[str, Any]] = None):
+    def __init__(self, embedding_backend: EmbeddingBackend):
         """
         初始化 Embedding 服务
 
-        :param embedding_backend: Embedding 后端实例
-        :param embedding_config: Embedding 配置字典
+        :param embedding_backend: Embedding 后端实例（必需）
         """
         self.embedding_backend = embedding_backend
-        if self.embedding_backend is None and embedding_config is not None:
-            self.embedding_backend = self._create_embedding_backend(embedding_config)
 
-    def _create_embedding_backend(self, config: Dict[str, Any]) -> EmbeddingBackend:
-        """根据配置创建 Embedding 后端"""
-        backend_type = config.get("backend_type", "openai")
+    @staticmethod
+    def create_backend(backend_type: str, **kwargs) -> EmbeddingBackend:
+        """
+        创建 Embedding 后端
+
+        :param backend_type: 后端类型 (openai/local)
+        :param kwargs: 后端配置参数
+        :return: Embedding 后端实例
+        """
         if backend_type == "openai":
             return OpenAIEmbeddingBackend(
-                api_key=config.get("openai_api_key", ""),
-                base_url=config.get("openai_base_url", ""),
-                model=config.get("openai_model", "text-embedding-3-small"),
+                api_key=kwargs["api_key"],
+                base_url=kwargs["base_url"],
+                model=kwargs["model"],
             )
         elif backend_type == "local":
             return LocalEmbeddingBackend(
-                model_name=config.get("model_name", "sentence-transformers/all-MiniLM-L6-v2"),
+                model_name=kwargs["model_name"],
             )
         else:
             raise ValueError(f"不支持的 Embedding 后端类型: {backend_type}")
@@ -49,10 +52,6 @@ class EmbeddingService:
         :param document_id: 文档 ID
         :return: 处理结果统计
         """
-        if self.embedding_backend is None:
-            raise ValueError("Embedding 后端未初始化，请提供 embedding_backend 或 embedding_config")
-
-        # 查询所有 chunk
         chunks = query_chunks(document_id=document_id)
 
         processed_count = 0
@@ -78,7 +77,6 @@ class EmbeddingService:
                 if embedding:
                     self._update_chunk_embedding(chunk_id, embedding)
                     processed_count += 1
-                    print(f"Success: Chunk {chunk_id} embedding 已更新")
                 else:
                     failed_chunks.append(chunk_id)
             except Exception as e:
@@ -104,11 +102,11 @@ class EmbeddingService:
         """更新 chunk 的 embedding 字段（存储为 JSON 字节）"""
         conn = get_connection()
         cursor = conn.cursor()
-        
+
         # 将 float 列表转换为 JSON 字节存储
         embedding_json = json.dumps(embedding)
         embedding_bytes = embedding_json.encode('utf-8')
-        
+
         cursor.execute("""
             UPDATE doc_chunks
             SET embedding = %s, updated_at = CURRENT_TIMESTAMP

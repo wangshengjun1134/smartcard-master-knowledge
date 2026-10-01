@@ -150,17 +150,22 @@ async def _async_vlm(
             "processing_status": "vlm_processing",
         })
 
-        vlm_config = {
-            "backend_type": backend_type,
-            "openai_api_key": api_key or settings.vlm_openai_api_key,
-            "openai_base_url": base_url or settings.vlm_openai_base_url,
-            "openai_model": model or settings.vlm_openai_model,
-        }
+        # 从参数或环境变量获取配置
+        resolved_api_key = api_key or settings.vlm_openai_api_key
+        resolved_base_url = base_url or settings.vlm_openai_base_url
+        resolved_model = model or settings.vlm_openai_model
 
-        if not vlm_config.get("openai_api_key"):
+        if not resolved_api_key:
             raise ValueError("VLM API Key 未配置")
 
-        service = VLMService(vlm_config=vlm_config)
+        # 创建后端并初始化服务
+        backend = VLMService.create_backend(
+            backend_type=backend_type,
+            api_key=resolved_api_key,
+            base_url=resolved_base_url,
+            model=resolved_model,
+        )
+        service = VLMService(vlm_backend=backend)
         result = service.generate_vlm_descriptions(
             document_id=document_id,
             output_dir=output_dir,
@@ -237,15 +242,24 @@ async def _async_embedding(
             "processing_status": "embedding",
         })
 
-        embedding_config = {
-            "backend_type": backend_type,
-            "openai_api_key": api_key or settings.embedding_openai_api_key,
-            "openai_base_url": base_url or settings.embedding_openai_base_url,
-            "openai_model": model or settings.embedding_openai_model,
-            "model_name": model_name or settings.embedding_model,
-        }
+        # 从参数或环境变量获取配置
+        resolved_api_key = api_key or settings.embedding_openai_api_key
+        resolved_base_url = base_url or settings.embedding_openai_base_url
+        resolved_model = model or settings.embedding_openai_model
+        resolved_model_name = model_name or settings.embedding_model
 
-        service = EmbeddingService(embedding_config=embedding_config)
+        if backend_type == "openai" and not resolved_api_key:
+            raise ValueError("Embedding API Key 未配置")
+
+        # 创建后端并初始化服务
+        backend = EmbeddingService.create_backend(
+            backend_type=backend_type,
+            api_key=resolved_api_key,
+            base_url=resolved_base_url,
+            model=resolved_model,
+            model_name=resolved_model_name,
+        )
+        service = EmbeddingService(embedding_backend=backend)
         result = service.generate_embeddings(document_id=document_id)
 
         update_document_info({

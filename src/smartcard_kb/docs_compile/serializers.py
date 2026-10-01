@@ -75,25 +75,14 @@ class VLMPictureSerializer(BasePictureSerializer):
             return SerializationResult(text="", spans=[])
     
     def _get_vlm_description(self, item: PictureItem) -> str | None:
-        """
-        从类属性 vlm_map 中获取 VLM 描述
-        
-        :param item: PictureItem
-        :return: VLM 描述字符串或 None
-        """
-        if not hasattr(VLMPictureSerializer, 'vlm_map') or not VLMPictureSerializer.vlm_map:
-            print(f"[DEBUG] VLMPictureSerializer.vlm_map is empty")
+        """从类属性 vlm_map 中获取 VLM 描述"""
+        if not VLMPictureSerializer.vlm_map:
             return None
-        
+
         self_ref = getattr(item, 'self_ref', None)
-        print(f"[DEBUG] PictureItem self_ref: {self_ref}, vlm_map keys: {list(VLMPictureSerializer.vlm_map.keys())}")
-        
         if self_ref and self_ref in VLMPictureSerializer.vlm_map:
-            vlm_desc = VLMPictureSerializer.vlm_map[self_ref]
-            print(f"[DEBUG] Found VLM description for {self_ref}, length: {len(vlm_desc)}")
-            return vlm_desc
-        
-        print(f"[DEBUG] No VLM description found for {self_ref}")
+            return VLMPictureSerializer.vlm_map[self_ref]
+
         return None
 
 
