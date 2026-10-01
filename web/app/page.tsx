@@ -374,23 +374,23 @@ export default function Home() {
               <DialogTrigger asChild>
                 <Button>
                   <Plus className="h-4 w-4 mr-2" />
-                  上传 PDF
+                  上传文档
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
-                  <DialogTitle>上传 PDF 文档</DialogTitle>
+                  <DialogTitle>上传 PDF/DOCX 文档</DialogTitle>
                   <DialogDescription>
-                    选择 PDF 文件并填写文档信息（可选）
+                    选择 PDF 或 DOCX 文件并填写文档信息（可选）
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="file">PDF 文件</Label>
+                    <Label htmlFor="file">PDF/DOCX 文件</Label>
                     <Input
                       id="file"
                       type="file"
-                      accept=".pdf"
+                      accept=".pdf,.docx"
                       onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
                       disabled={uploading}
                     />
@@ -502,7 +502,7 @@ export default function Home() {
               </div>
             ) : documents.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                {filterStatus ? '没有找到匹配的文档' : '暂无文档，请上传 PDF 文件'}
+                {filterStatus ? '没有找到匹配的文档' : '暂无文档，请上传 PDF/DOCX 文件'}
               </div>
             ) : (
               <>

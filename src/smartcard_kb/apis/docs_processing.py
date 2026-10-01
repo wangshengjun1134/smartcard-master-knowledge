@@ -19,8 +19,8 @@ router = APIRouter(prefix="/api/docs", tags=["文档处理流程"])
 
 
 class ParseRequest(BaseModel):
-    """解析请求"""
-    pdf_path: str
+    """解析请求（支持 PDF 和 DOCX）"""
+    pdf_path: str  # 文件路径（支持 .pdf 和 .docx）
     document_id: str
     page_range: Optional[tuple] = None
     output_dir: str = "output/pictures"
@@ -52,8 +52,8 @@ class VLMResponse(BaseModel):
 
 
 class ChunkRequest(BaseModel):
-    """分块请求"""
-    pdf_path: str
+    """分块请求（支持 PDF 和 DOCX）"""
+    pdf_path: str  # 文件路径（支持 .pdf 和 .docx）
     document_id: str
     page_range: Optional[tuple] = None
     max_tokens: int = 512
@@ -282,13 +282,13 @@ async def _async_embedding(
 @router.post("/process/parse", response_model=ParseResponse)
 async def parse_document(request: ParseRequest, background_tasks: BackgroundTasks):
     """
-    异步解析 PDF 文档并保存 Items
+    异步解析 PDF/DOCX 文档并保存 Items
 
-    - **pdf_path**: PDF 文件路径
+    - **pdf_path**: 文件路径（支持 .pdf 和 .docx）
     - **document_id**: 文档 ID
-    - **page_range**: 页码范围 (start, end)，1-based（可选）
+    - **page_range**: 页码范围 (start, end)，1-based（可选，仅对 PDF 有效）
     - **output_dir**: 图片保存目录
-    - **do_ocr**: 是否启用 OCR
+    - **do_ocr**: 是否启用 OCR（仅对 PDF 有效）
     """
     background_tasks.add_task(
         _async_parse,
@@ -300,7 +300,7 @@ async def parse_document(request: ParseRequest, background_tasks: BackgroundTask
     )
     return ParseResponse(
         success=True,
-        message="PDF 解析任务已提交，正在后台处理",
+        message="文档解析任务已提交，正在后台处理",
     )
 
 
@@ -346,12 +346,12 @@ async def chunk_document(request: ChunkRequest, background_tasks: BackgroundTask
     """
     异步对文档进行语义分块（自动注入 VLM 描述）
 
-    - **pdf_path**: PDF 文件路径
+    - **pdf_path**: 文件路径（支持 .pdf 和 .docx）
     - **document_id**: 文档 ID
-    - **page_range**: 页码范围 (start, end)，1-based（可选）
+    - **page_range**: 页码范围 (start, end)，1-based（可选，仅对 PDF 有效）
     - **max_tokens**: 分块最大 token 数
     - **tokenizer_name**: tokenizer 名称
-    - **do_ocr**: 是否启用 OCR
+    - **do_ocr**: 是否启用 OCR（仅对 PDF 有效）
     """
     background_tasks.add_task(
         _async_chunk,

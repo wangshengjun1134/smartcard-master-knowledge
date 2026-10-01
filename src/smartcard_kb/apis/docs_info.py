@@ -230,8 +230,8 @@ def get_document_tree():
                 # 递归扫描子目录
                 child_node = scan_directory(entry, entry_relative)
                 node["children"].append(child_node)
-            elif entry.is_file() and entry.suffix.lower() == '.pdf':
-                # 添加 PDF 文件节点
+            elif entry.is_file() and entry.suffix.lower() in ('.pdf', '.docx'):
+                # 添加 PDF/DOCX 文件节点
                 file_name = entry.name
                 doc_info = doc_map.get(file_name)
                 file_node = {
@@ -356,9 +356,9 @@ async def upload_document(
     language: Optional[str] = Form("en"),
 ):
     """
-    上传 PDF 文件并保存文档信息
+    上传 PDF/DOCX 文件并保存文档信息
 
-    - **file**: PDF 文件
+    - **file**: PDF 或 DOCX 文件
     - **document_code**: 文档编号（可选）
     - **title**: 文档标题（可选）
     - **series_id**: 系列 ID（可选）
@@ -369,8 +369,8 @@ async def upload_document(
     import hashlib
 
     # 验证文件类型
-    if not file.filename.lower().endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="只支持 PDF 文件")
+    if not (file.filename.lower().endswith('.pdf') or file.filename.lower().endswith('.docx')):
+        raise HTTPException(status_code=400, detail="只支持 PDF 和 DOCX 文件")
 
     # 读取文件
     file_content = await file.read()
@@ -393,6 +393,9 @@ async def upload_document(
     # 生成文档 ID
     doc_id = str(uuid.uuid4())
 
+    # 确定文件格式
+    file_format = "docx" if file.filename.lower().endswith('.docx') else "pdf"
+
     # 创建文档信息
     doc_data = {
         "id": doc_id,
@@ -403,7 +406,7 @@ async def upload_document(
         "file_path": str(file_path),
         "file_hash": file_hash,
         "file_size": file_size,
-        "file_format": "pdf",
+        "file_format": file_format,
         "issuer": issuer,
         "language": language,
         "source_type": "upload",

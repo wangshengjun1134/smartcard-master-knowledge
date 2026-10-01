@@ -1,15 +1,15 @@
-"""文档处理模块 - 基于 Docling 的 PDF 结构化内容提取"""
+"""文档处理模块 - 基于 Docling 的 PDF/DOCX 结构化内容提取"""
 
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
-from docling.document_converter import DocumentConverter, PdfFormatOption
+from docling.document_converter import DocumentConverter, PdfFormatOption, WordFormatOption
 from docling.datamodel.pipeline_options import PdfPipelineOptions, HeadingHierarchyOptions
 from docling.datamodel.base_models import InputFormat, DocItemLabel
 
 
 class DoclingPDFProcessor:
-    """基于 Docling 的 PDF 结构化内容提取器"""
+    """基于 Docling 的 PDF/DOCX 结构化内容提取器"""
 
     def __init__(self, do_ocr: bool = True):
         """
@@ -37,7 +37,8 @@ class DoclingPDFProcessor:
             format_options={
                 InputFormat.PDF: PdfFormatOption(
                     pipeline_options=self.pipeline_options
-                )
+                ),
+                InputFormat.DOCX: WordFormatOption(),
             }
         )
 

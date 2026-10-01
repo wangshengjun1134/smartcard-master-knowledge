@@ -1,17 +1,17 @@
-"""PDF 解析模块 - 基于 Docling 的 PDF 结构化内容提取并保存到数据库"""
+"""PDF/DOCX 解析模块 - 基于 Docling 的结构化内容提取并保存到数据库"""
 
 import uuid
 import time
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-from docling.document_converter import DocumentConverter, PdfFormatOption
+from docling.document_converter import DocumentConverter, PdfFormatOption, WordFormatOption
 from docling.datamodel.pipeline_options import PdfPipelineOptions, HeadingHierarchyOptions
 from docling.datamodel.base_models import InputFormat, DocItemLabel
 from .database import init_database, insert_document_items
 
 
 class PDFParser:
-    """基于 Docling 的 PDF 解析器 - 负责提取 Items 并保存"""
+    """基于 Docling 的 PDF/DOCX 解析器 - 负责提取 Items 并保存"""
 
     def __init__(
         self,
@@ -37,7 +37,8 @@ class PDFParser:
             format_options={
                 InputFormat.PDF: PdfFormatOption(
                     pipeline_options=self.pipeline_options
-                )
+                ),
+                InputFormat.DOCX: WordFormatOption(),
             }
         )
 

@@ -4,7 +4,7 @@ import uuid
 import time
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-from docling.document_converter import DocumentConverter, PdfFormatOption
+from docling.document_converter import DocumentConverter, PdfFormatOption, WordFormatOption
 from docling.datamodel.pipeline_options import PdfPipelineOptions, HeadingHierarchyOptions
 from docling.datamodel.base_models import InputFormat, DocItemLabel
 from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
@@ -46,7 +46,8 @@ class Chunker:
             format_options={
                 InputFormat.PDF: PdfFormatOption(
                     pipeline_options=self.pipeline_options
-                )
+                ),
+                InputFormat.DOCX: WordFormatOption(),
             }
         )
 
