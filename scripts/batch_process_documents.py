@@ -48,8 +48,8 @@ EMBEDDING_BACKEND = "local"
 # 输出目录
 OUTPUT_DIR = "output/pictures"
 
-# 并行度
-MAX_WORKERS = 5
+# 并行度（设置为 1 以串行处理，避免内存溢出）
+MAX_WORKERS = 1
 
 # 限流等待时间（秒）
 RATE_LIMIT_WAIT = 3600  # 1 小时
@@ -105,7 +105,7 @@ class BatchProcessor:
                     "page_size": page_size,
                     "processing_status": "uploaded",  # 查询 uploaded 状态的文档
                 },
-                timeout=30,
+                timeout=60,  # 增加超时时间到 60 秒
             )
             response.raise_for_status()
             data = response.json()
@@ -124,7 +124,7 @@ class BatchProcessor:
         
         return all_docs
     
-    def call_api(self, url: str, data: dict, timeout: int = 300) -> Optional[dict]:
+    def call_api(self, url: str, data: dict, timeout: int = 600) -> Optional[dict]:
         """调用 API，处理限流"""
         max_retries = 3
         for attempt in range(max_retries):
