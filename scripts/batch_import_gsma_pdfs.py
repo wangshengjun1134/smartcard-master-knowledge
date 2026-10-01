@@ -97,8 +97,8 @@ def main():
             
             # 构建文档记录
             relative_path = pdf_file.relative_to(Path(r"D:\softdata\workspaces\buff\smartcard-master-knowledge"))
-            # 使用反斜杠路径（与参考记录一致）
-            file_path_str = str(relative_path).replace("/", "\\")
+            # 使用正斜杠路径（跨平台兼容）
+            file_path_str = str(relative_path).replace("\\", "/")
             
             doc_data = {
                 "id": str(uuid.uuid4()),

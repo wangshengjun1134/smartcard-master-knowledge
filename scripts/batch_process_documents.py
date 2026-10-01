@@ -16,10 +16,18 @@ import sys
 import time
 import json
 import requests
+import os
 from pathlib import Path
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, Any, Optional
+
+# 设置 UTF-8 输出（Windows 兼容）
+os.environ["PYTHONIOENCODING"] = "utf-8"
+try:
+    sys.stdout.reconfigure(encoding='utf-8')
+except AttributeError:
+    pass  # Python < 3.7
 
 # ==================== 配置 ====================
 
@@ -95,7 +103,7 @@ class BatchProcessor:
                 params={
                     "page": page,
                     "page_size": page_size,
-                    "processing_status": "embedded",
+                    "processing_status": "uploaded",  # 查询 uploaded 状态的文档
                 },
                 timeout=30,
             )
@@ -167,7 +175,7 @@ class BatchProcessor:
             
             if result and result.get("success"):
                 # 等待解析完成（轮询）
-                self._wait_for_completion(doc_id, "parsing", timeout=1800)
+                self._wait_for_completion(doc_id, "parse", timeout=1800)
                 
                 # 获取统计信息
                 doc_stats = self._get_doc_stats(doc_id)
@@ -212,7 +220,7 @@ class BatchProcessor:
             
             if result and result.get("success"):
                 # 等待 VLM 完成
-                self._wait_for_completion(doc_id, "vlm_processing", timeout=3600)
+                self._wait_for_completion(doc_id, "vlm", timeout=3600)
                 
                 # 获取统计信息
                 doc_stats = self._get_doc_stats(doc_id)
@@ -258,7 +266,7 @@ class BatchProcessor:
             
             if result and result.get("success"):
                 # 等待分块完成
-                self._wait_for_completion(doc_id, "chunking", timeout=1800)
+                self._wait_for_completion(doc_id, "chunk", timeout=1800)
                 
                 # 获取统计信息
                 doc_stats = self._get_doc_stats(doc_id)
@@ -317,9 +325,11 @@ class BatchProcessor:
         
         return stats
     
-    def _wait_for_completion(self, doc_id: str, target_status: str, timeout: int = 1800):
-        """等待文档处理完成（通过 API 轮询）"""
+    def _wait_for_completion(self, doc_id: str, stage: str, timeout: int = 1800):
+        """等待文档处理完成（每10秒轮询一次）"""
         start = time.time()
+        poll_interval = 10  # 每10秒检查一次
+        
         while time.time() - start < timeout:
             try:
                 response = requests.get(
@@ -330,14 +340,32 @@ class BatchProcessor:
                 doc = response.json()
                 
                 status = doc.get("processing_status")
-                if status in ("completed", "embedded", "chunked"):
+                
+                # 根据阶段判断成功状态
+                success_statuses = {
+                    "parse": ["embedded", "vlm_processing", "chunking", "completed"],
+                    "vlm": ["embedded", "chunking", "completed"],
+                    "chunk": ["chunked", "embedding", "completed"],
+                    "embedding": ["completed"],
+                }
+                
+                if status in success_statuses.get(stage, ["completed"]):
                     return  # 完成
-                elif status in ("failed", "parse_failed", "vlm_failed", "chunk_failed", "embedding_failed"):
+                
+                # 失败状态
+                failed_statuses = ["failed", "parse_failed", "vlm_failed", "chunk_failed", "embedding_failed"]
+                if status in failed_statuses:
                     raise Exception(f"处理失败: {status}")
+                
+                # 仍在处理中
+                processing_statuses = ["parsing", "vlm_processing", "chunking", "embedding"]
+                if status in processing_statuses:
+                    print(f"  ⏳ 状态: {status}, 等待 {poll_interval} 秒...")
+                
             except requests.exceptions.RequestException as e:
                 print(f"  ⚠️  查询状态失败: {e}")
             
-            time.sleep(5)
+            time.sleep(poll_interval)
         
         raise Exception(f"处理超时 ({timeout}s)")
     
