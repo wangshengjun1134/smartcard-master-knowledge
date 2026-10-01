@@ -5,6 +5,7 @@ import { searchDocuments } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -115,15 +116,14 @@ export default function SearchPage() {
               <div className="mb-4">
                 <Label htmlFor="query">查询内容</Label>
                 <div className="flex gap-2 mt-2">
-                  <Input
+                  <Textarea
                     id="query"
-                    placeholder="输入您的问题，例如：eUICC 架构是什么？"
+                    placeholder="输入您的问题，例如：eUICC 架构是什么？&#10;支持多行输入..."
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                    className="flex-1"
+                    className="flex-1 min-h-[80px] resize-y"
                   />
-                  <Button onClick={handleSearch} disabled={loading || !query.trim()}>
+                  <Button onClick={handleSearch} disabled={loading || !query.trim()} className="self-end">
                     <Search className="h-4 w-4 mr-2" />
                     {loading ? '检索中...' : '检索'}
                   </Button>
