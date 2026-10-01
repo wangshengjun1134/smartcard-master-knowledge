@@ -196,18 +196,20 @@ export default function SearchPage() {
                 {/* 右侧：查询输入 */}
                 <div className="flex-1">
                   <Label htmlFor="query">查询内容</Label>
-                  <div className="flex gap-2 mt-2">
+                  <div className="flex flex-col gap-2 mt-2">
                     <Textarea
                       id="query"
                       placeholder="输入您的问题，例如：eUICC 架构是什么？&#10;支持多行输入..."
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
-                      className="flex-1 min-h-[200px] resize-y"
+                      className="min-h-[200px] resize-y"
                     />
-                    <Button onClick={handleSearch} disabled={loading || !query.trim()} className="self-end h-10">
-                      <Search className="h-4 w-4 mr-2" />
-                      {loading ? '检索中...' : '检索'}
-                    </Button>
+                    <div className="flex justify-end">
+                      <Button onClick={handleSearch} disabled={loading || !query.trim()}>
+                        <Search className="h-4 w-4 mr-2" />
+                        {loading ? '检索中...' : '检索'}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
