@@ -112,96 +112,104 @@ export default function SearchPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {/* 查询输入 */}
-              <div className="mb-4">
-                <Label htmlFor="query">查询内容</Label>
-                <div className="flex gap-2 mt-2">
-                  <Textarea
-                    id="query"
-                    placeholder="输入您的问题，例如：eUICC 架构是什么？&#10;支持多行输入..."
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    className="flex-1 min-h-[80px] resize-y"
-                  />
-                  <Button onClick={handleSearch} disabled={loading || !query.trim()} className="self-end">
-                    <Search className="h-4 w-4 mr-2" />
-                    {loading ? '检索中...' : '检索'}
-                  </Button>
-                </div>
-              </div>
+              <div className="flex flex-col md:flex-row gap-6">
+                {/* 左侧：参数设置 */}
+                <div className="w-full md:w-80 lg:w-96 space-y-4 border-r pr-6">
+                  <div>
+                    <Label htmlFor="search-type">检索类型</Label>
+                    <Select value={searchType} onValueChange={setSearchType}>
+                      <SelectTrigger className="mt-2">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="hybrid">混合检索 (Hybrid)</SelectItem>
+                        <SelectItem value="vector">向量检索 (Vector)</SelectItem>
+                        <SelectItem value="keyword">关键词检索 (Keyword)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              <Separator className="my-4" />
+                  <Separator />
 
-              {/* 参数设置 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <Label htmlFor="search-type">检索类型</Label>
-                  <Select value={searchType} onValueChange={setSearchType}>
-                    <SelectTrigger className="mt-2">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="hybrid">混合检索 (Hybrid)</SelectItem>
-                      <SelectItem value="vector">向量检索 (Vector)</SelectItem>
-                      <SelectItem value="keyword">关键词检索 (Keyword)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                  <div>
+                    <Label htmlFor="top-k">初始召回数量 (Top K)</Label>
+                    <div className="mt-2">
+                      <div className="text-sm text-muted-foreground mb-1">{topK} 条</div>
+                      <Slider
+                        id="top-k"
+                        value={[topK]}
+                        onValueChange={([v]) => setTopK(v)}
+                        min={5}
+                        max={100}
+                        step={5}
+                      />
+                    </div>
+                  </div>
 
-                <div>
-                  <Label htmlFor="top-k">初始召回数量 (Top K)</Label>
-                  <div className="mt-2">
-                    <div className="text-sm text-muted-foreground mb-1">{topK} 条</div>
-                    <Slider
-                      id="top-k"
-                      value={[topK]}
-                      onValueChange={([v]) => setTopK(v)}
-                      min={5}
-                      max={100}
-                      step={5}
+                  <Separator />
+
+                  <div>
+                    <Label htmlFor="rerank-top-k">重排数量 (Rerank Top K)</Label>
+                    <div className="mt-2">
+                      <div className="text-sm text-muted-foreground mb-1">{rerankTopK} 条</div>
+                      <Slider
+                        id="rerank-top-k"
+                        value={[rerankTopK]}
+                        onValueChange={([v]) => setRerankTopK(v)}
+                        min={1}
+                        max={50}
+                        step={1}
+                        disabled={!enableRerank}
+                      />
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div>
+                    <Label htmlFor="threshold">相似度阈值</Label>
+                    <div className="mt-2">
+                      <div className="text-sm text-muted-foreground mb-1">{threshold.toFixed(2)}</div>
+                      <Slider
+                        id="threshold"
+                        value={[threshold]}
+                        onValueChange={([v]) => setThreshold(v)}
+                        min={0}
+                        max={1}
+                        step={0.05}
+                      />
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="enable-rerank"
+                      checked={enableRerank}
+                      onCheckedChange={setEnableRerank}
                     />
+                    <Label htmlFor="enable-rerank">启用重排 (Rerank)</Label>
                   </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="rerank-top-k">重排数量 (Rerank Top K)</Label>
-                  <div className="mt-2">
-                    <div className="text-sm text-muted-foreground mb-1">{rerankTopK} 条</div>
-                    <Slider
-                      id="rerank-top-k"
-                      value={[rerankTopK]}
-                      onValueChange={([v]) => setRerankTopK(v)}
-                      min={1}
-                      max={50}
-                      step={1}
-                      disabled={!enableRerank}
+                {/* 右侧：查询输入 */}
+                <div className="flex-1">
+                  <Label htmlFor="query">查询内容</Label>
+                  <div className="flex gap-2 mt-2">
+                    <Textarea
+                      id="query"
+                      placeholder="输入您的问题，例如：eUICC 架构是什么？&#10;支持多行输入..."
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      className="flex-1 min-h-[200px] resize-y"
                     />
+                    <Button onClick={handleSearch} disabled={loading || !query.trim()} className="self-end h-10">
+                      <Search className="h-4 w-4 mr-2" />
+                      {loading ? '检索中...' : '检索'}
+                    </Button>
                   </div>
                 </div>
-
-                <div>
-                  <Label htmlFor="threshold">相似度阈值</Label>
-                  <div className="mt-2">
-                    <div className="text-sm text-muted-foreground mb-1">{threshold.toFixed(2)}</div>
-                    <Slider
-                      id="threshold"
-                      value={[threshold]}
-                      onValueChange={([v]) => setThreshold(v)}
-                      min={0}
-                      max={1}
-                      step={0.05}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-2 mt-4">
-                <Switch
-                  id="enable-rerank"
-                  checked={enableRerank}
-                  onCheckedChange={setEnableRerank}
-                />
-                <Label htmlFor="enable-rerank">启用重排 (Rerank)</Label>
               </div>
             </CardContent>
           </Card>
