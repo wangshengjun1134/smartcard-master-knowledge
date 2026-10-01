@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 
 from PIL import Image
 
-from .base import VLMBackend
+from .vlm_base import VLMBackend
 
 
 class LocalQwenVLMBackend(VLMBackend):

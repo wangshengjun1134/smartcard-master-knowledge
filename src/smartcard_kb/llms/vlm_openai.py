@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 
 from PIL import Image
 
-from .base import VLMBackend
+from .vlm_base import VLMBackend
 
 
 class OpenAICompatibleBackend(VLMBackend):
