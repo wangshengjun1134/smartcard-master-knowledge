@@ -507,34 +507,34 @@ export default function Home() {
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <Table>
+                  <Table className="text-sm">
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>文档编号</TableHead>
-                        <TableHead>文件名</TableHead>
-                        <TableHead className="hidden sm:table-cell">系列 ID</TableHead>
-                        <TableHead className="hidden sm:table-cell">修订版本</TableHead>
-                        <TableHead>状态</TableHead>
-                        <TableHead>操作</TableHead>
+                      <TableRow className="h-8">
+                        <TableHead className="h-8 px-2 py-1">文档编号</TableHead>
+                        <TableHead className="h-8 px-2 py-1">文件名</TableHead>
+                        <TableHead className="hidden sm:table-cell h-8 px-2 py-1">系列 ID</TableHead>
+                        <TableHead className="hidden sm:table-cell h-8 px-2 py-1">修订版本</TableHead>
+                        <TableHead className="h-8 px-2 py-1">状态</TableHead>
+                        <TableHead className="h-8 px-2 py-1">操作</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {documents.map((doc) => (
-                        <TableRow key={doc.id}>
-                          <TableCell className="font-medium">
+                        <TableRow key={doc.id} className="h-10">
+                          <TableCell className="font-medium px-2 py-1">
                             {doc.document_code || '-'}
                           </TableCell>
-                          <TableCell className="max-w-[200px] truncate">
+                          <TableCell className="max-w-[200px] truncate px-2 py-1">
                             {doc.file_name}
                           </TableCell>
-                          <TableCell className="hidden sm:table-cell">
+                          <TableCell className="hidden sm:table-cell px-2 py-1">
                             {doc.series_id || '-'}
                           </TableCell>
-                          <TableCell className="hidden sm:table-cell">
+                          <TableCell className="hidden sm:table-cell px-2 py-1">
                             {doc.revision || '-'}
                           </TableCell>
-                          <TableCell>{getStatusBadge(doc.processing_status)}</TableCell>
-                          <TableCell>
+                          <TableCell className="px-2 py-1">{getStatusBadge(doc.processing_status)}</TableCell>
+                          <TableCell className="px-2 py-1">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="outline" size="sm">
