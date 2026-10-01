@@ -19,16 +19,29 @@ def extract_doc_info(file_path: Path) -> dict:
     """从文件名提取文档信息"""
     name = file_path.name.replace(".pdf", "")
     
-    # 提取 series_id (如 SGP.01, SGP.23-1)
+    # 提取 series_id (如 SGP.01, SGP.23-1, SGP.11-4)
     match = re.match(r'(SGP\.\d+(?:-\d+)?)', name, re.IGNORECASE)
     series_id = match.group(1).upper().replace("_", "-") if match else None
     
-    # 提取 revision (如 v1.12, v4.0)
+    # 提取 revision - 支持两种格式：
+    # 1. 带 v 前缀：SGP.01-v1.12.pdf → revision=1.12
+    # 2. 不带 v 前缀：SGP.11-4.2.1.pdf → revision=2.1 (系列号后的数字部分)
+    revision = None
+    
+    # 先尝试带 v 前缀的格式
     rev_match = re.search(r'[vV](\d+(?:\.\d+)*)', name)
-    revision = rev_match.group(1) if rev_match else None
+    if rev_match:
+        revision = rev_match.group(1)
+    elif series_id:
+        # 如果不带 v，尝试从系列号后提取版本号
+        # 例如：SGP.11-4.2.1 → 系列号 SGP.11-4，版本号 2.1
+        suffix = name[len(series_id):]  # 移除系列号前缀
+        suffix_match = re.match(r'[._-]?(\d+(?:\.\d+)*)', suffix)
+        if suffix_match:
+            revision = suffix_match.group(1)
     
     # document_code = series_id + "-v" + revision
-    document_code = f"{series_id}-v{revision}" if series_id and revision else None
+    document_code = f"{series_id}-v{revision}" if series_id and revision else series_id
     
     return {
         "document_code": document_code,
