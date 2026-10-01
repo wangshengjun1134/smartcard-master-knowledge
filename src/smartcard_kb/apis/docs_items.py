@@ -10,11 +10,13 @@ from smartcard_kb.docs_compile.database import (
     update_item_textualization,
     query_items_needing_textualization,
 )
-from smartcard_kb.docs_compile.textualize import (
-    textualize_item,
-    textualize_all_items,
-    create_vlm_backend,
-)
+
+# TODO: textualize 模块已被删除，需要重新实现或恢复
+# from smartcard_kb.docs_compile.textualize import (
+#     textualize_item,
+#     textualize_all_items,
+#     create_vlm_backend,
+# )
 
 router = APIRouter(prefix="/api/docs", tags=["文档 Item 管理"])
 
@@ -182,89 +184,90 @@ def get_document_item(document_id: str, item_id: str):
     return item
 
 
-@router.post("/{document_id}/items/textualize", response_model=TextualizeResponse)
-def textualize_items(request: TextualizeRequest):
-    """
-    文本化文档 item
-
-    - **document_id**: 文档 ID
-    - **label**: 类型（可选，None 表示所有类型）
-    - **vlm_backend_type**: VLM 后端类型（openai / local）
-    - **vlm_api_key**: VLM API Key
-    - **vlm_base_url**: VLM API 基础 URL
-    - **vlm_model**: VLM 模型名称
-    - **dry_run**: 是否只查询不更新
-    """
-    # 创建 VLM 后端
-    vlm_backend = None
-    if request.vlm_api_key:
-        vlm_backend = create_vlm_backend(
-            backend_type=request.vlm_backend_type,
-            api_key=request.vlm_api_key,
-            base_url=request.vlm_base_url,
-            model=request.vlm_model,
-        )
-
-    # 执行文本化
-    stats = textualize_all_items(
-        document_id=request.document_id,
-        label=request.label,
-        vlm_backend=vlm_backend,
-        dry_run=request.dry_run,
-    )
-
-    return TextualizeResponse(
-        success=True,
-        message=f"文本化处理完成" if not request.dry_run else "文本化预览完成",
-        stats=stats,
-    )
-
-
-@router.post("/items/{item_id}/textualize", response_model=DocItemResponse)
-def textualize_single_item(
-    item_id: str,
-    document_id: str = Query(...),
-    vlm_backend_type: str = "openai",
-    vlm_api_key: Optional[str] = None,
-    vlm_base_url: Optional[str] = None,
-    vlm_model: str = "qwen-vl-max",
-):
-    """
-    文本化单个 item
-
-    - **item_id**: Item ID
-    - **document_id**: 文档 ID
-    - **vlm_backend_type**: VLM 后端类型
-    - **vlm_api_key**: VLM API Key
-    - **vlm_base_url**: VLM API 基础 URL
-    - **vlm_model**: VLM 模型名称
-    """
-    # 查询 item
-    items = query_document_items(document_id=document_id)
-    item = next((i for i in items if i["id"] == item_id), None)
-
-    if not item:
-        raise HTTPException(status_code=404, detail="Item 不存在")
-
-    # 创建 VLM 后端
-    vlm_backend = None
-    if vlm_api_key:
-        vlm_backend = create_vlm_backend(
-            backend_type=vlm_backend_type,
-            api_key=vlm_api_key,
-            base_url=vlm_base_url,
-            model=vlm_model,
-        )
-
-    # 文本化
-    result = textualize_item(item, vlm_backend)
-
-    if result is not None:
-        update_item_textualization(item_id, result)
-
-        # 返回更新后的 item
-        items = query_document_items(document_id=document_id)
-        updated_item = next((i for i in items if i["id"] == item_id), None)
-        return updated_item
-    else:
-        raise HTTPException(status_code=500, detail="文本化失败")
+# TODO: 这些端点依赖被删除的 textualize 模块，暂时禁用
+# @router.post("/{document_id}/items/textualize", response_model=TextualizeResponse)
+# def textualize_items(request: TextualizeRequest):
+#     """
+#     文本化文档 item
+#
+#     - **document_id**: 文档 ID
+#     - **label**: 类型（可选，None 表示所有类型）
+#     - **vlm_backend_type**: VLM 后端类型（openai / local）
+#     - **vlm_api_key**: VLM API Key
+#     - **vlm_base_url**: VLM API 基础 URL
+#     - **vlm_model**: VLM 模型名称
+#     - **dry_run**: 是否只查询不更新
+#     """
+#     # 创建 VLM 后端
+#     vlm_backend = None
+#     if request.vlm_api_key:
+#         vlm_backend = create_vlm_backend(
+#             backend_type=request.vlm_backend_type,
+#             api_key=request.vlm_api_key,
+#             base_url=request.vlm_base_url,
+#             model=request.vlm_model,
+#         )
+#
+#     # 执行文本化
+#     stats = textualize_all_items(
+#         document_id=request.document_id,
+#         label=request.label,
+#         vlm_backend=vlm_backend,
+#         dry_run=request.dry_run,
+#     )
+#
+#     return TextualizeResponse(
+#         success=True,
+#         message=f"文本化处理完成" if not request.dry_run else "文本化预览完成",
+#         stats=stats,
+#     )
+#
+#
+# @router.post("/items/{item_id}/textualize", response_model=DocItemResponse)
+# def textualize_single_item(
+#     item_id: str,
+#     document_id: str = Query(...),
+#     vlm_backend_type: str = "openai",
+#     vlm_api_key: Optional[str] = None,
+#     vlm_base_url: Optional[str] = None,
+#     vlm_model: str = "qwen-vl-max",
+# ):
+#     """
+#     文本化单个 item
+#
+#     - **item_id**: Item ID
+#     - **document_id**: 文档 ID
+#     - **vlm_backend_type**: VLM 后端类型
+#     - **vlm_api_key**: VLM API Key
+#     - **vlm_base_url**: VLM API 基础 URL
+#     - **vlm_model**: VLM 模型名称
+#     """
+#     # 查询 item
+#     items = query_document_items(document_id=document_id)
+#     item = next((i for i in items if i["id"] == item_id), None)
+#
+#     if not item:
+#         raise HTTPException(status_code=404, detail="Item 不存在")
+#
+#     # 创建 VLM 后端
+#     vlm_backend = None
+#     if vlm_api_key:
+#         vlm_backend = create_vlm_backend(
+#             backend_type=vlm_backend_type,
+#             api_key=vlm_api_key,
+#             base_url=vlm_base_url,
+#             model=vlm_model,
+#         )
+#
+#     # 文本化
+#     result = textualize_item(item, vlm_backend)
+#
+#     if result is not None:
+#         update_item_textualization(item_id, result)
+#
+#         # 返回更新后的 item
+#         items = query_document_items(document_id=document_id)
+#         updated_item = next((i for i in items if i["id"] == item_id), None)
+#         return updated_item
+#     else:
+#         raise HTTPException(status_code=500, detail="文本化失败")

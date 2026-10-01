@@ -6,9 +6,9 @@ from typing import List, Dict, Any, Optional
 from PIL import Image
 
 from .database import query_document_items, get_connection
-from ..llms.base import VLMBackend
-from ..llms.openai import OpenAICompatibleBackend
-from ..llms.local import LocalQwenVLMBackend
+from ..llms.vlm_base import VLMBackend
+from ..llms.vlm_openai import OpenAICompatibleBackend
+from ..llms.vlm_local import LocalQwenVLMBackend
 
 
 class VLMService:

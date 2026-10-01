@@ -6,15 +6,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from smartcard_kb.config import settings
-from smartcard_kb.docs_compile.database import init_database
 from smartcard_kb.apis import docs_info_router, docs_items_router, docs_processing_router, search_router
 
 # 设置 Docling 模型路径
 if settings.docling_models_path:
     os.environ["DOCLING_MODELS_PATH"] = settings.docling_models_path
-
-# 初始化数据库
-init_database()
 
 app = FastAPI(
     title="SmartCard Master Knowledge Base",
@@ -36,6 +32,17 @@ app.include_router(docs_info_router)
 app.include_router(docs_items_router)
 app.include_router(docs_processing_router)
 app.include_router(search_router)
+
+
+@app.on_event("startup")
+async def startup_event():
+    """应用启动时初始化数据库"""
+    from smartcard_kb.docs_compile.database import init_database
+    try:
+        init_database()
+        print("数据库初始化成功")
+    except Exception as e:
+        print(f"数据库初始化失败（请检查 PostgreSQL 是否运行）: {e}")
 
 
 @app.get("/")
