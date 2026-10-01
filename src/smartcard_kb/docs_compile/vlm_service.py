@@ -48,7 +48,7 @@ class VLMService:
         self,
         document_id: str,
         output_dir: str,
-        prompt: str = "请详细描述这张图片的内容，包括所有技术细节、图表数据、流程步骤等。如果是流程图或架构图，请说明各个组件之间的关系。",
+        prompt: str = "Please describe this image in detail, including all technical details, chart data, process steps, etc. If it is a flowchart or architecture diagram, please explain the relationships between the components. Respond in English.",
         max_new_tokens: int = 512,
     ) -> Dict[str, Any]:
         """
@@ -116,7 +116,7 @@ class VLMService:
     ) -> Optional[str]:
         """调用 VLM 生成描述"""
         messages = [
-            {"role": "system", "content": "你是一个专业的技术文档分析助手，擅长描述和解释技术图表、流程图、架构图等内容。"},
+            {"role": "system", "content": "You are a professional technical document analysis assistant, skilled at describing and explaining technical charts, flowcharts, architecture diagrams, etc. Always respond in English."},
             {"role": "user", "content": [{"type": "image", "image": image}, {"type": "text", "text": prompt}]},
         ]
         try:
