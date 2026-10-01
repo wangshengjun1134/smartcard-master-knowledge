@@ -25,11 +25,8 @@ from typing import Dict, Any, Optional
 
 API_BASE_URL = "http://localhost:8000/api/docs"
 
-# VLM 配置
+# VLM 配置（使用后端 .env 中的配置，无需在此设置）
 VLM_BACKEND_TYPE = "openai"
-VLM_API_KEY = ""  # 从环境变量或配置文件读取
-VLM_BASE_URL = ""  # 从环境变量或配置文件读取
-VLM_MODEL = "qwen-vl-max"
 VLM_PROMPT = "Please describe this image in detail, including all technical details, chart data, process steps, etc. If it is a flowchart or architecture diagram, please explain the relationships between the components. Respond in English."
 VLM_MAX_TOKENS = 512
 
@@ -39,7 +36,6 @@ CHUNK_TOKENIZER = "BAAI/bge-m3"
 
 # Embedding 配置
 EMBEDDING_BACKEND = "local"
-EMBEDDING_MODEL = "D:/softdata/workspaces/ai-models/bge-m3"
 
 # 输出目录
 OUTPUT_DIR = "output/pictures"
@@ -208,9 +204,6 @@ class BatchProcessor:
                     "document_id": doc_id,
                     "output_dir": OUTPUT_DIR,
                     "backend_type": VLM_BACKEND_TYPE,
-                    "api_key": VLM_API_KEY,
-                    "base_url": VLM_BASE_URL,
-                    "model": VLM_MODEL,
                     "prompt": VLM_PROMPT,
                     "max_new_tokens": VLM_MAX_TOKENS,
                 },
@@ -301,7 +294,6 @@ class BatchProcessor:
                 {
                     "document_id": doc_id,
                     "backend_type": EMBEDDING_BACKEND,
-                    "model_name": EMBEDDING_MODEL,
                 },
                 timeout=300,
             )
@@ -405,7 +397,8 @@ class BatchProcessor:
         print("="*60)
         print(f"API 地址: {API_BASE_URL}")
         print(f"并行度: {MAX_WORKERS}")
-        print(f"VLM 后端: {VLM_BACKEND_TYPE}")
+        print(f"VLM 后端: {VLM_BACKEND_TYPE} (使用后端 .env 配置)")
+        print(f"Embedding 后端: {EMBEDDING_BACKEND} (使用后端 .env 配置)")
         print(f"输出目录: {OUTPUT_DIR}")
         print()
         
