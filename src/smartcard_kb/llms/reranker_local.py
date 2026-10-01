@@ -1,5 +1,6 @@
 """本地重排模型后端（基于 BGE-Reranker）"""
 
+import os
 from typing import List, Tuple
 
 from .reranker_base import RerankerBackend
@@ -8,10 +9,10 @@ from .reranker_base import RerankerBackend
 class LocalRerankerBackend(RerankerBackend):
     """本地重排模型后端"""
 
-    def __init__(self, model_path: str = "BAAI/bge-reranker-v2-m3"):
+    def __init__(self, model_path: str = "D:/softdata/workspaces/ai-models/bge-reranker-v2-m3"):
         """
         初始化本地重排模型后端
-        
+
         :param model_path: 模型路径或 HuggingFace 模型 ID
         """
         try:
@@ -25,8 +26,25 @@ class LocalRerankerBackend(RerankerBackend):
 
         self.torch = torch
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
+
         print(f"加载重排模型: {model_path}, 设备: {self.device}")
+
+        # 检查模型文件是否完整（防止 Git LFS 指针文件）
+        tokenizer_json = os.path.join(model_path, "tokenizer.json")
+        sp_model = os.path.join(model_path, "sentencepiece.bpe.model")
+
+        for f in [tokenizer_json, sp_model]:
+            if os.path.exists(f):
+                with open(f, 'r', encoding='utf-8') as fp:
+                    content = fp.read(100)
+                    if 'git-lfs' in content:
+                        raise FileNotFoundError(
+                            f"模型文件 {os.path.basename(f)} 是 Git LFS 指针文件，未下载实际内容。\n"
+                            f"请手动下载该文件并替换，或运行:\n"
+                            f"  cd {model_path}\n"
+                            f"  git lfs pull\n"
+                            f"或从 HuggingFace 手动下载: https://huggingface.co/BAAI/bge-reranker-v2-m3"
+                        )
 
         self.tokenizer = AutoTokenizer.from_pretrained(
             model_path, local_files_only=True
@@ -36,7 +54,7 @@ class LocalRerankerBackend(RerankerBackend):
         )
         self.model.to(self.device)
         self.model.eval()
-        
+
         self.model_path = model_path
         print(f"本地重排模型加载完成: {model_path}")
 
