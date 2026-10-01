@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { searchDocuments } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -12,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Search, FileText, Highlighter, ChevronDown, ChevronUp } from 'lucide-react'
+import { Search, FileText, Highlighter, ChevronDown, ChevronUp, Home } from 'lucide-react'
 
 interface SearchResult {
   id: string
@@ -97,6 +98,12 @@ export default function SearchPage() {
             <Search className="h-6 w-6" />
             <h1 className="text-xl font-bold">SmartCard Knowledge Base - 文档检索</h1>
           </div>
+          <nav className="flex items-center gap-4">
+            <Link href="/" className="text-sm font-medium hover:underline flex items-center gap-1">
+              <Home className="h-4 w-4" />
+              文档管理
+            </Link>
+          </nav>
         </div>
       </header>
 
