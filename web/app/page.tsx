@@ -512,11 +512,9 @@ export default function Home() {
                       <TableRow>
                         <TableHead>文档编号</TableHead>
                         <TableHead>文件名</TableHead>
-                        <TableHead className="hidden md:table-cell">标题</TableHead>
+                        <TableHead className="hidden sm:table-cell">系列 ID</TableHead>
+                        <TableHead className="hidden sm:table-cell">修订版本</TableHead>
                         <TableHead>状态</TableHead>
-                        <TableHead className="hidden sm:table-cell">Item 数</TableHead>
-                        <TableHead className="hidden lg:table-cell">文件大小</TableHead>
-                        <TableHead className="hidden lg:table-cell">创建时间</TableHead>
                         <TableHead>操作</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -529,17 +527,13 @@ export default function Home() {
                           <TableCell className="max-w-[200px] truncate">
                             {doc.file_name}
                           </TableCell>
-                          <TableCell className="hidden md:table-cell max-w-xs truncate">
-                            {doc.title || '-'}
+                          <TableCell className="hidden sm:table-cell">
+                            {doc.series_id || '-'}
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell">
+                            {doc.revision || '-'}
                           </TableCell>
                           <TableCell>{getStatusBadge(doc.processing_status)}</TableCell>
-                          <TableCell className="hidden sm:table-cell">{doc.item_count}</TableCell>
-                          <TableCell className="hidden lg:table-cell">
-                            {doc.file_size ? formatFileSize(doc.file_size) : '-'}
-                          </TableCell>
-                          <TableCell className="hidden lg:table-cell">
-                            {doc.created_at ? formatDate(doc.created_at) : '-'}
-                          </TableCell>
                           <TableCell>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
