@@ -27,9 +27,13 @@ class LocalRerankerBackend(RerankerBackend):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         print(f"加载重排模型: {model_path}, 设备: {self.device}")
-        
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
-        self.model = AutoModelForSequenceClassification.from_pretrained(model_path)
+
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            model_path, local_files_only=True
+        )
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            model_path, local_files_only=True
+        )
         self.model.to(self.device)
         self.model.eval()
         

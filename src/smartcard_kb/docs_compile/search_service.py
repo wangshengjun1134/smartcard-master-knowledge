@@ -18,7 +18,7 @@ class SearchService:
         embedding_backend: Optional[LocalEmbeddingBackend] = None,
         reranker_backend: Optional[LocalRerankerBackend] = None,
         embedding_model_path: str = "D:/softdata/workspaces/ai-models/bge-m3",
-        reranker_model_path: str = "BAAI/bge-reranker-v2-m3",
+        reranker_model_path: str = "D:/softdata/workspaces/ai-models/bge-reranker-v2-m3",
     ):
         """
         初始化检索服务
