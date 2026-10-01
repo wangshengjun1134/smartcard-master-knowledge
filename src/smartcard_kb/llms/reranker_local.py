@@ -35,9 +35,10 @@ class LocalRerankerBackend(RerankerBackend):
 
         for f in [tokenizer_json, sp_model]:
             if os.path.exists(f):
-                with open(f, 'r', encoding='utf-8') as fp:
+                # 使用二进制模式读取，避免编码错误
+                with open(f, 'rb') as fp:
                     content = fp.read(100)
-                    if 'git-lfs' in content:
+                    if b'git-lfs' in content:
                         raise FileNotFoundError(
                             f"模型文件 {os.path.basename(f)} 是 Git LFS 指针文件，未下载实际内容。\n"
                             f"请手动下载该文件并替换，或运行:\n"
@@ -47,7 +48,7 @@ class LocalRerankerBackend(RerankerBackend):
                         )
 
         self.tokenizer = AutoTokenizer.from_pretrained(
-            model_path, local_files_only=True
+            model_path, local_files_only=True, trust_remote_code=True
         )
         self.model = AutoModelForSequenceClassification.from_pretrained(
             model_path, local_files_only=True
@@ -88,7 +89,7 @@ class LocalRerankerBackend(RerankerBackend):
         ).to(self.device)
 
         # 推理
-        with torch.no_grad():
+        with self.torch.no_grad():
             outputs = self.model(**inputs)
             scores = outputs.logits.squeeze(-1).cpu().numpy()
 

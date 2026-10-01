@@ -20,8 +20,8 @@ export function DocumentTree() {
     try {
       const result = await getDocumentTree()
       // API 现在返回单个树节点，需要提取 children
-      if (result.tree && result.tree.children) {
-        setTreeNodes(result.tree.children)
+      if (result.tree && (result.tree as any).children) {
+        setTreeNodes((result.tree as any).children)
       } else if (Array.isArray(result.tree)) {
         setTreeNodes(result.tree)
       }

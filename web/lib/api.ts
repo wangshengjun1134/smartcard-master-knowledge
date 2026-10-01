@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { DocumentInfo, DocItem, Chunk, ApiResponse, TextualizeRequest, TextualizeResponse, ItemStatistics, PaginatedItemsResponse, PaginatedChunksResponse } from '@/types'
+import type { DocumentInfo, DocItem, Chunk, ApiResponse, TextualizeRequest, TextualizeResponse, ItemStatistics, PaginatedItemsResponse, PaginatedChunksResponse, TreeNode } from '@/types'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
