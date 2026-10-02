@@ -96,19 +96,29 @@ class BatchProcessor:
         all_docs = []
         page = 1
         page_size = 100
+        max_retries = 5
         
         while True:
-            response = requests.get(
-                f"{API_BASE_URL}",
-                params={
-                    "page": page,
-                    "page_size": page_size,
-                    "processing_status": "uploaded",  # 查询 uploaded 状态的文档
-                },
-                timeout=60,  # 增加超时时间到 60 秒
-            )
-            response.raise_for_status()
-            data = response.json()
+            for attempt in range(max_retries):
+                try:
+                    response = requests.get(
+                        f"{API_BASE_URL}",
+                        params={
+                            "page": page,
+                            "page_size": page_size,
+                            "processing_status": "uploaded",  # 查询 uploaded 状态的文档
+                        },
+                        timeout=3600,  # 超时时间设置为 1 小时
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                    break
+                except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+                    if attempt < max_retries - 1:
+                        print(f"  ⚠️  获取文档列表失败，等待 60 秒后重试 {attempt + 1}/{max_retries}...")
+                        time.sleep(60)  # 等待 60 秒后重试
+                    else:
+                        raise
             
             items = data.get("items", [])
             if not items:
@@ -124,7 +134,7 @@ class BatchProcessor:
         
         return all_docs
     
-    def call_api(self, url: str, data: dict, timeout: int = 600) -> Optional[dict]:
+    def call_api(self, url: str, data: dict, timeout: int = 3600) -> Optional[dict]:
         """调用 API，处理限流"""
         max_retries = 3
         for attempt in range(max_retries):
@@ -175,7 +185,7 @@ class BatchProcessor:
             
             if result and result.get("success"):
                 # 等待解析完成（轮询）
-                self._wait_for_completion(doc_id, "parse", timeout=1800)
+                self._wait_for_completion(doc_id, "parse", timeout=3600)
                 
                 # 获取统计信息
                 doc_stats = self._get_doc_stats(doc_id)
@@ -266,7 +276,7 @@ class BatchProcessor:
             
             if result and result.get("success"):
                 # 等待分块完成
-                self._wait_for_completion(doc_id, "chunk", timeout=1800)
+                self._wait_for_completion(doc_id, "chunk", timeout=3600)
                 
                 # 获取统计信息
                 doc_stats = self._get_doc_stats(doc_id)
@@ -308,7 +318,7 @@ class BatchProcessor:
             
             if result and result.get("success"):
                 # 等待 Embedding 完成
-                self._wait_for_completion(doc_id, "embedding", timeout=1800)
+                self._wait_for_completion(doc_id, "embedding", timeout=3600)
                 
                 elapsed = time.time() - t0
                 stats.mark_success("embedding", time=elapsed)
@@ -572,7 +582,9 @@ class BatchProcessor:
 
 def main():
     """主函数"""
+    print("DEBUG: Starting batch processor...", flush=True)
     processor = BatchProcessor()
+    print("DEBUG: Running processor...", flush=True)
     processor.run()
 
 
