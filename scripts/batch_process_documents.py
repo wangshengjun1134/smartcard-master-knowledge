@@ -48,8 +48,8 @@ EMBEDDING_BACKEND = "local"
 # 输出目录
 OUTPUT_DIR = "output/pictures"
 
-# 并行度（设置为 1 以串行处理，避免内存溢出）
-MAX_WORKERS = 1
+# 并行度
+MAX_WORKERS = 5
 
 # 限流等待时间（秒）
 RATE_LIMIT_WAIT = 3600  # 1 小时
