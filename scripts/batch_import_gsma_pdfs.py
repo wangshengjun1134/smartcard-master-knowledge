@@ -12,7 +12,9 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from smartcard_kb.docs_compile.database import init_database, insert_document_info, query_document_info
 
-GSMA_DIR = Path(r"D:\softdata\workspaces\buff\smartcard-master-knowledge\specs\03-management-provisioning\gsma")
+# 使用脚本所在目录自动计算项目根目录
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+GSMA_DIR = PROJECT_ROOT / "specs" / "03-management-provisioning" / "gsma"
 
 
 def extract_doc_info(file_path: Path) -> dict:
@@ -20,21 +22,25 @@ def extract_doc_info(file_path: Path) -> dict:
     name = file_path.name.replace(".pdf", "")
     
     # 提取 series_id (如 SGP.01, SGP.23-1, SGP.11-4)
-    match = re.match(r'(SGP\.\d+(?:-\d+)?)', name, re.IGNORECASE)
+    # 使用负向前瞻：如果 -数字 后面跟着 .数字，说明是版本号而非子系列号
+    # 例如：SGP.29-1.0 → SGP.29 (因为 -1 后面是 .0)，SGP.23-1-v3.1 → SGP.23-1
+    match = re.match(r'(SGP\.\d+(?:-\d+)?)(?!\.\d)', name, re.IGNORECASE)
     series_id = match.group(1).upper().replace("_", "-") if match else None
-    
-    # 提取 revision - 支持两种格式：
+
+    # 提取 revision - 支持多种格式：
     # 1. 带 v 前缀：SGP.01-v1.12.pdf → revision=1.12
-    # 2. 不带 v 前缀：SGP.11-4.2.1.pdf → revision=2.1 (系列号后的数字部分)
+    # 2. 带 v 前缀含连字符：SGP.05v1-0.pdf → revision=1-0
+    # 3. 不带 v 前缀：SGP.29-1.0.pdf → revision=1.0
+    # 4. 多段版本号：SGP.32-1.0.1.pdf → revision=1.0.1
     revision = None
-    
-    # 先尝试带 v 前缀的格式
-    rev_match = re.search(r'[vV](\d+(?:\.\d+)*)', name)
+
+    # 先尝试带 v 前缀的格式（支持 . 和 - 分隔的版本号）
+    rev_match = re.search(r'[vV](\d+(?:[\.-]\d+)*)', name)
     if rev_match:
         revision = rev_match.group(1)
     elif series_id:
         # 如果不带 v，尝试从系列号后提取版本号
-        # 例如：SGP.11-4.2.1 → 系列号 SGP.11-4，版本号 2.1
+        # 例如：SGP.29-1.0 → 系列号 SGP.29，版本号 1.0
         suffix = name[len(series_id):]  # 移除系列号前缀
         suffix_match = re.match(r'[._-]?(\d+(?:\.\d+)*)', suffix)
         if suffix_match:
@@ -96,7 +102,7 @@ def main():
                 continue
             
             # 构建文档记录
-            relative_path = pdf_file.relative_to(Path(r"D:\softdata\workspaces\buff\smartcard-master-knowledge"))
+            relative_path = pdf_file.relative_to(PROJECT_ROOT)
             # 使用正斜杠路径（跨平台兼容）
             file_path_str = str(relative_path).replace("\\", "/")
             
