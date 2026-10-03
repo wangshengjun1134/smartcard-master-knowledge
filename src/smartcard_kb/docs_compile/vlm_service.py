@@ -82,7 +82,13 @@ class VLMService:
                 failed_items.append(item_id)
                 continue
 
-            image_path = Path(output_dir) / Path(image_path_str).name
+            # 使用完整路径（数据库已包含 document_id 子目录）
+            image_path = Path(image_path_str)
+            if not image_path.is_absolute():
+                # 如果是相对路径，基于项目根目录解析
+                project_root = Path(__file__).resolve().parent.parent.parent.parent
+                image_path = project_root / image_path
+            
             if not image_path.exists():
                 print(f"Warning: 图片不存在 {image_path}，跳过")
                 failed_items.append(item_id)
