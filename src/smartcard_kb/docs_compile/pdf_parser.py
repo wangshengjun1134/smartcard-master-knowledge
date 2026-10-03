@@ -1,5 +1,6 @@
 """PDF/DOCX 解析模块 - 基于 Docling 的结构化内容提取并保存到数据库"""
 
+import os
 import uuid
 import time
 from pathlib import Path
@@ -32,6 +33,11 @@ class PDFParser:
         )
         self.pipeline_options.generate_picture_images = True
         self.pipeline_options.images_scale = 2.0
+
+        # 使用本地模型路径（避免运行时下载）
+        artifacts_path = os.environ.get("DOCLING_MODELS_PATH")
+        if artifacts_path:
+            self.pipeline_options.artifacts_path = artifacts_path
 
         self.converter = DocumentConverter(
             format_options={

@@ -1,5 +1,6 @@
 """文档处理模块 - 基于 Docling 的 PDF/DOCX 结构化内容提取"""
 
+import os
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
@@ -33,6 +34,11 @@ class DoclingPDFProcessor:
         # 图片缩放倍数
         self.pipeline_options.images_scale = 2.0
 
+        # 使用本地模型路径（避免运行时下载）
+        artifacts_path = os.environ.get("DOCLING_MODELS_PATH")
+        if artifacts_path:
+            self.pipeline_options.artifacts_path = artifacts_path
+
         self.converter = DocumentConverter(
             format_options={
                 InputFormat.PDF: PdfFormatOption(
@@ -42,19 +48,26 @@ class DoclingPDFProcessor:
             }
         )
 
-    def extract_structured_content(self, doc, output_dir: str = "output/pictures") -> List[Dict[str, Any]]:
+    def extract_structured_content(self, doc, output_dir: str = "output/pictures", document_id: str = None) -> List[Dict[str, Any]]:
         """
         从 Docling 文档对象中提取结构化内容
         :param doc: Docling 转换后的文档对象
         :param output_dir: 图片保存目录
+        :param document_id: 文档 ID，用于创建独立子目录避免图片覆盖
         :return: 结构化内容列表
         """
         heading_stack = []
         results = []
         picture_count = 0
 
+        # 如果提供了 document_id，使用独立子目录
+        if document_id:
+            output_dir = Path(output_dir) / document_id
+        else:
+            output_dir = Path(output_dir)
+        
         # 确保输出目录存在
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         for item, level in doc.iterate_items():
             # -------------------------
@@ -136,12 +149,13 @@ class DoclingPDFProcessor:
 
         return results
 
-    def process_pdf(self, pdf_path: str, page_range: Optional[tuple] = None, output_dir: str = "output/pictures") -> List[Dict[str, Any]]:
+    def process_pdf(self, pdf_path: str, page_range: Optional[tuple] = None, output_dir: str = "output/pictures", document_id: str = None) -> List[Dict[str, Any]]:
         """
         处理 PDF 文件并返回结构化内容
         :param pdf_path: PDF 文件路径
         :param page_range: 页码范围 (start, end)，1-based
         :param output_dir: 图片保存目录
+        :param document_id: 文档 ID，用于创建独立子目录避免图片覆盖
         :return: 结构化内容列表
         """
         # 动态构建参数，避免 page_range=None 时触发 docling 校验报错
@@ -150,4 +164,4 @@ class DoclingPDFProcessor:
             kwargs["page_range"] = page_range
 
         result = self.converter.convert(pdf_path, **kwargs)
-        return self.extract_structured_content(result.document, output_dir)
+        return self.extract_structured_content(result.document, output_dir, document_id)
