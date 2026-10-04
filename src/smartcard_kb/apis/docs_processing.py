@@ -103,8 +103,10 @@ async def _async_parse(
             "processing_started_at": "NOW()",
         })
 
+        # 使用线程池执行同步阻塞操作，避免阻塞事件循环
         parser = PDFParser(do_ocr=do_ocr)
-        result = parser.parse_pdf(
+        result = await asyncio.to_thread(
+            parser.parse_pdf,
             pdf_path=pdf_path,
             document_id=document_id,
             page_range=page_range,
@@ -162,7 +164,7 @@ async def _async_vlm(
         if not resolved_api_key:
             raise ValueError("VLM API Key 未配置")
 
-        # 创建后端并初始化服务
+        # 使用线程池执行同步阻塞操作，避免阻塞事件循环
         backend = VLMService.create_backend(
             backend_type=backend_type,
             api_key=resolved_api_key,
@@ -170,7 +172,8 @@ async def _async_vlm(
             model=resolved_model,
         )
         service = VLMService(vlm_backend=backend)
-        result = service.generate_vlm_descriptions(
+        result = await asyncio.to_thread(
+            service.generate_vlm_descriptions,
             document_id=document_id,
             output_dir=output_dir,
             prompt=prompt,
@@ -208,12 +211,14 @@ async def _async_chunk(
             "processing_status": "chunking",
         })
 
+        # 使用线程池执行同步阻塞操作，避免阻塞事件循环
         chunker = Chunker(
             do_ocr=do_ocr,
             max_tokens=max_tokens,
             tokenizer_name=tokenizer_name,
         )
-        result = chunker.generate_chunks(
+        result = await asyncio.to_thread(
+            chunker.generate_chunks,
             pdf_path=pdf_path,
             document_id=document_id,
             page_range=page_range,
@@ -257,7 +262,7 @@ async def _async_embedding(
         if backend_type == "openai" and not resolved_api_key:
             raise ValueError("Embedding API Key 未配置")
 
-        # 创建后端并初始化服务
+        # 使用线程池执行同步阻塞操作，避免阻塞事件循环
         backend = EmbeddingService.create_backend(
             backend_type=backend_type,
             api_key=resolved_api_key,
@@ -266,7 +271,10 @@ async def _async_embedding(
             model_name=resolved_model_name,
         )
         service = EmbeddingService(embedding_backend=backend)
-        result = service.generate_embeddings(document_id=document_id)
+        result = await asyncio.to_thread(
+            service.generate_embeddings,
+            document_id=document_id,
+        )
 
         update_document_info({
             "id": document_id,
