@@ -64,8 +64,9 @@ class PDFParser:
         :param output_dir: 图片保存目录
         :return: 包含 items 的字典
         """
-        # 确保输出目录存在
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        # 确保输出目录存在（每个文档使用独立子目录）
+        document_output_dir = Path(output_dir) / document_id
+        document_output_dir.mkdir(parents=True, exist_ok=True)
 
         # 初始化数据库
         init_database()
@@ -80,8 +81,8 @@ class PDFParser:
         result = self.converter.convert(pdf_path, **kwargs)
         t1 = time.time()
 
-        # 提取 items
-        items = self._extract_all_items(result.document, document_id, output_dir)
+        # 提取 items（使用文档独立子目录）
+        items = self._extract_all_items(result.document, document_id, str(document_output_dir))
         insert_document_items(items)
         t2 = time.time()
 
@@ -129,14 +130,13 @@ class PDFParser:
                 pass
 
             if item.label == DocItemLabel.PICTURE:
+                image_path = None
                 try:
                     image = item.get_image(doc)
                     if image is not None:
                         picture_count += 1
-                        image_path = Path(output_dir) / f"picture_{picture_count:04d}.png"
-                        image.save(str(image_path))
-                        text = str(image_path)
-                        content = {"image_path": str(image_path)}
+                        image_path = str(Path(output_dir) / f"picture_{picture_count:04d}.png")
+                        image.save(image_path)
                 except Exception:
                     pass
 
@@ -146,6 +146,10 @@ class PDFParser:
                         metadata["caption"] = caption
                 except Exception:
                     pass
+
+                # 保存图片路径到 metadata 字段
+                if image_path:
+                    metadata["image_path"] = image_path
 
             elif item.label == DocItemLabel.TABLE:
                 try:
