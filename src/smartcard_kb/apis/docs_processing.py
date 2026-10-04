@@ -9,7 +9,7 @@ from smartcard_kb.docs_compile.pdf_parser import PDFParser
 from smartcard_kb.docs_compile.vlm_service import VLMService
 from smartcard_kb.docs_compile.embedding_service import EmbeddingService
 from smartcard_kb.docs_compile.chunker import Chunker
-from smartcard_kb.docs_compile.database import update_document_info, get_document_stats
+from smartcard_kb.docs_compile.database import update_document_info, get_document_stats, query_document_info
 from smartcard_kb.config import settings
 
 router = APIRouter(prefix="/api/docs", tags=["文档处理流程"])
@@ -31,6 +31,21 @@ class ParseResponse(BaseModel):
     """解析响应"""
     success: bool
     message: str
+
+
+class ParseAllRequest(BaseModel):
+    """批量解析请求"""
+    parallel_count: int = 1  # 并行数量，默认1
+    output_dir: str = "output/pictures"
+    do_ocr: bool = True
+
+
+class ParseAllResponse(BaseModel):
+    """批量解析响应"""
+    success: bool
+    message: str
+    total: int  # 总文档数
+    parallel_count: int  # 并行数量
 
 
 class VLMRequest(BaseModel):
@@ -135,6 +150,87 @@ async def _async_parse(
             "processing_status": "parse_failed",
             "processing_error": str(e),
         })
+
+
+async def _async_parse_all(
+    docs: list,
+    parallel_count: int,
+    output_dir: str,
+    do_ocr: bool,
+):
+    """
+    异步批量解析所有 uploaded 状态的文档
+
+    :param docs: 文档列表（从 doc_info 表查询）
+    :param parallel_count: 并行数量
+    :param output_dir: 图片保存目录
+    :param do_ocr: 是否启用 OCR
+    """
+    semaphore = asyncio.Semaphore(parallel_count)
+
+    async def _parse_single_doc(doc):
+        """解析单个文档"""
+        async with semaphore:
+            document_id = doc["id"]
+            pdf_path = doc.get("file_path")
+
+            if not pdf_path:
+                print(f"Error: file_path not found for document {document_id}")
+                update_document_info({
+                    "id": document_id,
+                    "processing_status": "parse_failed",
+                    "processing_error": "file_path not found",
+                })
+                return
+
+            print(f"Starting parse for document {document_id}: {doc.get('file_name', 'unknown')}")
+
+            try:
+                update_document_info({
+                    "id": document_id,
+                    "processing_status": "parsing",
+                    "processing_started_at": "NOW()",
+                })
+
+                # 使用线程池执行同步阻塞操作
+                parser = PDFParser(do_ocr=do_ocr)
+                result = await asyncio.to_thread(
+                    parser.parse_pdf,
+                    pdf_path=pdf_path,
+                    document_id=document_id,
+                    page_range=None,
+                    output_dir=output_dir,
+                )
+
+                # 更新统计信息
+                stats = get_document_stats(document_id)
+                type_counts = {
+                    "item_count": len(result.get("items", [])),
+                    "text_count": stats.get("text", 0),
+                    "title_count": stats.get("section_header", 0),
+                    "table_count": stats.get("table", 0),
+                    "picture_count": stats.get("picture", 0),
+                    "formula_count": stats.get("formula", 0),
+                }
+                update_document_info({
+                    "id": document_id,
+                    "processing_status": "parsed",
+                    **type_counts,
+                })
+                print(f"Parse completed for document {document_id}")
+
+            except Exception as e:
+                print(f"Error: Parse failed for document {document_id}: {e}")
+                update_document_info({
+                    "id": document_id,
+                    "processing_status": "parse_failed",
+                    "processing_error": str(e),
+                })
+
+    # 并发执行所有文档解析
+    tasks = [_parse_single_doc(doc) for doc in docs]
+    await asyncio.gather(*tasks)
+    print(f"Batch parse completed: {len(docs)} documents processed")
 
 
 async def _async_vlm(
@@ -315,6 +411,42 @@ async def parse_document(request: ParseRequest, background_tasks: BackgroundTask
     return ParseResponse(
         success=True,
         message="文档解析任务已提交，正在后台处理",
+    )
+
+
+@router.post("/process/parse-all", response_model=ParseAllResponse)
+async def parse_all_documents(request: ParseAllRequest, background_tasks: BackgroundTasks):
+    """
+    异步批量解析所有 uploaded 状态的文档
+
+    - **parallel_count**: 并行数量（默认1）
+    - **output_dir**: 图片保存目录
+    - **do_ocr**: 是否启用 OCR
+    """
+    # 查询所有 uploaded 状态的文档
+    docs = query_document_info(processing_status="uploaded")
+
+    if not docs:
+        return ParseAllResponse(
+            success=True,
+            message="没有需要解析的文档",
+            total=0,
+            parallel_count=request.parallel_count,
+        )
+
+    background_tasks.add_task(
+        _async_parse_all,
+        docs,
+        request.parallel_count,
+        request.output_dir,
+        request.do_ocr,
+    )
+
+    return ParseAllResponse(
+        success=True,
+        message=f"已提交 {len(docs)} 个文档的解析任务，并行数: {request.parallel_count}",
+        total=len(docs),
+        parallel_count=request.parallel_count,
     )
 
 
