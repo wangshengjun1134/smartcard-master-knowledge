@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { listDocuments, uploadDocument, parseDocument, generateVLMDocuments, chunkDocument, generateEmbeddings } from '@/lib/api'
+import { listDocuments, uploadDocument, parseDocument, parseAllDocuments, generateVLMDocuments, chunkDocument, generateEmbeddings } from '@/lib/api'
 import type { DocumentInfo } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -60,6 +60,7 @@ export default function Home() {
   const [totalDocs, setTotalDocs] = useState(0)
   const [processingDoc, setProcessingDoc] = useState<string | null>(null)
   const [processingType, setProcessingType] = useState<string | null>(null)
+  const [parsingAll, setParsingAll] = useState(false)
   const pageSize = 20
 
   useEffect(() => {
@@ -152,6 +153,29 @@ export default function Home() {
     } finally {
       setProcessingDoc(null)
       setProcessingType(null)
+    }
+  }
+
+  const handleParseAll = async () => {
+    setParsingAll(true)
+    try {
+      const result = await parseAllDocuments({
+        parallel_count: 1,
+        do_ocr: true,
+      })
+      toast({
+        title: '批量解析任务已提交',
+        description: result.message || `已提交 ${result.total} 个文档的解析任务`,
+      })
+      await loadDocuments()
+    } catch (error: any) {
+      toast({
+        title: '批量解析失败',
+        description: error.response?.data?.detail || '请重试',
+        variant: 'destructive',
+      })
+    } finally {
+      setParsingAll(false)
     }
   }
 
@@ -488,12 +512,24 @@ export default function Home() {
         {/* 文档列表 */}
         <Card>
           <CardHeader>
-            <CardTitle>文档列表</CardTitle>
-            <CardDescription>
-              共 {totalDocs} 个文档
-              {filterStatus && ` (过滤: ${filterStatus})`}
-              {totalPages > 1 && ` - 第 ${currentPage}/${totalPages} 页`}
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>文档列表</CardTitle>
+                <CardDescription>
+                  共 {totalDocs} 个文档
+                  {filterStatus && ` (过滤: ${filterStatus})`}
+                  {totalPages > 1 && ` - 第 ${currentPage}/${totalPages} 页`}
+                </CardDescription>
+              </div>
+              <Button
+                onClick={handleParseAll}
+                disabled={parsingAll || totalDocs === 0}
+                variant="outline"
+                size="sm"
+              >
+                {parsingAll ? '解析中...' : '解析所有'}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (

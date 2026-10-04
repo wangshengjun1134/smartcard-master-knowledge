@@ -157,6 +157,15 @@ export async function parseDocument(request: {
   return response.data
 }
 
+export async function parseAllDocuments(request: {
+  parallel_count?: number
+  output_dir?: string
+  do_ocr?: boolean
+}): Promise<{ success: boolean; message: string; total: number; parallel_count: number }> {
+  const response = await api.post('/api/docs/process/parse-all', request)
+  return response.data
+}
+
 export async function generateVLMDocuments(request: {
   document_id: string
   output_dir?: string
