@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { formatFileSize, formatDate } from '@/lib/utils'
-import { Upload, FileText, Search, Moon, Sun, Plus, ChevronLeft, ChevronRight, MoreHorizontal, Eye, FileUp, Image, Layers, Database } from 'lucide-react'
+import { Upload, FileText, Search, Moon, Sun, Plus, ChevronLeft, ChevronRight, MoreHorizontal, Eye, FileUp, Image, Layers, Database, Play } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { DocumentTree } from '@/components/document-tree'
 
@@ -524,10 +524,21 @@ export default function Home() {
               <Button
                 onClick={handleParseAll}
                 disabled={parsingAll || totalDocs === 0}
-                variant="outline"
+                variant="default"
                 size="sm"
+                className="gap-1.5"
               >
-                {parsingAll ? '解析中...' : '解析所有'}
+                {parsingAll ? (
+                  <>
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    解析中...
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4" />
+                    解析所有
+                  </>
+                )}
               </Button>
             </div>
           </CardHeader>
