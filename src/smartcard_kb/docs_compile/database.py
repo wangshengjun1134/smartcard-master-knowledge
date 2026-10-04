@@ -562,6 +562,56 @@ def insert_document_info(doc_info: Dict[str, Any]) -> None:
     conn.close()
 
 
+def query_documents_by_status(
+    processing_status: Optional[str] = None,
+    for_update: bool = False,
+) -> List[Dict[str, Any]]:
+    """
+    查询 doc_info 记录（支持行锁）
+
+    :param processing_status: 处理状态
+    :param for_update: 是否加行锁（FOR UPDATE SKIP LOCKED）
+    :return: 查询结果列表
+    """
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    conditions = []
+    params = []
+
+    if processing_status is not None:
+        conditions.append("processing_status = %s")
+        params.append(processing_status)
+
+    where_clause = " AND ".join(conditions) if conditions else "TRUE"
+    lock_clause = " FOR UPDATE SKIP LOCKED" if for_update else ""
+    query = f"SELECT * FROM doc_info WHERE {where_clause} ORDER BY created_at DESC{lock_clause}"
+
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+
+    results = []
+    for row in rows:
+        item = dict(row)
+        # 反序列化 JSON 字段
+        if item.get("metadata"):
+            try:
+                item["metadata"] = json.loads(item["metadata"])
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        # 转换 datetime 为字符串
+        for dt_field in ("created_at", "updated_at"):
+            if item.get(dt_field) and hasattr(item[dt_field], 'isoformat'):
+                item[dt_field] = item[dt_field].isoformat()
+
+        results.append(item)
+
+    cursor.close()
+    conn.close()
+    return results
+
+
 def query_document_info(
     document_id: Optional[str] = None,
     document_code: Optional[str] = None,
