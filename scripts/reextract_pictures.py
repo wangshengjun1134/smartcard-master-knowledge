@@ -27,8 +27,14 @@ import sys
 import argparse
 from pathlib import Path
 
+# 项目根目录（scripts 的上一级）
+PROJECT_ROOT = Path(__file__).parent.parent
+
+# 模型目录（与项目平级，不在项目内部）
+MODELS_DIR = PROJECT_ROOT.parent / "models"
+
 # 设置环境变量（必须在导入 smartcard_kb.document 之前设置）
-os.environ["DOCLING_MODELS_PATH"] = "/home/models/docling-models"
+os.environ["DOCLING_MODELS_PATH"] = str(MODELS_DIR / "docling-models")
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 # 添加项目路径

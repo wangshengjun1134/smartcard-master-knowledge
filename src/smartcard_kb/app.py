@@ -5,11 +5,11 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from smartcard_kb.config import settings
+from smartcard_kb.config import settings, MODELS_DIR
 from smartcard_kb.apis import docs_info_router, docs_items_router, docs_processing_router, search_router
 
-# 设置 Docling 模型路径（硬编码 Linux 路径，避免 .env 旧值干扰）
-os.environ["DOCLING_MODELS_PATH"] = "/home/models/docling-models"
+# 设置 Docling 模型路径（使用相对路径，支持 Linux 和 Windows）
+os.environ["DOCLING_MODELS_PATH"] = str(MODELS_DIR / "docling-models")
 
 # 设置 HuggingFace 镜像源（解决网络不可达问题）
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
