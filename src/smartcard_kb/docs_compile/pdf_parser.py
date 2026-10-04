@@ -113,7 +113,7 @@ class PDFParser:
             item_id = str(uuid.uuid4())
 
             prov = item.prov[0] if item.prov else None
-            page_id = f"{document_id}_page_{prov.page_no}" if prov else f"{document_id}_page_unknown"
+            page_id = prov.page_no if prov else None
 
             bbox = None
             if prov and prov.bbox:
