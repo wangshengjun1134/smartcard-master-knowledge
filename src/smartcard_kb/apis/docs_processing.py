@@ -14,8 +14,9 @@ from smartcard_kb.config import settings
 
 router = APIRouter(prefix="/api/docs", tags=["文档处理流程"])
 
-# 全局锁：防止并发执行 parse-all
+# 全局锁：防止并发执行 parse-all / vlm-all
 _parse_all_lock = asyncio.Lock()
+_vlm_all_lock = asyncio.Lock()
 
 
 # ==================== Pydantic 模型 ====================
@@ -69,6 +70,28 @@ class VLMResponse(BaseModel):
     """VLM 响应"""
     success: bool
     message: str
+
+
+class VlmAllRequest(BaseModel):
+    """批量 VLM 增强请求"""
+    parallel_count: int = 1  # 并行数量，默认1
+    output_dir: str = "output/pictures"
+    backend_type: str = "openai"
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    model: Optional[str] = None
+    prompt: str = "Please describe this image in detail, including all technical details, chart data, process steps, etc. If it is a flowchart or architecture diagram, please explain the relationships between the components. Respond in English."
+    max_new_tokens: int = 512
+    language: str = "en"
+    detail_level: str = "detailed"
+
+
+class VlmAllResponse(BaseModel):
+    """批量 VLM 增强响应"""
+    success: bool
+    message: str
+    total: int  # 总文档数
+    parallel_count: int  # 并行数量
 
 
 class ChunkRequest(BaseModel):
@@ -296,6 +319,97 @@ async def _async_vlm(
         })
 
 
+async def _async_vlm_all(
+    docs: list,
+    parallel_count: int,
+    output_dir: str,
+    backend_type: str,
+    api_key: Optional[str],
+    base_url: Optional[str],
+    model: Optional[str],
+    prompt: str,
+    max_new_tokens: int,
+    language: str,
+    detail_level: str,
+):
+    """
+    异步批量 VLM 增强所有已解析的文档
+
+    :param docs: 文档列表
+    :param parallel_count: 并行数量
+    :param output_dir: 图片保存目录
+    :param backend_type: VLM 后端类型
+    :param api_key: VLM API Key
+    :param base_url: VLM API 基础 URL
+    :param model: VLM 模型名称
+    :param prompt: VLM 提示词
+    :param max_new_tokens: 最大生成 token 数
+    :param language: 输出语言
+    :param detail_level: 描述详细程度
+    """
+    async with _vlm_all_lock:
+        semaphore = asyncio.Semaphore(parallel_count)
+
+        # 从参数或环境变量获取配置
+        resolved_api_key = api_key or settings.vlm_openai_api_key
+        resolved_base_url = base_url or settings.vlm_openai_base_url
+        resolved_model = model or settings.vlm_openai_model
+
+        if not resolved_api_key:
+            print("Error: VLM API Key not configured")
+            return
+
+        backend = VLMService.create_backend(
+            backend_type=backend_type,
+            api_key=resolved_api_key,
+            base_url=resolved_base_url,
+            model=resolved_model,
+        )
+
+        async def _vlm_single_doc(doc):
+            """VLM 增强单个文档"""
+            async with semaphore:
+                document_id = doc["id"]
+
+                print(f"Starting VLM for document {document_id}: {doc.get('file_name', 'unknown')}")
+
+                try:
+                    update_document_info({
+                        "id": document_id,
+                        "processing_status": "vlm_processing",
+                    })
+
+                    service = VLMService(vlm_backend=backend)
+                    result = await asyncio.to_thread(
+                        service.generate_vlm_descriptions,
+                        document_id=document_id,
+                        output_dir=output_dir,
+                        prompt=prompt,
+                        max_new_tokens=max_new_tokens,
+                        language=language,
+                        detail_level=detail_level,
+                    )
+
+                    update_document_info({
+                        "id": document_id,
+                        "processing_status": "vlm_completed",
+                    })
+                    print(f"VLM completed for document {document_id}: {result}")
+
+                except Exception as e:
+                    print(f"Error: VLM failed for document {document_id}: {e}")
+                    update_document_info({
+                        "id": document_id,
+                        "processing_status": "vlm_failed",
+                        "processing_error": str(e),
+                    })
+
+        # 并发执行所有文档 VLM 增强
+        tasks = [_vlm_single_doc(doc) for doc in docs]
+        await asyncio.gather(*tasks)
+        print(f"Batch VLM completed: {len(docs)} documents processed")
+
+
 async def _async_chunk(
     pdf_path: str,
     document_id: str,
@@ -501,6 +615,65 @@ async def generate_vlm_descriptions(request: VLMRequest, background_tasks: Backg
     return VLMResponse(
         success=True,
         message="VLM 增强任务已提交，正在后台处理",
+    )
+
+
+@router.post("/process/vlm-all", response_model=VlmAllResponse)
+async def vlm_all_documents(request: VlmAllRequest, background_tasks: BackgroundTasks):
+    """
+    异步批量 VLM 增强所有已解析的文档
+
+    - **parallel_count**: 并行数量（默认1）
+    - **output_dir**: 图片保存目录
+    - **backend_type**: VLM 后端类型（openai / local）
+    - **api_key**: VLM API Key
+    - **base_url**: VLM API 基础 URL
+    - **model**: VLM 模型名称
+    - **prompt**: VLM 提示词
+    - **max_new_tokens**: 最大生成 token 数
+    - **language**: 输出语言（en/zh/ja），默认英文
+    - **detail_level**: 描述详细程度（brief/detailed/comprehensive）
+    """
+    # Use global lock to prevent concurrent execution of vlm-all
+    if _vlm_all_lock.locked():
+        return VlmAllResponse(
+            success=False,
+            message="已有批量 VLM 增强任务正在执行，请稍后再试",
+            total=0,
+            parallel_count=request.parallel_count,
+        )
+
+    # Query all parsed documents that need VLM processing
+    docs = query_documents_by_status(processing_status="parsed")
+
+    if not docs:
+        return VlmAllResponse(
+            success=True,
+            message="没有需要 VLM 增强的文档（状态为已解析）",
+            total=0,
+            parallel_count=request.parallel_count,
+        )
+
+    background_tasks.add_task(
+        _async_vlm_all,
+        docs,
+        request.parallel_count,
+        request.output_dir,
+        request.backend_type,
+        request.api_key,
+        request.base_url,
+        request.model,
+        request.prompt,
+        request.max_new_tokens,
+        request.language,
+        request.detail_level,
+    )
+
+    return VlmAllResponse(
+        success=True,
+        message=f"已提交 {len(docs)} 个文档的 VLM 增强任务，并行数: {request.parallel_count}",
+        total=len(docs),
+        parallel_count=request.parallel_count,
     )
 
 

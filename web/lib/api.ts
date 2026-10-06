@@ -180,6 +180,22 @@ export async function generateVLMDocuments(request: {
   return response.data
 }
 
+export async function vlmAllDocuments(request: {
+  parallel_count?: number
+  output_dir?: string
+  backend_type?: string
+  api_key?: string
+  base_url?: string
+  model?: string
+  prompt?: string
+  max_new_tokens?: number
+  language?: string
+  detail_level?: string
+}): Promise<{ success: boolean; message: string; total: number; parallel_count: number }> {
+  const response = await api.post('/api/docs/process/vlm-all', request)
+  return response.data
+}
+
 export async function chunkDocument(request: {
   pdf_path: string
   document_id: string

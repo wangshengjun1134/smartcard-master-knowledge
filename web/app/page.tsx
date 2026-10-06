@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { listDocuments, uploadDocument, parseDocument, parseAllDocuments, generateVLMDocuments, chunkDocument, generateEmbeddings } from '@/lib/api'
+import { listDocuments, uploadDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, generateEmbeddings } from '@/lib/api'
 import type { DocumentInfo } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { formatFileSize, formatDate } from '@/lib/utils'
-import { Upload, FileText, Search, Moon, Sun, Plus, ChevronLeft, ChevronRight, MoreHorizontal, Eye, FileUp, Image, Layers, Database, Play } from 'lucide-react'
+import { Upload, FileText, Search, Moon, Sun, Plus, ChevronLeft, ChevronRight, MoreHorizontal, Eye, FileUp, Image, Layers, Database, Play, Sparkles } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { DocumentTree } from '@/components/document-tree'
 
@@ -61,6 +61,7 @@ export default function Home() {
   const [processingDoc, setProcessingDoc] = useState<string | null>(null)
   const [processingType, setProcessingType] = useState<string | null>(null)
   const [parsingAll, setParsingAll] = useState(false)
+  const [vlmAll, setVlmAll] = useState(false)
   const pageSize = 20
 
   useEffect(() => {
@@ -176,6 +177,29 @@ export default function Home() {
       })
     } finally {
       setParsingAll(false)
+    }
+  }
+
+  const handleVlmAll = async () => {
+    setVlmAll(true)
+    try {
+      const result = await vlmAllDocuments({
+        parallel_count: 1,
+        backend_type: 'openai',
+      })
+      toast({
+        title: '批量 VLM 增强任务已提交',
+        description: result.message || `已提交 ${result.total} 个文档的 VLM 增强任务`,
+      })
+      await loadDocuments()
+    } catch (error: any) {
+      toast({
+        title: '批量 VLM 增强失败',
+        description: error.response?.data?.detail || '请重试',
+        variant: 'destructive',
+      })
+    } finally {
+      setVlmAll(false)
     }
   }
 
@@ -521,25 +545,46 @@ export default function Home() {
                   {totalPages > 1 && ` - 第 ${currentPage}/${totalPages} 页`}
                 </CardDescription>
               </div>
-              <Button
-                onClick={handleParseAll}
-                disabled={parsingAll || totalDocs === 0}
-                variant="default"
-                size="sm"
-                className="gap-1.5"
-              >
-                {parsingAll ? (
-                  <>
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    解析中...
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4" />
-                    解析所有
-                  </>
-                )}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={handleParseAll}
+                  disabled={parsingAll || totalDocs === 0}
+                  variant="default"
+                  size="sm"
+                  className="gap-1.5"
+                >
+                  {parsingAll ? (
+                    <>
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      解析中...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4" />
+                      解析所有
+                    </>
+                  )}
+                </Button>
+                <Button
+                  onClick={handleVlmAll}
+                  disabled={vlmAll || totalDocs === 0}
+                  variant="secondary"
+                  size="sm"
+                  className="gap-1.5"
+                >
+                  {vlmAll ? (
+                    <>
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      VLM处理中...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4" />
+                      VLM增强所有
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
