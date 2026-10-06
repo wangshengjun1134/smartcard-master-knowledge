@@ -78,11 +78,10 @@ class VLMService:
                 processed_count += 1
                 continue
 
-            # Get image path
-            content = item.get("content") or {}
-            image_path_str = content.get("image_path") or item.get("text")
+            # Get image path from metadata
+            image_path_str = metadata.get("image_path")
             if not image_path_str:
-                print(f"Warning: Item {item_id} has no image path, skipping")
+                print(f"Warning: Item {item_id} has no image_path in metadata, skipping")
                 failed_items.append(item_id)
                 continue
 
