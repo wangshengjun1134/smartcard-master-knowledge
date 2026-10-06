@@ -41,8 +41,10 @@ class VLMRequest(BaseModel):
     api_key: Optional[str] = None
     base_url: Optional[str] = None
     model: Optional[str] = None
-    prompt: str = "请详细描述这张图片的内容，包括所有技术细节、图表数据、流程步骤等。如果是流程图或架构图，请说明各个组件之间的关系。"
+    prompt: str = "Please describe this image in detail, including all technical details, chart data, process steps, etc. If it is a flowchart or architecture diagram, please explain the relationships between the components. Respond in English."
     max_new_tokens: int = 512
+    language: str = "en"
+    detail_level: str = "detailed"
 
 
 class VLMResponse(BaseModel):
@@ -142,6 +144,8 @@ async def _async_vlm(
     model: Optional[str],
     prompt: str,
     max_new_tokens: int,
+    language: str = "en",
+    detail_level: str = "detailed",
 ):
     """异步生成 VLM 描述"""
     try:
@@ -171,6 +175,8 @@ async def _async_vlm(
             output_dir=output_dir,
             prompt=prompt,
             max_new_tokens=max_new_tokens,
+            language=language,
+            detail_level=detail_level,
         )
 
         update_document_info({
@@ -317,6 +323,8 @@ async def generate_vlm_descriptions(request: VLMRequest, background_tasks: Backg
     - **model**: VLM 模型名称
     - **prompt**: VLM 提示词
     - **max_new_tokens**: 最大生成 token 数
+    - **language**: 输出语言（en/zh/ja），默认英文
+    - **detail_level**: 描述详细程度（brief/detailed/comprehensive）
     """
     if not request.api_key and not settings.vlm_openai_api_key:
         raise HTTPException(
@@ -334,6 +342,8 @@ async def generate_vlm_descriptions(request: VLMRequest, background_tasks: Backg
         request.model,
         request.prompt,
         request.max_new_tokens,
+        request.language,
+        request.detail_level,
     )
     return VLMResponse(
         success=True,

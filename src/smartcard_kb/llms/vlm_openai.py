@@ -1,4 +1,4 @@
-"""OpenAI 兼容 API 后端（支持 DashScope 等）"""
+"""OpenAI Compatible API Backend (supports DashScope, etc.)"""
 
 import base64
 import io
@@ -10,27 +10,27 @@ from .vlm_base import VLMBackend
 
 
 class OpenAICompatibleBackend(VLMBackend):
-    """OpenAI 兼容的 API 后端"""
+    """OpenAI Compatible API Backend"""
 
     def __init__(self, api_key: str, base_url: str, model: str = "qwen-vl-max", timeout: int = 120):
         """
-        初始化 OpenAI 兼容后端
+        Initialize OpenAI compatible backend
         :param api_key: API Key
-        :param base_url: API 基础 URL
-        :param model: 模型名称
-        :param timeout: 请求超时时间（秒）
+        :param base_url: API base URL
+        :param model: Model name
+        :param timeout: Request timeout (seconds)
         """
         try:
             from openai import OpenAI
         except ImportError:
-            raise ImportError("使用 OpenAI 兼容后端需要安装 openai: pip install openai")
+            raise ImportError("Using OpenAI compatible backend requires openai: pip install openai")
 
         self.client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
         self.model = model
-        print(f"OpenAI 兼容后端初始化完成: {base_url}, 模型: {model}")
+        print(f"OpenAI compatible backend initialized: {base_url}, model: {model}")
 
     def _encode_image(self, image: Image.Image) -> str:
-        """将 PIL Image 编码为 base64"""
+        """Encode PIL Image to base64"""
         buffer = io.BytesIO()
         if image.mode in ("RGBA", "P"):
             image = image.convert("RGB")
@@ -38,11 +38,11 @@ class OpenAICompatibleBackend(VLMBackend):
         return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
     def generate(self, image: Image.Image, messages: List[Dict[str, Any]], max_new_tokens: int = 512) -> str:
-        """调用 OpenAI 兼容 API 生成回复"""
+        """Call OpenAI compatible API to generate response"""
         image_base64 = self._encode_image(image)
         data_url = f"data:image/jpeg;base64,{image_base64}"
 
-        # 构建 OpenAI 格式的消息
+        # Build OpenAI format messages
         api_messages = []
         for msg in messages:
             if msg["role"] == "system":
