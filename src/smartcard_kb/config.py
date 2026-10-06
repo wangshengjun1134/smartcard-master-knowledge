@@ -22,7 +22,7 @@ class Settings(BaseSettings):
 
     # PostgreSQL 配置
     postgres_host: str = "localhost"
-    postgres_port: int = 54321
+    postgres_port: int = 5432
     postgres_user: str = "postgres"
     postgres_password: str = "123456"
     postgres_db: str = "smartcard_master_knowledge"
@@ -37,9 +37,11 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4"
 
     # VLM 配置
+    vlm_backend_type: str = "openai"
     vlm_openai_api_key: str = ""
     vlm_openai_base_url: str = ""
     vlm_openai_model: str = "qwen-vl-plus"
+    vlm_local_model_path: str = str(MODELS_DIR / "Qwen3-VL-8B-Instruct")
 
     # Embedding 配置
     embedding_openai_api_key: str = ""
