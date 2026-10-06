@@ -9,9 +9,15 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { formatDate, truncateText } from '@/lib/utils'
-import { ArrowLeft, FileText, Table2, Image, List, Hash, BookOpen, ChevronLeft, ChevronRight, Blocks, Scan, Link2 } from 'lucide-react'
+import { ArrowLeft, FileText, Table2, Image, List, Hash, BookOpen, ChevronLeft, ChevronRight, Blocks, Scan, Link2, Eye } from 'lucide-react'
 
 type TabType = 'items' | 'chunks'
 
@@ -27,7 +33,6 @@ export default function DocumentDetail() {
   const [stats, setStats] = useState<ItemStatistics | null>(null)
   const [loading, setLoading] = useState(true)
   const [filterLabel, setFilterLabel] = useState<string>('')
-  const [textualizing, setTextualizing] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
@@ -41,6 +46,7 @@ export default function DocumentDetail() {
   const [chunkTotalPages, setChunkTotalPages] = useState(1)
   const [chunkTotalItems, setChunkTotalItems] = useState(0)
   const chunkPageSize = 20
+  const [imageViewer, setImageViewer] = useState<{ open: boolean; src: string; title: string }>({ open: false, src: '', title: '' })
 
   const toggleItem = (itemId: string) => {
     setExpandedItems(prev => {
@@ -127,32 +133,6 @@ export default function DocumentDetail() {
       loadChunks()
     }
   }, [documentId, chunkFilterRag, chunkPage, activeTab])
-
-  const handleTextualize = async () => {
-    setTextualizing(true)
-    try {
-      const result = await textualizeItems({
-        document_id: documentId,
-        vlm_backend_type: 'openai',
-        vlm_model: 'qwen-vl-max',
-        dry_run: false,
-      })
-      toast({
-        title: '文本化完成',
-        description: `成功: ${result.stats.success}, 失败: ${result.stats.failed}`,
-      })
-      await loadData()
-    } catch (error) {
-      console.error('Failed to textualize:', error)
-      toast({
-        title: '文本化失败',
-        description: '请重试',
-        variant: 'destructive',
-      })
-    } finally {
-      setTextualizing(false)
-    }
-  }
 
   const filteredItems = filterLabel
     ? items.filter(item => item.label === filterLabel)
@@ -273,9 +253,6 @@ export default function DocumentDetail() {
             </Link>
             <h1 className="text-xl font-bold truncate max-w-md">{document.file_name}</h1>
           </div>
-          <Button onClick={handleTextualize} disabled={textualizing}>
-            {textualizing ? '文本化中...' : '批量文本化'}
-          </Button>
         </div>
       </header>
 
@@ -457,7 +434,7 @@ export default function DocumentDetail() {
                     <TableHead className="w-24">类型</TableHead>
                     <TableHead>内容</TableHead>
                     <TableHead className="w-32">文本化</TableHead>
-                    <TableHead className="w-24">RAG</TableHead>
+                    <TableHead className="w-24">操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -502,9 +479,27 @@ export default function DocumentDetail() {
                           )}
                         </TableCell>
                         <TableCell className="py-1.5 px-2">
-                          <Badge variant={item.is_rag_enabled ? 'default' : 'outline'} className="text-xs px-2 py-0">
-                            {item.is_rag_enabled ? '启用' : '禁用'}
-                          </Badge>
+                          {item.label === 'picture' && item.metadata?.image_path ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs gap-1.5"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                const imagePath = item.metadata!.image_path
+                                setImageViewer({
+                                  open: true,
+                                  src: imagePath,
+                                  title: imagePath.split('/').pop() || '图片',
+                                })
+                              }}
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              查看图片
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
                         </TableCell>
                       </TableRow>
                     )
@@ -743,6 +738,22 @@ export default function DocumentDetail() {
           </Card>
         )}
       </main>
+
+      {/* 图片查看器 */}
+      <Dialog open={imageViewer.open} onOpenChange={(open) => setImageViewer({ open, src: '', title: '' })}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>{imageViewer.title}</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center">
+            <img
+              src={`/api/docs/${documentId}/file?image_path=${encodeURIComponent(imageViewer.src)}`}
+              alt={imageViewer.title}
+              className="max-w-full max-h-[80vh] object-contain"
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

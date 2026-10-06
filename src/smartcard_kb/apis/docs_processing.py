@@ -741,17 +741,52 @@ async def generate_embeddings(request: EmbeddingRequest, background_tasks: Backg
 
 
 @router.get("/{document_id}/file")
-async def get_document_file(document_id: str):
+async def get_document_file(document_id: str, image_path: Optional[str] = None):
     """
     获取文档文件（支持本地路径和 URL）
 
     - **document_id**: 文档 ID
+    - **image_path**: 图片路径（从 metadata.image_path 传入，用于直接查看图片）
     """
     docs = query_document_info(document_id=document_id)
     if not docs:
         raise HTTPException(status_code=404, detail="文档不存在")
 
     doc = docs[0]
+
+    # If image_path is provided, serve that specific image
+    if image_path:
+        resolved_path = Path(image_path)
+        if not resolved_path.is_absolute():
+            project_root = Path(__file__).resolve().parent.parent.parent.parent
+            resolved_path = project_root / resolved_path
+
+        if not resolved_path.exists():
+            raise HTTPException(status_code=404, detail=f"图片不存在: {resolved_path}")
+
+        ext = resolved_path.suffix.lower()
+        media_type_map = {
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.gif': 'image/gif',
+            '.webp': 'image/webp',
+            '.svg': 'image/svg+xml',
+            '.bmp': 'image/bmp',
+            '.tiff': 'image/tiff',
+            '.tif': 'image/tiff',
+        }
+        media_type = media_type_map.get(ext, 'application/octet-stream')
+
+        file_name = resolved_path.name
+        return FileResponse(
+            path=str(resolved_path),
+            filename=file_name,
+            media_type=media_type,
+            headers={"Content-Disposition": f'inline; filename="{file_name}"'},
+        )
+
+    # Otherwise, serve the main document file
     file_path = doc.get("file_path")
     if not file_path:
         raise HTTPException(status_code=404, detail="文档路径未配置")
