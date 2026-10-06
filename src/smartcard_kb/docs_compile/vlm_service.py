@@ -159,19 +159,15 @@ class VLMService:
             return None
 
     def _update_item_vlm_description(self, item_id: str, vlm_description: str) -> None:
-        """Update item's vlm_description"""
+        """Update item's text field with VLM description"""
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             UPDATE doc_items
-            SET metadata = jsonb_set(
-                COALESCE(metadata, '{}'::jsonb),
-                '{vlm_description}',
-                %s::jsonb
-            ),
-            updated_at = CURRENT_TIMESTAMP
+            SET text = %s,
+                updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
-        """, (json.dumps(vlm_description), item_id))
+        """, (vlm_description, item_id))
         conn.commit()
         cursor.close()
         conn.close()
