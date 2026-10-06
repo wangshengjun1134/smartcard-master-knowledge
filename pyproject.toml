@@ -49,6 +49,9 @@ dependencies = [
     # 数据验证
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
+
+    # 连接 PostgreSQL 的驱动
+    "psycopg2-binary>=2.9.9",
 ]
 
 [project.optional-dependencies]
