@@ -3,16 +3,15 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getDocument, listDocumentItems, getItemStatistics, textualizeItems, listDocumentChunks } from '@/lib/api'
+import { getDocument, listDocumentItems, getItemStatistics, listDocumentChunks } from '@/lib/api'
 import type { DocumentInfo, DocItem, Chunk, ItemStatistics, PaginatedItemsResponse } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Progress } from '@/components/ui/progress'
 import { useToast } from '@/hooks/use-toast'
 import { formatDate, truncateText } from '@/lib/utils'
-import { ArrowLeft, FileText, Table2, Image, List, Hash, BookOpen, ChevronLeft, ChevronRight, Blocks, Scan } from 'lucide-react'
+import { ArrowLeft, FileText, Table2, Image, List, Hash, BookOpen, ChevronLeft, ChevronRight, Blocks, Scan, Link2 } from 'lucide-react'
 
 type TabType = 'items' | 'chunks'
 
@@ -318,26 +317,23 @@ export default function DocumentDetail() {
                 <div className="text-sm text-muted-foreground">Item 总数</div>
                 <div className="font-medium">{document.item_count}</div>
               </div>
-              <div>
-                <div className="text-sm text-muted-foreground">已文本化</div>
-                <div className="font-medium">{stats?.textualized || 0}</div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">待文本化</div>
-                <div className="font-medium">{stats?.needs_textualization || 0}</div>
+              <div className="col-span-2 md:col-span-2">
+                <div className="text-sm text-muted-foreground">文档连接</div>
+                {document.file_path ? (
+                  <a
+                    href={`/api/docs/${document.id}/file`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-primary hover:underline inline-flex items-center gap-1.5"
+                  >
+                    <Link2 className="h-3.5 w-3.5" />
+                    <span className="truncate max-w-[400px]">{document.file_path}</span>
+                  </a>
+                ) : (
+                  <div className="font-medium text-muted-foreground">-</div>
+                )}
               </div>
             </div>
-
-            {/* 文本化进度 */}
-            {stats && stats.total_items > 0 && (
-              <div className="mt-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-muted-foreground">文本化进度</span>
-                  <span className="text-sm font-medium">{textualizationProgress}%</span>
-                </div>
-                <Progress value={textualizationProgress} className="h-2" />
-              </div>
-            )}
           </CardContent>
         </Card>
 

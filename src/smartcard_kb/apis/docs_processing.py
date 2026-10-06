@@ -1,15 +1,18 @@
 """文档处理 API 接口 - 解析、VLM 增强、分块、Embedding（异步）"""
 
 import asyncio
+import os
+from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 
 from smartcard_kb.docs_compile.pdf_parser import PDFParser
 from smartcard_kb.docs_compile.vlm_service import VLMService
 from smartcard_kb.docs_compile.embedding_service import EmbeddingService
 from smartcard_kb.docs_compile.chunker import Chunker
-from smartcard_kb.docs_compile.database import update_document_info, get_document_stats, query_documents_by_status
+from smartcard_kb.docs_compile.database import update_document_info, get_document_stats, query_documents_by_status, query_document_info
 from smartcard_kb.config import settings
 
 router = APIRouter(prefix="/api/docs", tags=["文档处理流程"])
@@ -734,4 +737,68 @@ async def generate_embeddings(request: EmbeddingRequest, background_tasks: Backg
     return EmbeddingResponse(
         success=True,
         message="Embedding 生成任务已提交，正在后台处理",
+    )
+
+
+@router.get("/{document_id}/file")
+async def get_document_file(document_id: str):
+    """
+    获取文档文件（支持本地路径和 URL）
+
+    - **document_id**: 文档 ID
+    """
+    docs = query_document_info(document_id=document_id)
+    if not docs:
+        raise HTTPException(status_code=404, detail="文档不存在")
+
+    doc = docs[0]
+    file_path = doc.get("file_path")
+    if not file_path:
+        raise HTTPException(status_code=404, detail="文档路径未配置")
+
+    # If it's a URL, redirect to it
+    if file_path.startswith(("http://", "https://")):
+        return RedirectResponse(url=file_path, status_code=302)
+
+    # Local file path
+    resolved_path = Path(file_path)
+    if not resolved_path.is_absolute():
+        project_root = Path(__file__).resolve().parent.parent.parent.parent
+        resolved_path = project_root / resolved_path
+
+    if not resolved_path.exists():
+        raise HTTPException(status_code=404, detail=f"文件不存在: {resolved_path}")
+
+    file_name = doc.get("file_name", resolved_path.name)
+
+    # Determine media type based on file extension for inline browser display
+    ext = resolved_path.suffix.lower()
+    media_type_map = {
+        '.pdf': 'application/pdf',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.svg': 'image/svg+xml',
+        '.bmp': 'image/bmp',
+        '.tiff': 'image/tiff',
+        '.tif': 'image/tiff',
+        '.html': 'text/html',
+        '.htm': 'text/html',
+        '.txt': 'text/plain',
+        '.csv': 'text/csv',
+        '.json': 'application/json',
+        '.xml': 'application/xml',
+        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    }
+    media_type = media_type_map.get(ext, 'application/octet-stream')
+
+    return FileResponse(
+        path=str(resolved_path),
+        filename=file_name,
+        media_type=media_type,
+        headers={"Content-Disposition": f'inline; filename="{file_name}"'},
     )
