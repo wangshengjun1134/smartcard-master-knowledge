@@ -56,8 +56,47 @@ class OpenAICompatibleBackend(VLMBackend):
                         content_parts.append({"type": "text", "text": item["text"]})
                 api_messages.append({"role": "user", "content": content_parts})
 
+        # Print request details
+        print("\n" + "="*80)
+        print("📤 VLM API Request")
+        print("="*80)
+        print(f"Model: {self.model}")
+        print(f"Max tokens: {max_new_tokens}")
+        print(f"Temperature: 0.1")
+        print(f"\n📋 Messages ({len(api_messages)} messages):")
+        for i, msg in enumerate(api_messages, 1):
+            print(f"\n  [{i}] Role: {msg['role']}")
+            if isinstance(msg["content"], str):
+                print(f"      Content: {msg['content'][:200]}...")
+            elif isinstance(msg["content"], list):
+                for part in msg["content"]:
+                    if part["type"] == "image_url":
+                        print(f"      [Image] URL: {part['image_url']['url'][:100]}... (detail: {part['image_url']['detail']})")
+                    elif part["type"] == "text":
+                        print(f"      [Text] {part['text'][:200]}...")
+        print("="*80)
+
+        # Call API
         response = self.client.chat.completions.create(
             model=self.model, messages=api_messages, max_tokens=max_new_tokens, temperature=0.1
         )
 
-        return response.choices[0].message.content
+        # Print response details
+        print("\n" + "="*80)
+        print("📥 VLM API Response")
+        print("="*80)
+        print(f"Response ID: {response.id}")
+        print(f"Model: {response.model}")
+        print(f"Created: {response.created}")
+        if hasattr(response, 'usage') and response.usage:
+            print(f"\n📊 Token Usage:")
+            print(f"  Prompt tokens: {response.usage.prompt_tokens}")
+            print(f"  Completion tokens: {response.usage.completion_tokens}")
+            print(f"  Total tokens: {response.usage.total_tokens}")
+        
+        content = response.choices[0].message.content
+        print(f"\n💬 Response Content ({len(content)} chars):")
+        print(f"  {content[:500]}...")
+        print("="*80 + "\n")
+
+        return content

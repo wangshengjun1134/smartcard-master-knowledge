@@ -100,6 +100,7 @@ class VLMService:
 
             try:
                 image = Image.open(image_path).convert("RGB")
+                print(f"\n🖼️  Processing image for Item {item_id}: {image_path}")
                 vlm_desc = self._generate_vlm_description(
                     image, prompt, max_new_tokens, language, detail_level
                 )
@@ -107,10 +108,12 @@ class VLMService:
                 if vlm_desc:
                     self._update_item_vlm_description(item_id, vlm_desc)
                     processed_count += 1
+                    print(f"✅ Successfully generated VLM description for Item {item_id} ({len(vlm_desc)} chars)")
                 else:
+                    print(f"❌ Failed to generate VLM description for Item {item_id}")
                     failed_items.append(item_id)
             except Exception as e:
-                print(f"Error: Item {item_id} VLM generation failed: {e}")
+                print(f"❌ Error processing Item {item_id}: {e}")
                 failed_items.append(item_id)
 
         return {
