@@ -64,7 +64,7 @@ class VLMRequest(BaseModel):
     base_url: Optional[str] = None
     model: Optional[str] = None
     prompt: str = "Please describe this image in detail, including all technical details, chart data, process steps, etc. If it is a flowchart or architecture diagram, please explain the relationships between the components. Respond in English."
-    max_new_tokens: int = 512
+    max_new_tokens: int = 2048
     language: str = "en"
     detail_level: str = "detailed"
 
@@ -84,7 +84,7 @@ class VlmAllRequest(BaseModel):
     base_url: Optional[str] = None
     model: Optional[str] = None
     prompt: str = "Please describe this image in detail, including all technical details, chart data, process steps, etc. If it is a flowchart or architecture diagram, please explain the relationships between the components. Respond in English."
-    max_new_tokens: int = 512
+    max_new_tokens: int = 2048
     language: str = "en"
     detail_level: str = "detailed"
 

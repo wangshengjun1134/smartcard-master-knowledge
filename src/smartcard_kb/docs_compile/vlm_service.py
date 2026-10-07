@@ -9,6 +9,7 @@ from .database import query_document_items, get_connection
 from ..llms.vlm_base import VLMBackend
 from ..llms.vlm_openai import OpenAICompatibleBackend
 from ..llms.vlm_local import LocalQwenVLMBackend
+from ..prompts.vlm_prompts import build_system_prompt, USER_PROMPT
 
 
 class VLMService:
@@ -49,7 +50,7 @@ class VLMService:
         document_id: str,
         output_dir: str,
         prompt: str = "Please describe this image in detail, including all technical details, chart data, process steps, etc. If it is a flowchart or architecture diagram, please explain the relationships between the components. Respond in English.",
-        max_new_tokens: int = 512,
+        max_new_tokens: int = 2048,
         language: str = "en",
         detail_level: str = "detailed",
     ) -> Dict[str, Any]:
@@ -130,27 +131,12 @@ class VLMService:
         language: str = "en",
         detail_level: str = "detailed",
     ) -> Optional[str]:
-        """调用 VLM 生成描述"""
-        # 根据详细程度调整 system prompt
-        detail_prompts = {
-            "brief": "You are a professional technical document analysis assistant. Provide concise descriptions of technical charts, flowcharts, and architecture diagrams. Focus on key elements and main relationships.",
-            "detailed": "You are a professional technical document analysis assistant, skilled at describing and explaining technical charts, flowcharts, architecture diagrams, etc. Provide thorough descriptions with technical details.",
-            "comprehensive": "You are an expert technical document analyst with decades of experience. Provide exhaustive, highly detailed descriptions of technical charts, flowcharts, and architecture diagrams. Include all technical specifications, data points, relationships, and contextual information."
-        }
-        
-        system_prompt = detail_prompts.get(detail_level, detail_prompts["detailed"])
-        
-        # 根据语言调整响应要求
-        language_map = {
-            "en": "Always respond in English.",
-            "zh": "Always respond in Chinese (中文).",
-            "ja": "Always respond in Japanese (日本語).",
-        }
-        language_instruction = language_map.get(language, language_map["en"])
-        
+        """Call VLM to generate description"""
+        system_prompt = build_system_prompt(language)
+
         messages = [
-            {"role": "system", "content": f"{system_prompt} {language_instruction}"},
-            {"role": "user", "content": [{"type": "image", "image": image}, {"type": "text", "text": prompt}]},
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": [{"type": "image", "image": image}, {"type": "text", "text": USER_PROMPT}]},
         ]
         try:
             return self.vlm_backend.generate(image=image, messages=messages, max_new_tokens=max_new_tokens).strip()

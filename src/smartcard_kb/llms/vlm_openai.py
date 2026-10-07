@@ -37,7 +37,7 @@ class OpenAICompatibleBackend(VLMBackend):
         image.save(buffer, format="JPEG", quality=95)
         return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
-    def generate(self, image: Image.Image, messages: List[Dict[str, Any]], max_new_tokens: int = 512) -> str:
+    def generate(self, image: Image.Image, messages: List[Dict[str, Any]], max_new_tokens: int = 2048) -> str:
         """Call OpenAI compatible API to generate response"""
         image_base64 = self._encode_image(image)
         data_url = f"data:image/jpeg;base64,{image_base64}"

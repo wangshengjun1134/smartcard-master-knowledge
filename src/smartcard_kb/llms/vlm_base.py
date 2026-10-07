@@ -14,7 +14,7 @@ class VLMBackend(ABC):
         self,
         image: Image.Image,
         messages: List[Dict[str, Any]],
-        max_new_tokens: int = 512
+        max_new_tokens: int = 2048
     ) -> str:
         """
         Call VLM to generate response

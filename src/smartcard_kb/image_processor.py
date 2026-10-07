@@ -107,7 +107,7 @@ class ImageContentExtractor:
         image_path: str,
         prompt: str,
         caption: str = "",
-        max_new_tokens: int = 512
+        max_new_tokens: int = 2048
     ) -> str:
         """处理图片并返回 VLM 结果"""
         if not Path(image_path).exists():

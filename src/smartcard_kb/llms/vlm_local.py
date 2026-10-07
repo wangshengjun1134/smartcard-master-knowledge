@@ -32,7 +32,7 @@ class LocalQwenVLMBackend(VLMBackend):
         self.processor = AutoProcessor.from_pretrained(model_path)
         print(f"Local VLM loaded, device: {self.model.device}")
 
-    def generate(self, image: Image.Image, messages: List[Dict[str, Any]], max_new_tokens: int = 512) -> str:
+    def generate(self, image: Image.Image, messages: List[Dict[str, Any]], max_new_tokens: int = 2048) -> str:
         """Call local VLM to generate response"""
         # Print request details
         print("\n" + "="*80)
