@@ -503,7 +503,7 @@ export default function Home() {
                 onClick={() => { setPipelineFilter(''); setCurrentPage(1) }}
                 className={`w-[126px] flex-shrink-0 flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
                   pipelineFilter === ''
-                    ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                    ? 'border-primary/60 bg-primary/5 ring-1 ring-primary/40'
                     : 'border-border hover:bg-muted'
                 }`}
               >
@@ -521,7 +521,7 @@ export default function Home() {
                 onClick={() => { setPipelineFilter('uploaded'); setCurrentPage(1) }}
                 className={`w-[126px] flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
                   pipelineFilter === 'uploaded'
-                    ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                    ? 'border-primary/60 bg-primary/5 ring-1 ring-primary/40'
                     : 'border-border hover:bg-muted'
                 }`}
               >
@@ -542,7 +542,7 @@ export default function Home() {
                   onClick={() => { setPipelineFilter('parsed'); setCurrentPage(1) }}
                   className={`w-full flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
                     pipelineFilter === 'parsed'
-                      ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                      ? 'border-primary/60 bg-primary/5 ring-1 ring-primary/40'
                       : 'border-border hover:bg-muted'
                   }`}
                 >
@@ -580,7 +580,7 @@ export default function Home() {
                   onClick={() => { setPipelineFilter('vlm_completed'); setCurrentPage(1) }}
                   className={`w-full flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
                     pipelineFilter === 'vlm_completed'
-                      ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                      ? 'border-primary/60 bg-primary/5 ring-1 ring-primary/40'
                       : 'border-border hover:bg-muted'
                   }`}
                 >
@@ -618,7 +618,7 @@ export default function Home() {
                   onClick={() => { setPipelineFilter('chunked'); setCurrentPage(1) }}
                   className={`w-full flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
                     pipelineFilter === 'chunked'
-                      ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                      ? 'border-primary/60 bg-primary/5 ring-1 ring-primary/40'
                       : 'border-border hover:bg-muted'
                   }`}
                 >
@@ -656,7 +656,7 @@ export default function Home() {
                   onClick={() => { setPipelineFilter('embedded'); setCurrentPage(1) }}
                   className={`w-full flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
                     pipelineFilter === 'embedded'
-                      ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                      ? 'border-primary/60 bg-primary/5 ring-1 ring-primary/40'
                       : 'border-border hover:bg-muted'
                   }`}
                 >
