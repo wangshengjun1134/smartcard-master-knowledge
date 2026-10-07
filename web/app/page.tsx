@@ -438,7 +438,7 @@ export default function Home() {
               {/* 全部 */}
               <button
                 onClick={() => { setPipelineFilter(''); setCurrentPage(1) }}
-                className={`flex-shrink-0 flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
+                className={`w-[126px] flex-shrink-0 flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
                   pipelineFilter === ''
                     ? 'border-primary bg-primary/5 ring-1 ring-primary'
                     : 'border-border hover:bg-muted'
@@ -456,7 +456,7 @@ export default function Home() {
               {/* 已上传 */}
               <button
                 onClick={() => { setPipelineFilter('uploaded'); setCurrentPage(1) }}
-                className={`w-[120px] flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
+                className={`w-[126px] flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
                   pipelineFilter === 'uploaded'
                     ? 'border-primary bg-primary/5 ring-1 ring-primary'
                     : 'border-border hover:bg-muted'
@@ -474,7 +474,7 @@ export default function Home() {
               <ArrowRight className="h-4 w-4 text-muted-foreground mt-2 flex-shrink-0" />
 
               {/* 已解析 + 失败分支 */}
-              <div className="w-[120px] flex flex-col items-center">
+              <div className="w-[126px] flex flex-col items-center">
                 <button
                   onClick={() => { setPipelineFilter('parsed'); setCurrentPage(1) }}
                   className={`w-full flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
@@ -512,7 +512,7 @@ export default function Home() {
               <ArrowRight className="h-4 w-4 text-muted-foreground mt-2 flex-shrink-0" />
 
               {/* VLM已完成 + 失败分支 */}
-              <div className="w-[120px] flex flex-col items-center">
+              <div className="w-[126px] flex flex-col items-center">
                 <button
                   onClick={() => { setPipelineFilter('vlm_completed'); setCurrentPage(1) }}
                   className={`w-full flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
@@ -550,7 +550,7 @@ export default function Home() {
               <ArrowRight className="h-4 w-4 text-muted-foreground mt-2 flex-shrink-0" />
 
               {/* 已分块 + 失败分支 */}
-              <div className="w-[120px] flex flex-col items-center">
+              <div className="w-[126px] flex flex-col items-center">
                 <button
                   onClick={() => { setPipelineFilter('chunked'); setCurrentPage(1) }}
                   className={`w-full flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
@@ -588,7 +588,7 @@ export default function Home() {
               <ArrowRight className="h-4 w-4 text-muted-foreground mt-2 flex-shrink-0" />
 
               {/* 已嵌入 + 失败分支 */}
-              <div className="w-[120px] flex flex-col items-center">
+              <div className="w-[126px] flex flex-col items-center">
                 <button
                   onClick={() => { setPipelineFilter('embedded'); setCurrentPage(1) }}
                   className={`w-full flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
@@ -613,7 +613,7 @@ export default function Home() {
                   }`}
                 >
                   <AlertCircle className="h-3 w-3 text-destructive" />
-                  <span className="text-xs font-medium text-destructive">Embedding失败</span>
+                  <span className="text-xs font-medium text-destructive">嵌入失败</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
                     pipelineFilter === 'embedding_failed' ? 'bg-destructive/20 text-destructive' : 'bg-destructive/10 text-destructive'
                   }`}>
