@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { listDocuments, uploadDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings, embeddingAllDocuments } from '@/lib/api'
 import type { DocumentInfo } from '@/types'
 import { Button } from '@/components/ui/button'
@@ -35,13 +36,14 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { formatFileSize, formatDate } from '@/lib/utils'
-import { Upload, FileText, Search, Moon, Sun, Plus, ChevronLeft, ChevronRight, MoreHorizontal, Eye, FileUp, Image, Layers, Database, Play, Sparkles, RotateCcw, AlertCircle, CheckCircle, ArrowRight } from 'lucide-react'
+import { Upload, FileText, Search, Moon, Sun, Plus, ChevronLeft, ChevronRight, MoreHorizontal, Eye, FileUp, Image, Layers, Database, Play, Sparkles, RotateCcw, AlertCircle, CheckCircle, ArrowRight, ListChecks } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { DocumentTree } from '@/components/document-tree'
 
 export default function Home() {
   const { toast } = useToast()
   const { theme, setTheme } = useTheme()
+  const pathname = usePathname()
   const [documents, setDocuments] = useState<DocumentInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -441,12 +443,17 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-4">
             <nav className="flex items-center gap-4">
-              <Link href="/" className="text-sm font-medium hover:underline">
-                文档管理
-              </Link>
-              <Link href="/search" className="text-sm font-medium hover:underline">
-                文档检索
-              </Link>
+              {pathname === '/' ? (
+                <Link href="/search" className="text-sm font-medium hover:underline flex items-center gap-1.5">
+                  <Search className="h-4 w-4" />
+                  文档检索
+                </Link>
+              ) : (
+                <Link href="/" className="text-sm font-medium hover:underline flex items-center gap-1.5">
+                  <ListChecks className="h-4 w-4" />
+                  文档管理
+                </Link>
+              )}
             </nav>
             <Button
               variant="outline"
