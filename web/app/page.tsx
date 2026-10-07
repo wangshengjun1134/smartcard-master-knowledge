@@ -456,7 +456,7 @@ export default function Home() {
               {/* 已上传 */}
               <button
                 onClick={() => { setPipelineFilter('uploaded'); setCurrentPage(1) }}
-                className={`flex-1 min-w-[80px] flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
+                className={`w-[120px] flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
                   pipelineFilter === 'uploaded'
                     ? 'border-primary bg-primary/5 ring-1 ring-primary'
                     : 'border-border hover:bg-muted'
@@ -474,7 +474,7 @@ export default function Home() {
               <ArrowRight className="h-4 w-4 text-muted-foreground mt-2 flex-shrink-0" />
 
               {/* 已解析 + 失败分支 */}
-              <div className="flex-1 min-w-[80px] flex flex-col items-center">
+              <div className="w-[120px] flex flex-col items-center">
                 <button
                   onClick={() => { setPipelineFilter('parsed'); setCurrentPage(1) }}
                   className={`w-full flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
@@ -512,7 +512,7 @@ export default function Home() {
               <ArrowRight className="h-4 w-4 text-muted-foreground mt-2 flex-shrink-0" />
 
               {/* VLM已完成 + 失败分支 */}
-              <div className="flex-1 min-w-[80px] flex flex-col items-center">
+              <div className="w-[120px] flex flex-col items-center">
                 <button
                   onClick={() => { setPipelineFilter('vlm_completed'); setCurrentPage(1) }}
                   className={`w-full flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
@@ -550,7 +550,7 @@ export default function Home() {
               <ArrowRight className="h-4 w-4 text-muted-foreground mt-2 flex-shrink-0" />
 
               {/* 已分块 + 失败分支 */}
-              <div className="flex-1 min-w-[80px] flex flex-col items-center">
+              <div className="w-[120px] flex flex-col items-center">
                 <button
                   onClick={() => { setPipelineFilter('chunked'); setCurrentPage(1) }}
                   className={`w-full flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
@@ -588,7 +588,7 @@ export default function Home() {
               <ArrowRight className="h-4 w-4 text-muted-foreground mt-2 flex-shrink-0" />
 
               {/* 已嵌入 + 失败分支 */}
-              <div className="flex-1 min-w-[80px] flex flex-col items-center">
+              <div className="w-[120px] flex flex-col items-center">
                 <button
                   onClick={() => { setPipelineFilter('embedded'); setCurrentPage(1) }}
                   className={`w-full flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
