@@ -20,6 +20,7 @@ router = APIRouter(prefix="/api/docs", tags=["文档处理流程"])
 # 全局锁：防止并发执行 parse-all / vlm-all
 _parse_all_lock = asyncio.Lock()
 _vlm_all_lock = asyncio.Lock()
+_chunk_all_lock = asyncio.Lock()
 
 
 # ==================== Pydantic 模型 ====================
@@ -111,6 +112,22 @@ class ChunkResponse(BaseModel):
     """分块响应"""
     success: bool
     message: str
+
+
+class ChunkAllRequest(BaseModel):
+    """批量分块请求"""
+    parallel_count: int = 1
+    max_tokens: int = 512
+    tokenizer_name: str = "BAAI/bge-m3"
+    do_ocr: bool = True
+
+
+class ChunkAllResponse(BaseModel):
+    """批量分块响应"""
+    success: bool
+    message: str
+    total: int
+    parallel_count: int
 
 
 class EmbeddingRequest(BaseModel):
@@ -455,6 +472,80 @@ async def _async_chunk(
         })
 
 
+async def _async_chunk_all(
+    docs: list,
+    parallel_count: int,
+    max_tokens: int,
+    tokenizer_name: str,
+    do_ocr: bool,
+):
+    """
+    异步批量分块所有 vlm_completed 状态的文档
+
+    :param docs: 文档列表
+    :param parallel_count: 并行数量
+    :param max_tokens: 分块最大 token 数
+    :param tokenizer_name: tokenizer 名称
+    :param do_ocr: 是否启用 OCR
+    """
+    async with _chunk_all_lock:
+        semaphore = asyncio.Semaphore(parallel_count)
+
+        async def _chunk_single_doc(doc):
+            """分块单个文档"""
+            async with semaphore:
+                document_id = doc["id"]
+                pdf_path = doc.get("file_path")
+
+                if not pdf_path:
+                    print(f"Error: file_path not found for document {document_id}")
+                    update_document_info({
+                        "id": document_id,
+                        "processing_status": "chunk_failed",
+                        "processing_error": "file_path not found",
+                    })
+                    return
+
+                print(f"Starting chunk for document {document_id}: {doc.get('file_name', 'unknown')}")
+
+                try:
+                    update_document_info({
+                        "id": document_id,
+                        "processing_status": "chunking",
+                    })
+
+                    chunker = Chunker(
+                        do_ocr=do_ocr,
+                        max_tokens=max_tokens,
+                        tokenizer_name=tokenizer_name,
+                    )
+                    result = await asyncio.to_thread(
+                        chunker.generate_chunks,
+                        pdf_path=pdf_path,
+                        document_id=document_id,
+                        page_range=None,
+                    )
+
+                    update_document_info({
+                        "id": document_id,
+                        "processing_status": "chunked",
+                    })
+                    print(f"Chunk completed for document {document_id}: {len(result.get('chunks', []))} chunks")
+
+                except Exception as e:
+                    print(f"Error: Chunk failed for document {document_id}: {e}")
+                    update_document_info({
+                        "id": document_id,
+                        "processing_status": "chunk_failed",
+                        "processing_error": str(e),
+                    })
+
+        # 并发执行所有文档分块
+        tasks = [_chunk_single_doc(doc) for doc in docs]
+        await asyncio.gather(*tasks)
+        print(f"Batch chunk completed: {len(docs)} documents processed")
+
+
 async def _async_embedding(
     document_id: str,
     backend_type: str,
@@ -714,6 +805,53 @@ async def chunk_document(request: ChunkRequest, background_tasks: BackgroundTask
     return ChunkResponse(
         success=True,
         message="文档分块任务已提交，正在后台处理",
+    )
+
+
+@router.post("/process/chunk-all", response_model=ChunkAllResponse)
+async def chunk_all_documents(request: ChunkAllRequest, background_tasks: BackgroundTasks):
+    """
+    异步批量分块所有 vlm_completed 状态的文档
+
+    - **parallel_count**: 并行数量（默认1）
+    - **max_tokens**: 分块最大 token 数
+    - **tokenizer_name**: tokenizer 名称
+    - **do_ocr**: 是否启用 OCR
+    """
+    # Use global lock to prevent concurrent execution of chunk-all
+    if _chunk_all_lock.locked():
+        return ChunkAllResponse(
+            success=False,
+            message="已有批量分块任务正在执行，请稍后再试",
+            total=0,
+            parallel_count=request.parallel_count,
+        )
+
+    # Query all vlm_completed documents that need chunking
+    docs = query_documents_by_status(processing_status="vlm_completed")
+
+    if not docs:
+        return ChunkAllResponse(
+            success=True,
+            message="没有需要分块的文档（状态为VLM已完成）",
+            total=0,
+            parallel_count=request.parallel_count,
+        )
+
+    background_tasks.add_task(
+        _async_chunk_all,
+        docs,
+        request.parallel_count,
+        request.max_tokens,
+        request.tokenizer_name,
+        request.do_ocr,
+    )
+
+    return ChunkAllResponse(
+        success=True,
+        message=f"已提交 {len(docs)} 个文档的分块任务，并行数: {request.parallel_count}",
+        total=len(docs),
+        parallel_count=request.parallel_count,
     )
 
 

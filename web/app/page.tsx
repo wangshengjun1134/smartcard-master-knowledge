@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { listDocuments, uploadDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, generateEmbeddings } from '@/lib/api'
+import { listDocuments, uploadDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings } from '@/lib/api'
 import type { DocumentInfo } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -61,8 +61,10 @@ export default function Home() {
   const [processingType, setProcessingType] = useState<string | null>(null)
   const [parsingAll, setParsingAll] = useState(false)
   const [vlmAll, setVlmAll] = useState(false)
+  const [chunkingAll, setChunkingAll] = useState(false)
   const [parseAllDialogOpen, setParseAllDialogOpen] = useState(false)
   const [vlmAllDialogOpen, setVlmAllDialogOpen] = useState(false)
+  const [chunkAllDialogOpen, setChunkAllDialogOpen] = useState(false)
   const [parseAllForm, setParseAllForm] = useState({
     parallel_count: 1,
     do_ocr: true,
@@ -78,6 +80,12 @@ export default function Home() {
     max_new_tokens: 2048,
     language: 'en',
     output_dir: 'output/pictures',
+  })
+  const [chunkAllForm, setChunkAllForm] = useState({
+    parallel_count: 1,
+    max_tokens: 512,
+    tokenizer_name: 'BAAI/bge-m3',
+    do_ocr: true,
   })
   // Pipeline filter state
   const [pipelineFilter, setPipelineFilter] = useState<string>('')
@@ -229,6 +237,32 @@ export default function Home() {
       })
     } finally {
       setVlmAll(false)
+    }
+  }
+
+  const handleChunkAll = async () => {
+    setChunkingAll(true)
+    try {
+      const result = await chunkAllDocuments({
+        parallel_count: chunkAllForm.parallel_count,
+        max_tokens: chunkAllForm.max_tokens,
+        tokenizer_name: chunkAllForm.tokenizer_name,
+        do_ocr: chunkAllForm.do_ocr,
+      })
+      toast({
+        title: '批量分块任务已提交',
+        description: result.message || `已提交 ${result.total} 个文档的分块任务`,
+      })
+      await loadDocuments()
+      setChunkAllDialogOpen(false)
+    } catch (error: any) {
+      toast({
+        title: '批量分块失败',
+        description: error.response?.data?.detail || '请重试',
+        variant: 'destructive',
+      })
+    } finally {
+      setChunkingAll(false)
     }
   }
 
@@ -923,6 +957,88 @@ export default function Home() {
                       </Button>
                       <Button onClick={handleVlmAll} disabled={vlmAll}>
                         {vlmAll ? '提交中...' : '确认提交'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Chunk All Dialog */}
+                <Dialog open={chunkAllDialogOpen} onOpenChange={setChunkAllDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      disabled={chunkingAll || totalDocs === 0}
+                      variant="secondary"
+                      size="sm"
+                      className="gap-1.5"
+                    >
+                      {chunkingAll ? (
+                        <>
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          分块中...
+                        </>
+                      ) : (
+                        <>
+                          <Layers className="h-4 w-4" />
+                          分块
+                        </>
+                      )}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                      <DialogTitle>批量分块</DialogTitle>
+                      <DialogDescription>
+                        配置分块参数，对所有 VLM 已完成状态的文档进行语义分块
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="chunk-parallel">并行数量</Label>
+                        <Input
+                          id="chunk-parallel"
+                          type="number"
+                          min={1}
+                          max={10}
+                          value={chunkAllForm.parallel_count}
+                          onChange={(e) => setChunkAllForm({ ...chunkAllForm, parallel_count: parseInt(e.target.value) || 1 })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="chunk-max-tokens">最大 Token 数</Label>
+                        <Input
+                          id="chunk-max-tokens"
+                          type="number"
+                          min={128}
+                          step={128}
+                          value={chunkAllForm.max_tokens}
+                          onChange={(e) => setChunkAllForm({ ...chunkAllForm, max_tokens: parseInt(e.target.value) || 512 })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="chunk-tokenizer">Tokenizer</Label>
+                        <Input
+                          id="chunk-tokenizer"
+                          value={chunkAllForm.tokenizer_name}
+                          onChange={(e) => setChunkAllForm({ ...chunkAllForm, tokenizer_name: e.target.value })}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          id="chunk-ocr"
+                          type="checkbox"
+                          checked={chunkAllForm.do_ocr}
+                          onChange={(e) => setChunkAllForm({ ...chunkAllForm, do_ocr: e.target.checked })}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                        <Label htmlFor="chunk-ocr">启用 OCR</Label>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setChunkAllDialogOpen(false)} disabled={chunkingAll}>
+                        取消
+                      </Button>
+                      <Button onClick={handleChunkAll} disabled={chunkingAll}>
+                        {chunkingAll ? '提交中...' : '确认提交'}
                       </Button>
                     </DialogFooter>
                   </DialogContent>

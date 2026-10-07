@@ -208,6 +208,16 @@ export async function chunkDocument(request: {
   return response.data
 }
 
+export async function chunkAllDocuments(request: {
+  parallel_count?: number
+  max_tokens?: number
+  tokenizer_name?: string
+  do_ocr?: boolean
+}): Promise<{ success: boolean; message: string; total: number; parallel_count: number }> {
+  const response = await api.post('/api/docs/process/chunk-all', request)
+  return response.data
+}
+
 export async function generateEmbeddings(request: {
   document_id: string
   backend_type?: string
