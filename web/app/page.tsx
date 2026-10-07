@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { formatFileSize, formatDate } from '@/lib/utils'
-import { Upload, FileText, Search, Moon, Sun, Plus, ChevronLeft, ChevronRight, MoreHorizontal, Eye, FileUp, Image, Layers, Database, Play, Sparkles } from 'lucide-react'
+import { Upload, FileText, Search, Moon, Sun, Plus, ChevronLeft, ChevronRight, MoreHorizontal, Eye, FileUp, Image, Layers, Database, Play, Sparkles, RotateCcw, AlertCircle, CheckCircle, ArrowRight } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { DocumentTree } from '@/components/document-tree'
 
@@ -45,7 +45,6 @@ export default function Home() {
   const [documents, setDocuments] = useState<DocumentInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterStatus, setFilterStatus] = useState<string>('')
   const [uploading, setUploading] = useState(false)
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
   const [uploadForm, setUploadForm] = useState({
@@ -80,16 +79,18 @@ export default function Home() {
     language: 'en',
     output_dir: 'output/pictures',
   })
+  // Pipeline filter state
+  const [pipelineFilter, setPipelineFilter] = useState<string>('')
   const pageSize = 20
 
   useEffect(() => {
     loadDocuments()
-  }, [currentPage, filterStatus])
+  }, [currentPage, pipelineFilter])
 
   const loadDocuments = async () => {
     try {
       const result = await listDocuments({
-        processing_status: filterStatus || undefined,
+        processing_status: pipelineFilter || undefined,
         page: currentPage,
         page_size: pageSize,
       })
@@ -415,6 +416,215 @@ export default function Home() {
           </p>
         </div>
 
+        {/* Pipeline 状态过滤 */}
+        <Card className="mb-4">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold">流水线状态过滤</span>
+                <span className="text-xs text-muted-foreground">（点击节点进行筛选）</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setPipelineFilter(''); setCurrentPage(1) }}
+                className="text-xs h-7"
+              >
+                <RotateCcw className="h-3 w-3 mr-1" />
+                重置
+              </Button>
+            </div>
+            <div className="flex items-start gap-2 overflow-x-auto pb-1">
+              {/* 全部 */}
+              <button
+                onClick={() => { setPipelineFilter(''); setCurrentPage(1) }}
+                className={`flex-shrink-0 flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
+                  pipelineFilter === ''
+                    ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                    : 'border-border hover:bg-muted'
+                }`}
+              >
+                <span className="text-xs font-semibold">全部</span>
+                <span className={`text-xs mt-1 px-2 py-0.5 rounded-full font-bold ${
+                  pipelineFilter === '' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                }`}>{totalDocs}</span>
+              </button>
+
+              {/* Arrow */}
+              <ArrowRight className="h-4 w-4 text-muted-foreground mt-2 flex-shrink-0" />
+
+              {/* 已上传 */}
+              <button
+                onClick={() => { setPipelineFilter('uploaded'); setCurrentPage(1) }}
+                className={`flex-1 min-w-[80px] flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
+                  pipelineFilter === 'uploaded'
+                    ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                    : 'border-border hover:bg-muted'
+                }`}
+              >
+                <span className="text-xs font-semibold">已上传</span>
+                <span className={`text-xs mt-1 px-2 py-0.5 rounded-full font-bold ${
+                  pipelineFilter === 'uploaded' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                }`}>
+                  {documents.filter(d => d.processing_status === 'uploaded').length}
+                </span>
+              </button>
+
+              {/* Arrow */}
+              <ArrowRight className="h-4 w-4 text-muted-foreground mt-2 flex-shrink-0" />
+
+              {/* 已解析 + 失败分支 */}
+              <div className="flex-1 min-w-[80px] flex flex-col items-center">
+                <button
+                  onClick={() => { setPipelineFilter('parsed'); setCurrentPage(1) }}
+                  className={`w-full flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
+                    pipelineFilter === 'parsed'
+                      ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                      : 'border-border hover:bg-muted'
+                  }`}
+                >
+                  <span className="text-xs font-semibold">已解析</span>
+                  <span className={`text-xs mt-1 px-2 py-0.5 rounded-full font-bold ${
+                    pipelineFilter === 'parsed' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                  }`}>
+                    {documents.filter(d => d.processing_status === 'parsed').length}
+                  </span>
+                </button>
+                <button
+                  onClick={() => { setPipelineFilter('parse_failed'); setCurrentPage(1) }}
+                  className={`w-full mt-1 flex items-center justify-center gap-1 px-2 py-1 rounded-lg border transition-all text-xs ${
+                    pipelineFilter === 'parse_failed'
+                      ? 'border-destructive bg-destructive/10 ring-1 ring-destructive'
+                      : 'border-destructive/30 bg-destructive/5 hover:bg-destructive/10'
+                  }`}
+                >
+                  <AlertCircle className="h-3 w-3 text-destructive" />
+                  <span className="text-xs font-medium text-destructive">解析失败</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                    pipelineFilter === 'parse_failed' ? 'bg-destructive/20 text-destructive' : 'bg-destructive/10 text-destructive'
+                  }`}>
+                    {documents.filter(d => d.processing_status === 'parse_failed').length}
+                  </span>
+                </button>
+              </div>
+
+              {/* Arrow */}
+              <ArrowRight className="h-4 w-4 text-muted-foreground mt-2 flex-shrink-0" />
+
+              {/* VLM已完成 + 失败分支 */}
+              <div className="flex-1 min-w-[80px] flex flex-col items-center">
+                <button
+                  onClick={() => { setPipelineFilter('vlm_completed'); setCurrentPage(1) }}
+                  className={`w-full flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
+                    pipelineFilter === 'vlm_completed'
+                      ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                      : 'border-border hover:bg-muted'
+                  }`}
+                >
+                  <span className="text-xs font-semibold">VLM已完成</span>
+                  <span className={`text-xs mt-1 px-2 py-0.5 rounded-full font-bold ${
+                    pipelineFilter === 'vlm_completed' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                  }`}>
+                    {documents.filter(d => d.processing_status === 'vlm_completed').length}
+                  </span>
+                </button>
+                <button
+                  onClick={() => { setPipelineFilter('vlm_failed'); setCurrentPage(1) }}
+                  className={`w-full mt-1 flex items-center justify-center gap-1 px-2 py-1 rounded-lg border transition-all text-xs ${
+                    pipelineFilter === 'vlm_failed'
+                      ? 'border-destructive bg-destructive/10 ring-1 ring-destructive'
+                      : 'border-destructive/30 bg-destructive/5 hover:bg-destructive/10'
+                  }`}
+                >
+                  <AlertCircle className="h-3 w-3 text-destructive" />
+                  <span className="text-xs font-medium text-destructive">VLM失败</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                    pipelineFilter === 'vlm_failed' ? 'bg-destructive/20 text-destructive' : 'bg-destructive/10 text-destructive'
+                  }`}>
+                    {documents.filter(d => d.processing_status === 'vlm_failed').length}
+                  </span>
+                </button>
+              </div>
+
+              {/* Arrow */}
+              <ArrowRight className="h-4 w-4 text-muted-foreground mt-2 flex-shrink-0" />
+
+              {/* 已分块 + 失败分支 */}
+              <div className="flex-1 min-w-[80px] flex flex-col items-center">
+                <button
+                  onClick={() => { setPipelineFilter('chunked'); setCurrentPage(1) }}
+                  className={`w-full flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
+                    pipelineFilter === 'chunked'
+                      ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                      : 'border-border hover:bg-muted'
+                  }`}
+                >
+                  <span className="text-xs font-semibold">已分块</span>
+                  <span className={`text-xs mt-1 px-2 py-0.5 rounded-full font-bold ${
+                    pipelineFilter === 'chunked' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                  }`}>
+                    {documents.filter(d => d.processing_status === 'chunked').length}
+                  </span>
+                </button>
+                <button
+                  onClick={() => { setPipelineFilter('chunk_failed'); setCurrentPage(1) }}
+                  className={`w-full mt-1 flex items-center justify-center gap-1 px-2 py-1 rounded-lg border transition-all text-xs ${
+                    pipelineFilter === 'chunk_failed'
+                      ? 'border-destructive bg-destructive/10 ring-1 ring-destructive'
+                      : 'border-destructive/30 bg-destructive/5 hover:bg-destructive/10'
+                  }`}
+                >
+                  <AlertCircle className="h-3 w-3 text-destructive" />
+                  <span className="text-xs font-medium text-destructive">分块失败</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                    pipelineFilter === 'chunk_failed' ? 'bg-destructive/20 text-destructive' : 'bg-destructive/10 text-destructive'
+                  }`}>
+                    {documents.filter(d => d.processing_status === 'chunk_failed').length}
+                  </span>
+                </button>
+              </div>
+
+              {/* Arrow */}
+              <ArrowRight className="h-4 w-4 text-muted-foreground mt-2 flex-shrink-0" />
+
+              {/* 已嵌入 + 失败分支 */}
+              <div className="flex-1 min-w-[80px] flex flex-col items-center">
+                <button
+                  onClick={() => { setPipelineFilter('embedded'); setCurrentPage(1) }}
+                  className={`w-full flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
+                    pipelineFilter === 'embedded'
+                      ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                      : 'border-border hover:bg-muted'
+                  }`}
+                >
+                  <span className="text-xs font-semibold">已嵌入</span>
+                  <span className={`text-xs mt-1 px-2 py-0.5 rounded-full font-bold ${
+                    pipelineFilter === 'embedded' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                  }`}>
+                    {documents.filter(d => d.processing_status === 'embedded').length}
+                  </span>
+                </button>
+                <button
+                  onClick={() => { setPipelineFilter('embedding_failed'); setCurrentPage(1) }}
+                  className={`w-full mt-1 flex items-center justify-center gap-1 px-2 py-1 rounded-lg border transition-all text-xs ${
+                    pipelineFilter === 'embedding_failed'
+                      ? 'border-destructive bg-destructive/10 ring-1 ring-destructive'
+                      : 'border-destructive/30 bg-destructive/5 hover:bg-destructive/10'
+                  }`}
+                >
+                  <AlertCircle className="h-3 w-3 text-destructive" />
+                  <span className="text-xs font-medium text-destructive">Embedding失败</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                    pipelineFilter === 'embedding_failed' ? 'bg-destructive/20 text-destructive' : 'bg-destructive/10 text-destructive'
+                  }`}>
+                    {documents.filter(d => d.processing_status === 'embedding_failed').length}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* 工具栏 */}
         <div className="flex items-center gap-3 mb-4 flex-wrap">
           {/* 搜索框 */}
@@ -428,28 +638,6 @@ export default function Home() {
               className="pl-9 w-48 sm:w-64"
             />
           </div>
-
-          {/* 状态过滤 */}
-          <Select value={filterStatus} onValueChange={(value) => {
-            setFilterStatus(value)
-            setCurrentPage(1)
-          }}>
-            <SelectTrigger className="w-36">
-              <SelectValue placeholder="所有状态" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">所有状态</SelectItem>
-              <SelectItem value="uploaded">已上传</SelectItem>
-              <SelectItem value="parsed">已解析</SelectItem>
-              <SelectItem value="vlm_completed">VLM已完成</SelectItem>
-              <SelectItem value="chunked">已分块</SelectItem>
-              <SelectItem value="embedded">已嵌入</SelectItem>
-              <SelectItem value="parse_failed">解析失败</SelectItem>
-              <SelectItem value="vlm_failed">VLM失败</SelectItem>
-              <SelectItem value="chunk_failed">分块失败</SelectItem>
-              <SelectItem value="embedding_failed">Embedding失败</SelectItem>
-            </SelectContent>
-          </Select>
 
           {/* 上传对话框 */}
           <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
@@ -759,7 +947,7 @@ export default function Home() {
               </div>
             ) : documents.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                {filterStatus ? '没有找到匹配的文档' : '暂无文档，请上传 PDF/DOCX 文件'}
+                {pipelineFilter ? '没有找到匹配的文档' : '暂无文档，请上传 PDF/DOCX 文件'}
               </div>
             ) : (
               <>

@@ -18,7 +18,7 @@ export interface DocumentInfo {
   source_type?: string
   parser?: string
   parser_version?: string
-  processing_status?: 'pending' | 'processing' | 'completed' | 'failed'
+  processing_status?: 'uploaded' | 'parsing' | 'parsed' | 'vlm_processing' | 'vlm_completed' | 'chunking' | 'chunked' | 'embedding' | 'embedded' | 'parse_failed' | 'vlm_failed' | 'chunk_failed' | 'embedding_failed' | 'completed' | 'failed' | 'pending' | 'processing'
   processing_started_at?: string
   processing_finished_at?: string
   processing_error?: string
