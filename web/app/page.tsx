@@ -424,15 +424,6 @@ export default function Home() {
                 <span className="text-sm font-semibold">状态过滤</span>
                 <span className="text-xs text-muted-foreground">（点击节点进行筛选）</span>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => { setPipelineFilter(''); setCurrentPage(1) }}
-                className="text-xs h-7"
-              >
-                <RotateCcw className="h-3 w-3 mr-1" />
-                重置
-              </Button>
             </div>
             <div className="flex items-start gap-2 overflow-x-auto pb-1">
               {/* 全部 */}
