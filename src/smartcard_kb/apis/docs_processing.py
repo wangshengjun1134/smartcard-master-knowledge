@@ -21,6 +21,7 @@ router = APIRouter(prefix="/api/docs", tags=["文档处理流程"])
 _parse_all_lock = asyncio.Lock()
 _vlm_all_lock = asyncio.Lock()
 _chunk_all_lock = asyncio.Lock()
+_embedding_all_lock = asyncio.Lock()
 
 
 # ==================== Pydantic 模型 ====================
@@ -144,6 +145,24 @@ class EmbeddingResponse(BaseModel):
     """Embedding 响应"""
     success: bool
     message: str
+
+
+class EmbeddingAllRequest(BaseModel):
+    """批量嵌入请求"""
+    parallel_count: int = 1
+    backend_type: str = "local"
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    model: Optional[str] = None
+    model_name: Optional[str] = None
+
+
+class EmbeddingAllResponse(BaseModel):
+    """批量嵌入响应"""
+    success: bool
+    message: str
+    total: int
+    parallel_count: int
 
 
 # ==================== 后台任务函数 ====================
@@ -598,6 +617,84 @@ async def _async_embedding(
         })
 
 
+async def _async_embedding_all(
+    docs: list,
+    parallel_count: int,
+    backend_type: str,
+    api_key: Optional[str],
+    base_url: Optional[str],
+    model: Optional[str],
+    model_name: Optional[str],
+):
+    """
+    异步批量嵌入所有 chunked 状态的文档
+
+    :param docs: 文档列表
+    :param parallel_count: 并行数量
+    :param backend_type: Embedding 后端类型
+    :param api_key: Embedding API Key
+    :param base_url: Embedding API 基础 URL
+    :param model: Embedding 模型名称
+    :param model_name: 本地模型名称
+    """
+    async with _embedding_all_lock:
+        semaphore = asyncio.Semaphore(parallel_count)
+
+        async def _embedding_single_doc(doc):
+            """嵌入单个文档"""
+            async with semaphore:
+                document_id = doc["id"]
+
+                print(f"Starting embedding for document {document_id}: {doc.get('file_name', 'unknown')}")
+
+                try:
+                    update_document_info({
+                        "id": document_id,
+                        "processing_status": "embedding",
+                    })
+
+                    # 从参数或环境变量获取配置
+                    resolved_api_key = api_key or settings.embedding_openai_api_key
+                    resolved_base_url = base_url or settings.embedding_openai_base_url
+                    resolved_model = model or settings.embedding_openai_model
+                    resolved_model_name = model_name or settings.embedding_model
+
+                    if backend_type == "openai" and not resolved_api_key:
+                        raise ValueError("Embedding API Key 未配置")
+
+                    backend = EmbeddingService.create_backend(
+                        backend_type=backend_type,
+                        api_key=resolved_api_key,
+                        base_url=resolved_base_url,
+                        model=resolved_model,
+                        model_name=resolved_model_name,
+                    )
+                    service = EmbeddingService(embedding_backend=backend)
+                    result = await asyncio.to_thread(
+                        service.generate_embeddings,
+                        document_id=document_id,
+                    )
+
+                    update_document_info({
+                        "id": document_id,
+                        "processing_status": "embedded",
+                    })
+                    print(f"Embedding completed for document {document_id}: {result}")
+
+                except Exception as e:
+                    print(f"Error: Embedding failed for document {document_id}: {e}")
+                    update_document_info({
+                        "id": document_id,
+                        "processing_status": "embedding_failed",
+                        "processing_error": str(e),
+                    })
+
+        # 并发执行所有文档嵌入
+        tasks = [_embedding_single_doc(doc) for doc in docs]
+        await asyncio.gather(*tasks)
+        print(f"Batch embedding completed: {len(docs)} documents processed")
+
+
 # ==================== API 接口 ====================
 
 
@@ -885,6 +982,57 @@ async def generate_embeddings(request: EmbeddingRequest, background_tasks: Backg
     return EmbeddingResponse(
         success=True,
         message="Embedding 生成任务已提交，正在后台处理",
+    )
+
+
+@router.post("/process/embedding-all", response_model=EmbeddingAllResponse)
+async def embedding_all_documents(request: EmbeddingAllRequest, background_tasks: BackgroundTasks):
+    """
+    异步批量嵌入所有 chunked 状态的文档
+
+    - **parallel_count**: 并行数量（默认1）
+    - **backend_type**: Embedding 后端类型（openai / local）
+    - **api_key**: Embedding API Key
+    - **base_url**: Embedding API 基础 URL
+    - **model**: Embedding 模型名称（OpenAI 后端）
+    - **model_name**: 本地模型名称（local 后端）
+    """
+    # Use global lock to prevent concurrent execution of embedding-all
+    if _embedding_all_lock.locked():
+        return EmbeddingAllResponse(
+            success=False,
+            message="已有批量嵌入任务正在执行，请稍后再试",
+            total=0,
+            parallel_count=request.parallel_count,
+        )
+
+    # Query all chunked documents that need embedding
+    docs = query_documents_by_status(processing_status="chunked")
+
+    if not docs:
+        return EmbeddingAllResponse(
+            success=True,
+            message="没有需要嵌入的文档（状态为已分块）",
+            total=0,
+            parallel_count=request.parallel_count,
+        )
+
+    background_tasks.add_task(
+        _async_embedding_all,
+        docs,
+        request.parallel_count,
+        request.backend_type,
+        request.api_key,
+        request.base_url,
+        request.model,
+        request.model_name,
+    )
+
+    return EmbeddingAllResponse(
+        success=True,
+        message=f"已提交 {len(docs)} 个文档的嵌入任务，并行数: {request.parallel_count}",
+        total=len(docs),
+        parallel_count=request.parallel_count,
     )
 
 

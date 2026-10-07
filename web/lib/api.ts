@@ -230,6 +230,18 @@ export async function generateEmbeddings(request: {
   return response.data
 }
 
+export async function embeddingAllDocuments(request: {
+  parallel_count?: number
+  backend_type?: string
+  api_key?: string
+  base_url?: string
+  model?: string
+  model_name?: string
+}): Promise<{ success: boolean; message: string; total: number; parallel_count: number }> {
+  const response = await api.post('/api/docs/process/embedding-all', request)
+  return response.data
+}
+
 // ==================== 文档检索 API ====================
 
 export async function searchDocuments(request: {

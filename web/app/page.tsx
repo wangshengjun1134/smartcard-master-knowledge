@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { listDocuments, uploadDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings } from '@/lib/api'
+import { listDocuments, uploadDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings, embeddingAllDocuments } from '@/lib/api'
 import type { DocumentInfo } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -62,9 +62,11 @@ export default function Home() {
   const [parsingAll, setParsingAll] = useState(false)
   const [vlmAll, setVlmAll] = useState(false)
   const [chunkingAll, setChunkingAll] = useState(false)
+  const [embeddingAll, setEmbeddingAll] = useState(false)
   const [parseAllDialogOpen, setParseAllDialogOpen] = useState(false)
   const [vlmAllDialogOpen, setVlmAllDialogOpen] = useState(false)
   const [chunkAllDialogOpen, setChunkAllDialogOpen] = useState(false)
+  const [embeddingAllDialogOpen, setEmbeddingAllDialogOpen] = useState(false)
   const [parseAllForm, setParseAllForm] = useState({
     parallel_count: 1,
     do_ocr: true,
@@ -86,6 +88,14 @@ export default function Home() {
     max_tokens: 512,
     tokenizer_name: 'BAAI/bge-m3',
     do_ocr: true,
+  })
+  const [embeddingAllForm, setEmbeddingAllForm] = useState({
+    parallel_count: 1,
+    backend_type: 'local',
+    api_key: '',
+    base_url: '',
+    model: '',
+    model_name: '',
   })
   // Pipeline filter state
   const [pipelineFilter, setPipelineFilter] = useState<string>('')
@@ -263,6 +273,34 @@ export default function Home() {
       })
     } finally {
       setChunkingAll(false)
+    }
+  }
+
+  const handleEmbeddingAll = async () => {
+    setEmbeddingAll(true)
+    try {
+      const result = await embeddingAllDocuments({
+        parallel_count: embeddingAllForm.parallel_count,
+        backend_type: embeddingAllForm.backend_type,
+        api_key: embeddingAllForm.api_key || undefined,
+        base_url: embeddingAllForm.base_url || undefined,
+        model: embeddingAllForm.model || undefined,
+        model_name: embeddingAllForm.model_name || undefined,
+      })
+      toast({
+        title: '批量嵌入任务已提交',
+        description: result.message || `已提交 ${result.total} 个文档的嵌入任务`,
+      })
+      await loadDocuments()
+      setEmbeddingAllDialogOpen(false)
+    } catch (error: any) {
+      toast({
+        title: '批量嵌入失败',
+        description: error.response?.data?.detail || '请重试',
+        variant: 'destructive',
+      })
+    } finally {
+      setEmbeddingAll(false)
     }
   }
 
@@ -1039,6 +1077,111 @@ export default function Home() {
                       </Button>
                       <Button onClick={handleChunkAll} disabled={chunkingAll}>
                         {chunkingAll ? '提交中...' : '确认提交'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Embedding All Dialog */}
+                <Dialog open={embeddingAllDialogOpen} onOpenChange={setEmbeddingAllDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      disabled={embeddingAll || totalDocs === 0}
+                      variant="secondary"
+                      size="sm"
+                      className="gap-1.5"
+                    >
+                      {embeddingAll ? (
+                        <>
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          嵌入中...
+                        </>
+                      ) : (
+                        <>
+                          <Database className="h-4 w-4" />
+                          嵌入
+                        </>
+                      )}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                      <DialogTitle>批量嵌入</DialogTitle>
+                      <DialogDescription>
+                        配置嵌入参数，对所有已分块状态的文档生成向量嵌入
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="embedding-parallel">并行数量</Label>
+                        <Input
+                          id="embedding-parallel"
+                          type="number"
+                          min={1}
+                          max={10}
+                          value={embeddingAllForm.parallel_count}
+                          onChange={(e) => setEmbeddingAllForm({ ...embeddingAllForm, parallel_count: parseInt(e.target.value) || 1 })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="embedding-backend">后端类型</Label>
+                        <Select
+                          value={embeddingAllForm.backend_type}
+                          onValueChange={(value) => setEmbeddingAllForm({ ...embeddingAllForm, backend_type: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="openai">OpenAI Compatible</SelectItem>
+                            <SelectItem value="local">Local</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="embedding-api-key">API Key（可选）</Label>
+                        <Input
+                          id="embedding-api-key"
+                          type="password"
+                          placeholder="留空使用环境变量 EMBEDDING_OPENAI_API_KEY"
+                          value={embeddingAllForm.api_key}
+                          onChange={(e) => setEmbeddingAllForm({ ...embeddingAllForm, api_key: e.target.value })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="embedding-base-url">Base URL（可选）</Label>
+                        <Input
+                          id="embedding-base-url"
+                          placeholder="例如: https://dashscope.aliyuncs.com/compatible-mode/v1"
+                          value={embeddingAllForm.base_url}
+                          onChange={(e) => setEmbeddingAllForm({ ...embeddingAllForm, base_url: e.target.value })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="embedding-model">模型名称（可选）</Label>
+                        <Input
+                          id="embedding-model"
+                          placeholder="留空使用默认模型"
+                          value={embeddingAllForm.model}
+                          onChange={(e) => setEmbeddingAllForm({ ...embeddingAllForm, model: e.target.value })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="embedding-model-name">本地模型名称（可选）</Label>
+                        <Input
+                          id="embedding-model-name"
+                          placeholder="留空使用默认本地模型"
+                          value={embeddingAllForm.model_name}
+                          onChange={(e) => setEmbeddingAllForm({ ...embeddingAllForm, model_name: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setEmbeddingAllDialogOpen(false)} disabled={embeddingAll}>
+                        取消
+                      </Button>
+                      <Button onClick={handleEmbeddingAll} disabled={embeddingAll}>
+                        {embeddingAll ? '提交中...' : '确认提交'}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
