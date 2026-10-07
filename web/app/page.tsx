@@ -730,7 +730,7 @@ export default function Home() {
                   <DialogTrigger asChild>
                     <Button
                       disabled={parsingAll || totalDocs === 0}
-                      variant="default"
+                      variant="secondary"
                       size="sm"
                       className="gap-1.5"
                     >
@@ -801,7 +801,7 @@ export default function Home() {
                   <DialogTrigger asChild>
                     <Button
                       disabled={vlmAll || totalDocs === 0}
-                      variant="default"
+                      variant="secondary"
                       size="sm"
                       className="gap-1.5"
                     >
