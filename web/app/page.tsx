@@ -742,7 +742,7 @@ export default function Home() {
                       ) : (
                         <>
                           <Play className="h-4 w-4" />
-                          解析所有
+                          解析
                         </>
                       )}
                     </Button>
@@ -813,7 +813,7 @@ export default function Home() {
                       ) : (
                         <>
                           <Sparkles className="h-4 w-4" />
-                          VLM增强所有
+                          VLM增强
                         </>
                       )}
                     </Button>
