@@ -650,7 +650,7 @@ export default function Home() {
                   <DialogTrigger asChild>
                     <Button
                       disabled={vlmAll || totalDocs === 0}
-                      variant="secondary"
+                      variant="default"
                       size="sm"
                       className="gap-1.5"
                     >
