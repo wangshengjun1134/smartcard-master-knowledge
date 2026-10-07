@@ -407,52 +407,58 @@ export default function Home() {
 
           {/* 右侧主内容区 */}
           <div className="flex-1 min-w-0">
-        {/* 页面标题和操作区 */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h2 className="text-2xl font-bold">文档管理</h2>
-            <p className="text-muted-foreground">
-              管理所有智能卡标准规范文档
-            </p>
+        {/* 页面标题 */}
+        <div className="mb-4">
+          <h2 className="text-2xl font-bold">文档管理</h2>
+          <p className="text-muted-foreground">
+            管理所有智能卡标准规范文档
+          </p>
+        </div>
+
+        {/* 工具栏 */}
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
+          {/* 搜索框 */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="搜索文档..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 w-48 sm:w-64"
+            />
           </div>
-          <div className="flex items-center gap-4 flex-wrap">
-            {/* 搜索框 */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="搜索文档..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 w-48 sm:w-64"
-              />
-            </div>
 
-            {/* 状态过滤 */}
-            <Select value={filterStatus} onValueChange={(value) => {
-              setFilterStatus(value)
-              setCurrentPage(1)
-            }}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="所有状态" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">所有状态</SelectItem>
-                <SelectItem value="pending">等待处理</SelectItem>
-                <SelectItem value="processing">处理中</SelectItem>
-                <SelectItem value="completed">已完成</SelectItem>
-                <SelectItem value="failed">失败</SelectItem>
-              </SelectContent>
-            </Select>
+          {/* 状态过滤 */}
+          <Select value={filterStatus} onValueChange={(value) => {
+            setFilterStatus(value)
+            setCurrentPage(1)
+          }}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="所有状态" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">所有状态</SelectItem>
+              <SelectItem value="uploaded">已上传</SelectItem>
+              <SelectItem value="parsed">已解析</SelectItem>
+              <SelectItem value="vlm_completed">VLM已完成</SelectItem>
+              <SelectItem value="chunked">已分块</SelectItem>
+              <SelectItem value="embedded">已嵌入</SelectItem>
+              <SelectItem value="parse_failed">解析失败</SelectItem>
+              <SelectItem value="vlm_failed">VLM失败</SelectItem>
+              <SelectItem value="chunk_failed">分块失败</SelectItem>
+              <SelectItem value="embedding_failed">Embedding失败</SelectItem>
+            </SelectContent>
+          </Select>
 
-            {/* 上传对话框 */}
-            <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  上传文档
-                </Button>
-              </DialogTrigger>
+          {/* 上传对话框 */}
+          <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Plus className="h-4 w-4 mr-1.5" />
+                上传文档
+              </Button>
+            </DialogTrigger>
               <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
                   <DialogTitle>上传 PDF/DOCX 文档</DialogTitle>
@@ -530,52 +536,9 @@ export default function Home() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-          </div>
-        </div>
 
-        {/* 统计卡片 */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>总文档数</CardDescription>
-              <CardTitle className="text-3xl">{totalDocs}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>当前页</CardDescription>
-              <CardTitle className="text-3xl">{currentPage}/{totalPages}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>每页数量</CardDescription>
-              <CardTitle className="text-3xl">{pageSize}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>当前页文档数</CardDescription>
-              <CardTitle className="text-3xl">{documents.length}</CardTitle>
-            </CardHeader>
-          </Card>
-        </div>
-
-        {/* 文档列表 */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>文档列表</CardTitle>
-                <CardDescription>
-                  共 {totalDocs} 个文档
-                  {filterStatus && ` (过滤: ${filterStatus})`}
-                  {totalPages > 1 && ` - 第 ${currentPage}/${totalPages} 页`}
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                {/* Parse All Dialog */}
-                <Dialog open={parseAllDialogOpen} onOpenChange={setParseAllDialogOpen}>
+            {/* Parse All Dialog */}
+            <Dialog open={parseAllDialogOpen} onOpenChange={setParseAllDialogOpen}>
                   <DialogTrigger asChild>
                     <Button
                       disabled={parsingAll || totalDocs === 0}
@@ -785,10 +748,11 @@ export default function Home() {
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
+          </div>
+
+          {/* 文档列表 */}
+          <Card className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            <CardContent className="p-0 flex-1 overflow-auto min-h-0">
             {loading ? (
               <div className="text-center py-8 text-muted-foreground">
                 加载中...
@@ -911,8 +875,8 @@ export default function Home() {
                 )}
               </>
             )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
         </div>
         </div>
       </main>
