@@ -421,7 +421,7 @@ export default function Home() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold">流水线状态过滤</span>
+                <span className="text-sm font-semibold">状态过滤</span>
                 <span className="text-xs text-muted-foreground">（点击节点进行筛选）</span>
               </div>
               <Button
