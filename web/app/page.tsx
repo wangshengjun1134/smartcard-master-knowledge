@@ -709,12 +709,15 @@ export default function Home() {
             />
           </div>
 
+          {/* 操作按钮组 - 靠右 */}
+          <div className="flex items-center gap-2 ml-auto flex-wrap">
+
           {/* 上传对话框 */}
           <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm">
                 <Plus className="h-4 w-4 mr-1.5" />
-                上传文档
+                上传
               </Button>
             </DialogTrigger>
               <DialogContent className="sm:max-w-[500px]">
@@ -1193,6 +1196,7 @@ export default function Home() {
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
+          </div>
           </div>
 
           {/* 文档列表 */}
