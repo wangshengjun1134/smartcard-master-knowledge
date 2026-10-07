@@ -602,6 +602,16 @@ async def generate_vlm_descriptions(request: VLMRequest, background_tasks: Backg
             detail="VLM API Key 未配置。请设置环境变量 VLM_OPENAI_API_KEY 或在请求中传入 api_key。"
         )
 
+    # Validate document status - only allow VLM for parsed documents
+    doc_info = query_document_info(request.document_id)
+    if not doc_info:
+        raise HTTPException(status_code=404, detail=f"文档 {request.document_id} 不存在")
+    if doc_info.get("processing_status") != "parsed":
+        raise HTTPException(
+            status_code=400,
+            detail=f"文档状态为 {doc_info.get('processing_status')}，只有已解析状态的文档才能进行 VLM 增强"
+        )
+
     background_tasks.add_task(
         _async_vlm,
         request.document_id,

@@ -62,6 +62,24 @@ export default function Home() {
   const [processingType, setProcessingType] = useState<string | null>(null)
   const [parsingAll, setParsingAll] = useState(false)
   const [vlmAll, setVlmAll] = useState(false)
+  const [parseAllDialogOpen, setParseAllDialogOpen] = useState(false)
+  const [vlmAllDialogOpen, setVlmAllDialogOpen] = useState(false)
+  const [parseAllForm, setParseAllForm] = useState({
+    parallel_count: 1,
+    do_ocr: true,
+    output_dir: 'output/pictures',
+  })
+  const [vlmAllForm, setVlmAllForm] = useState({
+    parallel_count: 1,
+    backend_type: 'openai',
+    api_key: '',
+    base_url: '',
+    model: '',
+    prompt: '',
+    max_new_tokens: 2048,
+    language: 'en',
+    output_dir: 'output/pictures',
+  })
   const pageSize = 20
 
   useEffect(() => {
@@ -161,14 +179,16 @@ export default function Home() {
     setParsingAll(true)
     try {
       const result = await parseAllDocuments({
-        parallel_count: 1,
-        do_ocr: true,
+        parallel_count: parseAllForm.parallel_count,
+        do_ocr: parseAllForm.do_ocr,
+        output_dir: parseAllForm.output_dir,
       })
       toast({
         title: '批量解析任务已提交',
         description: result.message || `已提交 ${result.total} 个文档的解析任务`,
       })
       await loadDocuments()
+      setParseAllDialogOpen(false)
     } catch (error: any) {
       toast({
         title: '批量解析失败',
@@ -184,14 +204,22 @@ export default function Home() {
     setVlmAll(true)
     try {
       const result = await vlmAllDocuments({
-        parallel_count: 1,
-        backend_type: 'openai',
+        parallel_count: vlmAllForm.parallel_count,
+        backend_type: vlmAllForm.backend_type,
+        api_key: vlmAllForm.api_key || undefined,
+        base_url: vlmAllForm.base_url || undefined,
+        model: vlmAllForm.model || undefined,
+        prompt: vlmAllForm.prompt || undefined,
+        max_new_tokens: vlmAllForm.max_new_tokens,
+        language: vlmAllForm.language,
+        output_dir: vlmAllForm.output_dir,
       })
       toast({
         title: '批量 VLM 增强任务已提交',
         description: result.message || `已提交 ${result.total} 个文档的 VLM 增强任务`,
       })
       await loadDocuments()
+      setVlmAllDialogOpen(false)
     } catch (error: any) {
       toast({
         title: '批量 VLM 增强失败',
@@ -546,44 +574,217 @@ export default function Home() {
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                <Button
-                  onClick={handleParseAll}
-                  disabled={parsingAll || totalDocs === 0}
-                  variant="default"
-                  size="sm"
-                  className="gap-1.5"
-                >
-                  {parsingAll ? (
-                    <>
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                      解析中...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4" />
-                      解析所有
-                    </>
-                  )}
-                </Button>
-                <Button
-                  onClick={handleVlmAll}
-                  disabled={vlmAll || totalDocs === 0}
-                  variant="secondary"
-                  size="sm"
-                  className="gap-1.5"
-                >
-                  {vlmAll ? (
-                    <>
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                      VLM处理中...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4" />
-                      VLM增强所有
-                    </>
-                  )}
-                </Button>
+                {/* Parse All Dialog */}
+                <Dialog open={parseAllDialogOpen} onOpenChange={setParseAllDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      disabled={parsingAll || totalDocs === 0}
+                      variant="default"
+                      size="sm"
+                      className="gap-1.5"
+                    >
+                      {parsingAll ? (
+                        <>
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          解析中...
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-4 w-4" />
+                          解析所有
+                        </>
+                      )}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                      <DialogTitle>批量解析文档</DialogTitle>
+                      <DialogDescription>
+                        配置批量解析参数，对所有已上传状态的文档进行解析
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="parse-parallel">并行数量</Label>
+                        <Input
+                          id="parse-parallel"
+                          type="number"
+                          min={1}
+                          max={10}
+                          value={parseAllForm.parallel_count}
+                          onChange={(e) => setParseAllForm({ ...parseAllForm, parallel_count: parseInt(e.target.value) || 1 })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="parse-output-dir">输出目录</Label>
+                        <Input
+                          id="parse-output-dir"
+                          value={parseAllForm.output_dir}
+                          onChange={(e) => setParseAllForm({ ...parseAllForm, output_dir: e.target.value })}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          id="parse-ocr"
+                          type="checkbox"
+                          checked={parseAllForm.do_ocr}
+                          onChange={(e) => setParseAllForm({ ...parseAllForm, do_ocr: e.target.checked })}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                        <Label htmlFor="parse-ocr">启用 OCR</Label>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setParseAllDialogOpen(false)} disabled={parsingAll}>
+                        取消
+                      </Button>
+                      <Button onClick={handleParseAll} disabled={parsingAll}>
+                        {parsingAll ? '提交中...' : '确认提交'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                {/* VLM All Dialog */}
+                <Dialog open={vlmAllDialogOpen} onOpenChange={setVlmAllDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      disabled={vlmAll || totalDocs === 0}
+                      variant="secondary"
+                      size="sm"
+                      className="gap-1.5"
+                    >
+                      {vlmAll ? (
+                        <>
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          VLM处理中...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4" />
+                          VLM增强所有
+                        </>
+                      )}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[550px]">
+                    <DialogHeader>
+                      <DialogTitle>批量 VLM 增强</DialogTitle>
+                      <DialogDescription>
+                        配置 VLM 增强参数，对所有已解析状态的文档进行视觉语言模型增强
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
+                      <div className="grid gap-2">
+                        <Label htmlFor="vlm-parallel">并行数量</Label>
+                        <Input
+                          id="vlm-parallel"
+                          type="number"
+                          min={1}
+                          max={10}
+                          value={vlmAllForm.parallel_count}
+                          onChange={(e) => setVlmAllForm({ ...vlmAllForm, parallel_count: parseInt(e.target.value) || 1 })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="vlm-backend">后端类型</Label>
+                        <Select
+                          value={vlmAllForm.backend_type}
+                          onValueChange={(value) => setVlmAllForm({ ...vlmAllForm, backend_type: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="openai">OpenAI Compatible</SelectItem>
+                            <SelectItem value="local">Local Qwen VLM</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="vlm-api-key">API Key（可选）</Label>
+                        <Input
+                          id="vlm-api-key"
+                          type="password"
+                          placeholder="留空使用环境变量 VLM_OPENAI_API_KEY"
+                          value={vlmAllForm.api_key}
+                          onChange={(e) => setVlmAllForm({ ...vlmAllForm, api_key: e.target.value })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="vlm-base-url">Base URL（可选）</Label>
+                        <Input
+                          id="vlm-base-url"
+                          placeholder="例如: https://dashscope.aliyuncs.com/compatible-mode/v1"
+                          value={vlmAllForm.base_url}
+                          onChange={(e) => setVlmAllForm({ ...vlmAllForm, base_url: e.target.value })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="vlm-model">模型名称（可选）</Label>
+                        <Input
+                          id="vlm-model"
+                          placeholder="留空使用默认模型"
+                          value={vlmAllForm.model}
+                          onChange={(e) => setVlmAllForm({ ...vlmAllForm, model: e.target.value })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="vlm-prompt">提示词（可选）</Label>
+                        <Textarea
+                          id="vlm-prompt"
+                          placeholder="留空使用默认提示词"
+                          rows={3}
+                          value={vlmAllForm.prompt}
+                          onChange={(e) => setVlmAllForm({ ...vlmAllForm, prompt: e.target.value })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="vlm-max-tokens">最大生成 Token 数</Label>
+                        <Input
+                          id="vlm-max-tokens"
+                          type="number"
+                          min={256}
+                          step={256}
+                          value={vlmAllForm.max_new_tokens}
+                          onChange={(e) => setVlmAllForm({ ...vlmAllForm, max_new_tokens: parseInt(e.target.value) || 2048 })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="vlm-language">输出语言</Label>
+                        <Select
+                          value={vlmAllForm.language}
+                          onValueChange={(value) => setVlmAllForm({ ...vlmAllForm, language: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="en">English</SelectItem>
+                            <SelectItem value="zh">中文</SelectItem>
+                            <SelectItem value="ja">日本語</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="vlm-output-dir">输出目录</Label>
+                        <Input
+                          id="vlm-output-dir"
+                          value={vlmAllForm.output_dir}
+                          onChange={(e) => setVlmAllForm({ ...vlmAllForm, output_dir: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setVlmAllDialogOpen(false)} disabled={vlmAll}>
+                        取消
+                      </Button>
+                      <Button onClick={handleVlmAll} disabled={vlmAll}>
+                        {vlmAll ? '提交中...' : '确认提交'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
           </CardHeader>

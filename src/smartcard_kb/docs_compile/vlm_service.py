@@ -74,8 +74,8 @@ class VLMService:
             item_id = item.get("id")
             metadata = item.get("metadata") or {}
 
-            # Skip items that already have VLM descriptions
-            if metadata.get("vlm_description"):
+            # Skip items that already have VLM descriptions (stored in text field)
+            if item.get("text"):
                 processed_count += 1
                 continue
 
