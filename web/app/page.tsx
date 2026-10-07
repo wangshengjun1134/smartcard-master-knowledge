@@ -998,7 +998,7 @@ export default function Home() {
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleEmbedding(doc)} disabled={processingDoc === doc.id}>
                                   <Database className="h-4 w-4 mr-2" />
-                                  {processingDoc === doc.id && processingType === 'embedding' ? 'Embedding中...' : 'Embedding'}
+                                  {processingDoc === doc.id && processingType === 'embedding' ? '嵌入中...' : '嵌入'}
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
