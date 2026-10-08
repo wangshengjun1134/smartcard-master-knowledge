@@ -147,16 +147,18 @@ def list_documents(
     series_id: Optional[str] = None,
     processing_status: Optional[str] = None,
     file_hash: Optional[str] = None,
+    keyword: Optional[str] = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
 ):
     """
-    获取文档列表（支持分页）
+    获取文档列表（支持分页和关键词搜索）
 
     - **document_code**: 文档编号（可选）
     - **series_id**: 系列 ID（可选）
     - **processing_status**: 处理状态（可选）
     - **file_hash**: 文件哈希（可选）
+    - **keyword**: 关键词，模糊匹配文档编号和文件名（可选）
     - **page**: 页码（默认 1）
     - **page_size**: 每页数量（默认 20，最大 100）
     """
@@ -165,6 +167,7 @@ def list_documents(
         series_id=series_id,
         processing_status=processing_status,
         file_hash=file_hash,
+        keyword=keyword,
     )
 
     total = len(all_docs)

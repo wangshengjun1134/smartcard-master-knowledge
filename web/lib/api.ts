@@ -17,6 +17,7 @@ export async function listDocuments(params?: {
   series_id?: string
   processing_status?: string
   file_hash?: string
+  keyword?: string
   page?: number
   page_size?: number
 }): Promise<{

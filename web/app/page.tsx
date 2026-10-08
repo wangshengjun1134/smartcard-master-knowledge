@@ -107,7 +107,7 @@ export default function Home() {
   useEffect(() => {
     loadDocuments()
     loadStatusCounts()
-  }, [currentPage, pipelineFilter])
+  }, [currentPage, pipelineFilter, searchTerm])
 
   const loadStatusCounts = async () => {
     try {
@@ -122,6 +122,7 @@ export default function Home() {
     try {
       const result = await listDocuments({
         processing_status: pipelineFilter || undefined,
+        keyword: searchTerm || undefined,
         page: currentPage,
         page_size: pageSize,
       })
@@ -719,7 +720,7 @@ export default function Home() {
               type="text"
               placeholder="搜索文档..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1) }}
               className="pl-9 w-48 sm:w-64"
             />
           </div>

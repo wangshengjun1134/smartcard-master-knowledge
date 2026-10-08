@@ -672,6 +672,7 @@ def query_document_info(
     series_id: Optional[str] = None,
     processing_status: Optional[str] = None,
     file_hash: Optional[str] = None,
+    keyword: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     查询 doc_info 记录
@@ -681,6 +682,7 @@ def query_document_info(
     :param series_id: 系列 ID
     :param processing_status: 处理状态
     :param file_hash: 文件哈希
+    :param keyword: 关键词，模糊匹配 document_code 和 file_name
     :return: 查询结果列表
     """
     conn = get_connection()
@@ -704,6 +706,10 @@ def query_document_info(
     if file_hash is not None:
         conditions.append("file_hash = %s")
         params.append(file_hash)
+    if keyword is not None:
+        conditions.append("(document_code ILIKE %s OR file_name ILIKE %s)")
+        like_pattern = f"%{keyword}%"
+        params.extend([like_pattern, like_pattern])
 
     where_clause = " AND ".join(conditions) if conditions else "TRUE"
     query = f"SELECT * FROM doc_info WHERE {where_clause} ORDER BY created_at DESC"
