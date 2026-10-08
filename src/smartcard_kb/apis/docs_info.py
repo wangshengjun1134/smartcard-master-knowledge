@@ -14,9 +14,26 @@ from smartcard_kb.docs_compile.database import (
     delete_document_info,
     get_document_stats,
     query_chunks,
+    get_status_counts,
 )
 
 router = APIRouter(prefix="/api/docs", tags=["文档管理"])
+
+
+class StatusCountsResponse(BaseModel):
+    """状态统计响应"""
+    counts: dict
+
+
+@router.get("/status-counts", response_model=StatusCountsResponse)
+async def get_status_counts_api():
+    """
+    获取所有文档按状态统计的数量
+
+    返回每个处理状态对应的文档数量，用于前端状态过滤按钮显示
+    """
+    counts = get_status_counts()
+    return StatusCountsResponse(counts=counts)
 
 
 # ==================== Pydantic 模型 ====================
