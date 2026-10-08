@@ -3,7 +3,7 @@
 import asyncio
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel
@@ -12,7 +12,7 @@ from smartcard_kb.docs_compile.pdf_parser import PDFParser
 from smartcard_kb.docs_compile.vlm_service import VLMService
 from smartcard_kb.docs_compile.embedding_service import EmbeddingService
 from smartcard_kb.docs_compile.chunker import Chunker
-from smartcard_kb.docs_compile.database import update_document_info, get_document_stats, query_documents_by_status, query_document_info
+from smartcard_kb.docs_compile.database import update_document_info, get_document_stats, query_documents_by_status, query_document_info, get_status_counts
 from smartcard_kb.config import settings
 
 router = APIRouter(prefix="/api/docs", tags=["文档处理流程"])
@@ -163,6 +163,11 @@ class EmbeddingAllResponse(BaseModel):
     message: str
     total: int
     parallel_count: int
+
+
+class StatusCountsResponse(BaseModel):
+    """状态统计响应"""
+    counts: Dict[str, int]
 
 
 # ==================== 后台任务函数 ====================
@@ -1035,6 +1040,17 @@ async def embedding_all_documents(request: EmbeddingAllRequest, background_tasks
         total=len(docs),
         parallel_count=request.parallel_count,
     )
+
+
+@router.get("/status-counts", response_model=StatusCountsResponse)
+async def get_status_counts():
+    """
+    获取所有文档按状态统计的数量
+
+    返回每个处理状态对应的文档数量，用于前端状态过滤按钮显示
+    """
+    counts = get_status_counts()
+    return StatusCountsResponse(counts=counts)
 
 
 @router.get("/{document_id}/file")

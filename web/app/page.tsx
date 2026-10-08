@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { listDocuments, uploadDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings, embeddingAllDocuments } from '@/lib/api'
+import { listDocuments, uploadDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings, embeddingAllDocuments, getStatusCounts } from '@/lib/api'
 import type { DocumentInfo } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -59,6 +59,7 @@ export default function Home() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalDocs, setTotalDocs] = useState(0)
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({})
   const [processingDoc, setProcessingDoc] = useState<string | null>(null)
   const [processingType, setProcessingType] = useState<string | null>(null)
   const [parsingAll, setParsingAll] = useState(false)
@@ -105,7 +106,17 @@ export default function Home() {
 
   useEffect(() => {
     loadDocuments()
+    loadStatusCounts()
   }, [currentPage, pipelineFilter])
+
+  const loadStatusCounts = async () => {
+    try {
+      const counts = await getStatusCounts()
+      setStatusCounts(counts)
+    } catch (error) {
+      console.error('Failed to load status counts:', error)
+    }
+  }
 
   const loadDocuments = async () => {
     try {
@@ -127,6 +138,10 @@ export default function Home() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const refreshData = async () => {
+    await Promise.all([loadDocuments(), loadStatusCounts()])
   }
 
   const handleUpload = async () => {
@@ -154,7 +169,7 @@ export default function Home() {
         description: `${selectedFile.name} 已上传并开始解析`,
       })
       setCurrentPage(1)
-      await loadDocuments()
+      await refreshData()
       setUploadDialogOpen(false)
       setUploadForm({ document_code: '', title: '', issuer: '', language: 'en' })
       setSelectedFile(null)
@@ -183,7 +198,7 @@ export default function Home() {
         title: '解析任务已提交',
         description: result.message || '正在后台处理，请稍后刷新查看',
       })
-      await loadDocuments()
+      await refreshData()
     } catch (error: any) {
       toast({
         title: '解析失败',
@@ -208,7 +223,7 @@ export default function Home() {
         title: '批量解析任务已提交',
         description: result.message || `已提交 ${result.total} 个文档的解析任务`,
       })
-      await loadDocuments()
+      await refreshData()
       setParseAllDialogOpen(false)
     } catch (error: any) {
       toast({
@@ -239,7 +254,7 @@ export default function Home() {
         title: '批量 VLM 增强任务已提交',
         description: result.message || `已提交 ${result.total} 个文档的 VLM 增强任务`,
       })
-      await loadDocuments()
+      await refreshData()
       setVlmAllDialogOpen(false)
     } catch (error: any) {
       toast({
@@ -265,7 +280,7 @@ export default function Home() {
         title: '批量分块任务已提交',
         description: result.message || `已提交 ${result.total} 个文档的分块任务`,
       })
-      await loadDocuments()
+      await refreshData()
       setChunkAllDialogOpen(false)
     } catch (error: any) {
       toast({
@@ -293,7 +308,7 @@ export default function Home() {
         title: '批量嵌入任务已提交',
         description: result.message || `已提交 ${result.total} 个文档的嵌入任务`,
       })
-      await loadDocuments()
+      await refreshData()
       setEmbeddingAllDialogOpen(false)
     } catch (error: any) {
       toast({
@@ -318,7 +333,7 @@ export default function Home() {
         title: 'VLM 任务已提交',
         description: result.message || '正在后台处理，请稍后刷新查看',
       })
-      await loadDocuments()
+      await refreshData()
     } catch (error: any) {
       toast({
         title: 'VLM 失败',
@@ -344,7 +359,7 @@ export default function Home() {
         title: '分块任务已提交',
         description: result.message || '正在后台处理，请稍后刷新查看',
       })
-      await loadDocuments()
+      await refreshData()
     } catch (error: any) {
       toast({
         title: '分块失败',
@@ -369,7 +384,7 @@ export default function Home() {
         title: 'Embedding 任务已提交',
         description: result.message || '正在后台处理，请稍后刷新查看',
       })
-      await loadDocuments()
+      await refreshData()
     } catch (error: any) {
       toast({
         title: 'Embedding 失败',
@@ -536,7 +551,7 @@ export default function Home() {
                 <span className={`text-xs mt-1 px-2 py-0.5 rounded-full font-bold ${
                   pipelineFilter === 'uploaded' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
                 }`}>
-                  {documents.filter(d => d.processing_status === 'uploaded').length}
+                  {statusCounts['uploaded'] || 0}
                 </span>
               </button>
 
@@ -557,7 +572,7 @@ export default function Home() {
                   <span className={`text-xs mt-1 px-2 py-0.5 rounded-full font-bold ${
                     pipelineFilter === 'parsed' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
                   }`}>
-                    {documents.filter(d => d.processing_status === 'parsed').length}
+                    {statusCounts['parsed'] || 0}
                   </span>
                 </button>
                 <button
@@ -573,7 +588,7 @@ export default function Home() {
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
                     pipelineFilter === 'parse_failed' ? 'bg-destructive/20 text-destructive' : 'bg-destructive/10 text-destructive'
                   }`}>
-                    {documents.filter(d => d.processing_status === 'parse_failed').length}
+                    {statusCounts['parse_failed'] || 0}
                   </span>
                 </button>
               </div>
@@ -595,7 +610,7 @@ export default function Home() {
                   <span className={`text-xs mt-1 px-2 py-0.5 rounded-full font-bold ${
                     pipelineFilter === 'vlm_completed' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
                   }`}>
-                    {documents.filter(d => d.processing_status === 'vlm_completed').length}
+                    {statusCounts['vlm_completed'] || 0}
                   </span>
                 </button>
                 <button
@@ -611,7 +626,7 @@ export default function Home() {
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
                     pipelineFilter === 'vlm_failed' ? 'bg-destructive/20 text-destructive' : 'bg-destructive/10 text-destructive'
                   }`}>
-                    {documents.filter(d => d.processing_status === 'vlm_failed').length}
+                    {statusCounts['vlm_failed'] || 0}
                   </span>
                 </button>
               </div>
@@ -633,7 +648,7 @@ export default function Home() {
                   <span className={`text-xs mt-1 px-2 py-0.5 rounded-full font-bold ${
                     pipelineFilter === 'chunked' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
                   }`}>
-                    {documents.filter(d => d.processing_status === 'chunked').length}
+                    {statusCounts['chunked'] || 0}
                   </span>
                 </button>
                 <button
@@ -649,7 +664,7 @@ export default function Home() {
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
                     pipelineFilter === 'chunk_failed' ? 'bg-destructive/20 text-destructive' : 'bg-destructive/10 text-destructive'
                   }`}>
-                    {documents.filter(d => d.processing_status === 'chunk_failed').length}
+                    {statusCounts['chunk_failed'] || 0}
                   </span>
                 </button>
               </div>
@@ -671,7 +686,7 @@ export default function Home() {
                   <span className={`text-xs mt-1 px-2 py-0.5 rounded-full font-bold ${
                     pipelineFilter === 'embedded' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
                   }`}>
-                    {documents.filter(d => d.processing_status === 'embedded').length}
+                    {statusCounts['embedded'] || 0}
                   </span>
                 </button>
                 <button
@@ -687,7 +702,7 @@ export default function Home() {
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
                     pipelineFilter === 'embedding_failed' ? 'bg-destructive/20 text-destructive' : 'bg-destructive/10 text-destructive'
                   }`}>
-                    {documents.filter(d => d.processing_status === 'embedding_failed').length}
+                    {statusCounts['embedding_failed'] || 0}
                   </span>
                 </button>
               </div>

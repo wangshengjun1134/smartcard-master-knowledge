@@ -562,6 +562,34 @@ def insert_document_info(doc_info: Dict[str, Any]) -> None:
     conn.close()
 
 
+def get_status_counts() -> Dict[str, int]:
+    """
+    获取所有文档按状态统计的数量
+
+    :return: 状态计数字典 {status: count}
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+            processing_status,
+            COUNT(*) as count
+        FROM doc_info
+        GROUP BY processing_status
+        ORDER BY processing_status
+    """)
+
+    counts = {}
+    for row in cursor.fetchall():
+        counts[row[0]] = row[1]
+
+    cursor.close()
+    conn.close()
+
+    return counts
+
+
 def query_documents_by_status(
     processing_status: Optional[str] = None,
     for_update: bool = False,

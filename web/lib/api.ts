@@ -30,6 +30,11 @@ export async function listDocuments(params?: {
   return response.data
 }
 
+export async function getStatusCounts(): Promise<Record<string, number>> {
+  const response = await api.get('/api/docs/status-counts')
+  return response.data.counts
+}
+
 export async function getDocumentTree(): Promise<{
   tree: TreeNode[]
   files: { path: string; name: string; directory: string }[]
