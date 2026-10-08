@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import time
 from pathlib import Path
 from typing import Optional, Dict
 from fastapi import APIRouter, HTTPException, BackgroundTasks
@@ -239,6 +240,7 @@ async def _async_parse_all(
     """
     async with _parse_all_lock:
         semaphore = asyncio.Semaphore(parallel_count)
+        t_start = time.time()
 
         async def _parse_single_doc(doc):
             """解析单个文档"""
@@ -256,6 +258,7 @@ async def _async_parse_all(
                     return
 
                 logger.info(f"Starting parse for document {document_id}: {doc.get('file_name', 'unknown')}")
+                t0 = time.time()
 
                 try:
                     update_document_info({
@@ -289,10 +292,10 @@ async def _async_parse_all(
                         "processing_status": "parsed",
                         **type_counts,
                     })
-                    logger.info(f"Parse completed for document {document_id}")
+                    logger.info(f"Parse completed for document {document_id} in {time.time() - t0:.2f}s")
 
                 except Exception as e:
-                    logger.error(f"Error: Parse failed for document {document_id}: {e}")
+                    logger.error(f"Error: Parse failed for document {document_id} in {time.time() - t0:.2f}s: {e}")
                     update_document_info({
                         "id": document_id,
                         "processing_status": "parse_failed",
@@ -302,7 +305,7 @@ async def _async_parse_all(
         # 并发执行所有文档解析
         tasks = [_parse_single_doc(doc) for doc in docs]
         await asyncio.gather(*tasks)
-        logger.info(f"Batch parse completed: {len(docs)} documents processed")
+        logger.info(f"Batch parse completed: {len(docs)} documents processed in {time.time() - t_start:.2f}s")
 
 
 async def _async_vlm(
@@ -394,6 +397,7 @@ async def _async_vlm_all(
     """
     async with _vlm_all_lock:
         semaphore = asyncio.Semaphore(parallel_count)
+        t_start = time.time()
 
         # 从参数或环境变量获取配置
         resolved_api_key = api_key or settings.vlm_openai_api_key
@@ -417,6 +421,7 @@ async def _async_vlm_all(
                 document_id = doc["id"]
 
                 logger.info(f"Starting VLM for document {document_id}: {doc.get('file_name', 'unknown')}")
+                t0 = time.time()
 
                 try:
                     update_document_info({
@@ -439,10 +444,10 @@ async def _async_vlm_all(
                         "id": document_id,
                         "processing_status": "vlm_completed",
                     })
-                    logger.info(f"VLM completed for document {document_id}: {result}")
+                    logger.info(f"VLM completed for document {document_id} in {time.time() - t0:.2f}s: {result}")
 
                 except Exception as e:
-                    logger.error(f"Error: VLM failed for document {document_id}: {e}")
+                    logger.error(f"Error: VLM failed for document {document_id} in {time.time() - t0:.2f}s: {e}")
                     update_document_info({
                         "id": document_id,
                         "processing_status": "vlm_failed",
@@ -452,7 +457,7 @@ async def _async_vlm_all(
         # 并发执行所有文档 VLM 增强
         tasks = [_vlm_single_doc(doc) for doc in docs]
         await asyncio.gather(*tasks)
-        logger.info(f"Batch VLM completed: {len(docs)} documents processed")
+        logger.info(f"Batch VLM completed: {len(docs)} documents processed in {time.time() - t_start:.2f}s")
 
 
 async def _async_chunk(
@@ -515,6 +520,7 @@ async def _async_chunk_all(
     """
     async with _chunk_all_lock:
         semaphore = asyncio.Semaphore(parallel_count)
+        t_start = time.time()
 
         async def _chunk_single_doc(doc):
             """分块单个文档"""
@@ -532,6 +538,7 @@ async def _async_chunk_all(
                     return
 
                 logger.info(f"Starting chunk for document {document_id}: {doc.get('file_name', 'unknown')}")
+                t0 = time.time()
 
                 try:
                     update_document_info({
@@ -555,10 +562,10 @@ async def _async_chunk_all(
                         "id": document_id,
                         "processing_status": "chunked",
                     })
-                    logger.info(f"Chunk completed for document {document_id}: {len(result.get('chunks', []))} chunks")
+                    logger.info(f"Chunk completed for document {document_id} in {time.time() - t0:.2f}s: {len(result.get('chunks', []))} chunks")
 
                 except Exception as e:
-                    logger.error(f"Error: Chunk failed for document {document_id}: {e}")
+                    logger.error(f"Error: Chunk failed for document {document_id} in {time.time() - t0:.2f}s: {e}")
                     update_document_info({
                         "id": document_id,
                         "processing_status": "chunk_failed",
@@ -568,7 +575,7 @@ async def _async_chunk_all(
         # 并发执行所有文档分块
         tasks = [_chunk_single_doc(doc) for doc in docs]
         await asyncio.gather(*tasks)
-        logger.info(f"Batch chunk completed: {len(docs)} documents processed")
+        logger.info(f"Batch chunk completed: {len(docs)} documents processed in {time.time() - t_start:.2f}s")
 
 
 async def _async_embedding(
@@ -645,6 +652,7 @@ async def _async_embedding_all(
     """
     async with _embedding_all_lock:
         semaphore = asyncio.Semaphore(parallel_count)
+        t_start = time.time()
 
         async def _embedding_single_doc(doc):
             """嵌入单个文档"""
@@ -652,6 +660,7 @@ async def _async_embedding_all(
                 document_id = doc["id"]
 
                 logger.info(f"Starting embedding for document {document_id}: {doc.get('file_name', 'unknown')}")
+                t0 = time.time()
 
                 try:
                     update_document_info({
@@ -685,10 +694,10 @@ async def _async_embedding_all(
                         "id": document_id,
                         "processing_status": "embedded",
                     })
-                    logger.info(f"Embedding completed for document {document_id}: {result}")
+                    logger.info(f"Embedding completed for document {document_id} in {time.time() - t0:.2f}s: {result}")
 
                 except Exception as e:
-                    logger.error(f"Error: Embedding failed for document {document_id}: {e}")
+                    logger.error(f"Error: Embedding failed for document {document_id} in {time.time() - t0:.2f}s: {e}")
                     update_document_info({
                         "id": document_id,
                         "processing_status": "embedding_failed",
@@ -698,7 +707,7 @@ async def _async_embedding_all(
         # 并发执行所有文档嵌入
         tasks = [_embedding_single_doc(doc) for doc in docs]
         await asyncio.gather(*tasks)
-        logger.info(f"Batch embedding completed: {len(docs)} documents processed")
+        logger.info(f"Batch embedding completed: {len(docs)} documents processed in {time.time() - t_start:.2f}s")
 
 
 # ==================== API 接口 ====================
