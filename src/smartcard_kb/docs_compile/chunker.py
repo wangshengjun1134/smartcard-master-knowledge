@@ -11,6 +11,8 @@ from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
 from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
 from transformers import AutoTokenizer
 
+from smartcard_kb.logger import logger
+
 from .database import init_database, query_document_items, insert_chunks
 from .serializers import CustomChunkingSerializerProvider
 
@@ -106,7 +108,7 @@ class Chunker:
         insert_chunks(chunks)
         t3 = time.time()
 
-        print(f"convert: {t1-t0:.2f}s, inject: {t2-t1:.2f}s, chunks: {t3-t2:.2f}s")
+        logger.debug(f"convert: {t1-t0:.2f}s, inject: {t2-t1:.2f}s, chunks: {t3-t2:.2f}s")
 
         return {"chunks": chunks}
 
@@ -174,7 +176,7 @@ class Chunker:
                 encoded = tokenizer_obj.encode(chunk.text)
                 token_count = len(encoded)
             except Exception as e:
-                print(f"Warning: Failed to compute token count: {e}")
+                logger.warning(f"Warning: Failed to compute token count: {e}")
                 token_count = None
 
             chunks.append({

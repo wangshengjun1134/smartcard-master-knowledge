@@ -3,6 +3,8 @@
 import os
 from typing import List, Tuple
 
+from smartcard_kb.logger import logger
+
 from .reranker_base import RerankerBackend
 
 
@@ -27,7 +29,7 @@ class LocalRerankerBackend(RerankerBackend):
         self.torch = torch
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        print(f"加载重排模型: {model_path}, 设备: {self.device}")
+        logger.info(f"加载重排模型: {model_path}, 设备: {self.device}")
 
         # 检查模型文件是否完整（防止 Git LFS 指针文件）
         tokenizer_json = os.path.join(model_path, "tokenizer.json")
@@ -57,7 +59,7 @@ class LocalRerankerBackend(RerankerBackend):
         self.model.eval()
 
         self.model_path = model_path
-        print(f"本地重排模型加载完成: {model_path}")
+        logger.info(f"本地重排模型加载完成: {model_path}")
 
     def rerank(
         self,

@@ -9,6 +9,8 @@ from typing import List, Dict, Any, Optional
 import numpy as np
 from PIL import Image
 
+from smartcard_kb.logger import logger
+
 from .llms import LocalQwenVLMBackend, OpenAICompatibleBackend, VLMBackend
 
 class ImageContentExtractor:
@@ -53,7 +55,7 @@ class ImageContentExtractor:
         try:
             from rapidocr_onnxruntime import RapidOCR
             self.ocr_engine = RapidOCR()
-            print("OCR 引擎 (RapidOCR) 加载成功")
+            logger.info("OCR 引擎 (RapidOCR) 加载成功")
         except ImportError:
             raise ImportError("未找到 rapidocr_onnxruntime，请 pip install rapidocr-onnxruntime")
 
@@ -67,7 +69,7 @@ class ImageContentExtractor:
         else:
             raise ValueError(f"不支持的后端类型: {backend_type}，支持 'local' 或 'openai'")
 
-        print(f"ImageContentExtractor 初始化完成，后端: {backend_type}")
+        logger.info(f"ImageContentExtractor 初始化完成，后端: {backend_type}")
 
     def _extract_ocr_with_bbox(self, image: Image.Image) -> List[Dict[str, Any]]:
         """
@@ -116,7 +118,7 @@ class ImageContentExtractor:
         image = Image.open(image_path).convert("RGB")
 
         # 提取 OCR 空间数据
-        print("正在提取 OCR 空间数据...")
+        logger.info("正在提取 OCR 空间数据...")
         ocr_items = self._extract_ocr_with_bbox(image)
         ocr_json_str = json.dumps(ocr_items, ensure_ascii=False, indent=2)
 
@@ -164,7 +166,7 @@ class ImageContentExtractor:
         ]
 
         # 调用 VLM 后端
-        print("正在调用 VLM 进行深度理解...")
+        logger.info("正在调用 VLM 进行深度理解...")
         return self.backend.generate(image, messages, max_new_tokens)
 
 

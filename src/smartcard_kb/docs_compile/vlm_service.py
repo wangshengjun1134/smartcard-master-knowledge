@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from PIL import Image
 
+from smartcard_kb.logger import logger
+
 from .database import query_document_items, get_connection
 from ..llms.vlm_base import VLMBackend
 from ..llms.vlm_openai import OpenAICompatibleBackend
@@ -82,7 +84,7 @@ class VLMService:
             # Get image path from metadata
             image_path_str = metadata.get("image_path")
             if not image_path_str:
-                print(f"Warning: Item {item_id} has no image_path in metadata, skipping")
+                logger.warning(f"Warning: Item {item_id} has no image_path in metadata, skipping")
                 failed_items.append(item_id)
                 continue
 
@@ -94,13 +96,13 @@ class VLMService:
                 image_path = project_root / image_path
 
             if not image_path.exists():
-                print(f"Warning: Image not found {image_path}, skipping")
+                logger.warning(f"Warning: Image not found {image_path}, skipping")
                 failed_items.append(item_id)
                 continue
 
             try:
                 image = Image.open(image_path).convert("RGB")
-                print(f"\n🖼️  Processing image for Item {item_id}: {image_path}")
+                logger.info(f"\n🖼️  Processing image for Item {item_id}: {image_path}")
                 vlm_desc = self._generate_vlm_description(
                     image, prompt, max_new_tokens, language, detail_level
                 )
@@ -108,12 +110,12 @@ class VLMService:
                 if vlm_desc:
                     self._update_item_vlm_description(item_id, vlm_desc)
                     processed_count += 1
-                    print(f"✅ Successfully generated VLM description for Item {item_id} ({len(vlm_desc)} chars)")
+                    logger.info(f"✅ Successfully generated VLM description for Item {item_id} ({len(vlm_desc)} chars)")
                 else:
-                    print(f"❌ Failed to generate VLM description for Item {item_id}")
+                    logger.error(f"❌ Failed to generate VLM description for Item {item_id}")
                     failed_items.append(item_id)
             except Exception as e:
-                print(f"❌ Error processing Item {item_id}: {e}")
+                logger.error(f"❌ Error processing Item {item_id}: {e}")
                 failed_items.append(item_id)
 
         return {
@@ -141,7 +143,7 @@ class VLMService:
         try:
             return self.vlm_backend.generate(image=image, messages=messages, max_new_tokens=max_new_tokens).strip()
         except Exception as e:
-            print(f"Warning: VLM generation failed: {e}")
+            logger.warning(f"Warning: VLM generation failed: {e}")
             return None
 
     def _update_item_vlm_description(self, item_id: str, vlm_description: str) -> None:

@@ -3,6 +3,8 @@
 import json
 from typing import List, Dict, Any, Optional
 
+from smartcard_kb.logger import logger
+
 from .database import query_chunks, get_connection
 from ..llms.embedding_base import EmbeddingBackend
 from ..llms.embedding_openai import OpenAIEmbeddingBackend
@@ -62,7 +64,7 @@ class EmbeddingService:
             chunk_text = chunk.get("text")
 
             if not chunk_text or not chunk_text.strip():
-                print(f"Warning: Chunk {chunk_id} 没有文本内容，跳过")
+                logger.warning(f"Warning: Chunk {chunk_id} 没有文本内容，跳过")
                 failed_chunks.append(chunk_id)
                 continue
 
@@ -80,7 +82,7 @@ class EmbeddingService:
                 else:
                     failed_chunks.append(chunk_id)
             except Exception as e:
-                print(f"Error: Chunk {chunk_id} embedding 生成失败: {e}")
+                logger.error(f"Error: Chunk {chunk_id} embedding 生成失败: {e}")
                 failed_chunks.append(chunk_id)
 
         return {
@@ -95,7 +97,7 @@ class EmbeddingService:
         try:
             return self.embedding_backend.embed(text=text)
         except Exception as e:
-            print(f"Warning: Embedding 生成失败: {e}")
+            logger.warning(f"Warning: Embedding 生成失败: {e}")
             return None
 
     def _update_chunk_embedding(self, chunk_id: str, embedding: List[float]) -> None:

@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel
 
+from smartcard_kb.logger import logger
 from smartcard_kb.docs_compile.pdf_parser import PDFParser
 from smartcard_kb.docs_compile.vlm_service import VLMService
 from smartcard_kb.docs_compile.embedding_service import EmbeddingService
@@ -214,7 +215,7 @@ async def _async_parse(
             **type_counts,
         })
     except Exception as e:
-        print(f"Error: Parse failed for {document_id}: {e}")
+        logger.error(f"Error: Parse failed for {document_id}: {e}")
         update_document_info({
             "id": document_id,
             "processing_status": "parse_failed",
@@ -246,7 +247,7 @@ async def _async_parse_all(
                 pdf_path = doc.get("file_path")
 
                 if not pdf_path:
-                    print(f"Error: file_path not found for document {document_id}")
+                    logger.error(f"Error: file_path not found for document {document_id}")
                     update_document_info({
                         "id": document_id,
                         "processing_status": "parse_failed",
@@ -254,7 +255,7 @@ async def _async_parse_all(
                     })
                     return
 
-                print(f"Starting parse for document {document_id}: {doc.get('file_name', 'unknown')}")
+                logger.info(f"Starting parse for document {document_id}: {doc.get('file_name', 'unknown')}")
 
                 try:
                     update_document_info({
@@ -288,10 +289,10 @@ async def _async_parse_all(
                         "processing_status": "parsed",
                         **type_counts,
                     })
-                    print(f"Parse completed for document {document_id}")
+                    logger.info(f"Parse completed for document {document_id}")
 
                 except Exception as e:
-                    print(f"Error: Parse failed for document {document_id}: {e}")
+                    logger.error(f"Error: Parse failed for document {document_id}: {e}")
                     update_document_info({
                         "id": document_id,
                         "processing_status": "parse_failed",
@@ -301,7 +302,7 @@ async def _async_parse_all(
         # 并发执行所有文档解析
         tasks = [_parse_single_doc(doc) for doc in docs]
         await asyncio.gather(*tasks)
-        print(f"Batch parse completed: {len(docs)} documents processed")
+        logger.info(f"Batch parse completed: {len(docs)} documents processed")
 
 
 async def _async_vlm(
@@ -353,9 +354,9 @@ async def _async_vlm(
             "id": document_id,
             "processing_status": "vlm_completed",
         })
-        print(f"VLM completed for {document_id}: {result}")
+        logger.info(f"VLM completed for {document_id}: {result}")
     except Exception as e:
-        print(f"Error: VLM failed for {document_id}: {e}")
+        logger.error(f"Error: VLM failed for {document_id}: {e}")
         update_document_info({
             "id": document_id,
             "processing_status": "vlm_failed",
@@ -400,7 +401,7 @@ async def _async_vlm_all(
         resolved_model = model or settings.vlm_openai_model
 
         if not resolved_api_key:
-            print("Error: VLM API Key not configured")
+            logger.error("Error: VLM API Key not configured")
             return
 
         backend = VLMService.create_backend(
@@ -415,7 +416,7 @@ async def _async_vlm_all(
             async with semaphore:
                 document_id = doc["id"]
 
-                print(f"Starting VLM for document {document_id}: {doc.get('file_name', 'unknown')}")
+                logger.info(f"Starting VLM for document {document_id}: {doc.get('file_name', 'unknown')}")
 
                 try:
                     update_document_info({
@@ -438,10 +439,10 @@ async def _async_vlm_all(
                         "id": document_id,
                         "processing_status": "vlm_completed",
                     })
-                    print(f"VLM completed for document {document_id}: {result}")
+                    logger.info(f"VLM completed for document {document_id}: {result}")
 
                 except Exception as e:
-                    print(f"Error: VLM failed for document {document_id}: {e}")
+                    logger.error(f"Error: VLM failed for document {document_id}: {e}")
                     update_document_info({
                         "id": document_id,
                         "processing_status": "vlm_failed",
@@ -451,7 +452,7 @@ async def _async_vlm_all(
         # 并发执行所有文档 VLM 增强
         tasks = [_vlm_single_doc(doc) for doc in docs]
         await asyncio.gather(*tasks)
-        print(f"Batch VLM completed: {len(docs)} documents processed")
+        logger.info(f"Batch VLM completed: {len(docs)} documents processed")
 
 
 async def _async_chunk(
@@ -486,9 +487,9 @@ async def _async_chunk(
             "id": document_id,
             "processing_status": "chunked",
         })
-        print(f"Chunking completed for {document_id}: {len(result.get('chunks', []))} chunks")
+        logger.info(f"Chunking completed for {document_id}: {len(result.get('chunks', []))} chunks")
     except Exception as e:
-        print(f"Error: Chunking failed for {document_id}: {e}")
+        logger.error(f"Error: Chunking failed for {document_id}: {e}")
         update_document_info({
             "id": document_id,
             "processing_status": "chunk_failed",
@@ -522,7 +523,7 @@ async def _async_chunk_all(
                 pdf_path = doc.get("file_path")
 
                 if not pdf_path:
-                    print(f"Error: file_path not found for document {document_id}")
+                    logger.error(f"Error: file_path not found for document {document_id}")
                     update_document_info({
                         "id": document_id,
                         "processing_status": "chunk_failed",
@@ -530,7 +531,7 @@ async def _async_chunk_all(
                     })
                     return
 
-                print(f"Starting chunk for document {document_id}: {doc.get('file_name', 'unknown')}")
+                logger.info(f"Starting chunk for document {document_id}: {doc.get('file_name', 'unknown')}")
 
                 try:
                     update_document_info({
@@ -554,10 +555,10 @@ async def _async_chunk_all(
                         "id": document_id,
                         "processing_status": "chunked",
                     })
-                    print(f"Chunk completed for document {document_id}: {len(result.get('chunks', []))} chunks")
+                    logger.info(f"Chunk completed for document {document_id}: {len(result.get('chunks', []))} chunks")
 
                 except Exception as e:
-                    print(f"Error: Chunk failed for document {document_id}: {e}")
+                    logger.error(f"Error: Chunk failed for document {document_id}: {e}")
                     update_document_info({
                         "id": document_id,
                         "processing_status": "chunk_failed",
@@ -567,7 +568,7 @@ async def _async_chunk_all(
         # 并发执行所有文档分块
         tasks = [_chunk_single_doc(doc) for doc in docs]
         await asyncio.gather(*tasks)
-        print(f"Batch chunk completed: {len(docs)} documents processed")
+        logger.info(f"Batch chunk completed: {len(docs)} documents processed")
 
 
 async def _async_embedding(
@@ -612,9 +613,9 @@ async def _async_embedding(
             "id": document_id,
             "processing_status": "embedded",
         })
-        print(f"Embedding completed for {document_id}: {result}")
+        logger.info(f"Embedding completed for {document_id}: {result}")
     except Exception as e:
-        print(f"Error: Embedding failed for {document_id}: {e}")
+        logger.error(f"Error: Embedding failed for {document_id}: {e}")
         update_document_info({
             "id": document_id,
             "processing_status": "embedding_failed",
@@ -650,7 +651,7 @@ async def _async_embedding_all(
             async with semaphore:
                 document_id = doc["id"]
 
-                print(f"Starting embedding for document {document_id}: {doc.get('file_name', 'unknown')}")
+                logger.info(f"Starting embedding for document {document_id}: {doc.get('file_name', 'unknown')}")
 
                 try:
                     update_document_info({
@@ -684,10 +685,10 @@ async def _async_embedding_all(
                         "id": document_id,
                         "processing_status": "embedded",
                     })
-                    print(f"Embedding completed for document {document_id}: {result}")
+                    logger.info(f"Embedding completed for document {document_id}: {result}")
 
                 except Exception as e:
-                    print(f"Error: Embedding failed for document {document_id}: {e}")
+                    logger.error(f"Error: Embedding failed for document {document_id}: {e}")
                     update_document_info({
                         "id": document_id,
                         "processing_status": "embedding_failed",
@@ -697,7 +698,7 @@ async def _async_embedding_all(
         # 并发执行所有文档嵌入
         tasks = [_embedding_single_doc(doc) for doc in docs]
         await asyncio.gather(*tasks)
-        print(f"Batch embedding completed: {len(docs)} documents processed")
+        logger.info(f"Batch embedding completed: {len(docs)} documents processed")
 
 
 # ==================== API 接口 ====================

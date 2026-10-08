@@ -2,6 +2,8 @@
 
 from typing import List
 
+from smartcard_kb.logger import logger
+
 from .embedding_base import EmbeddingBackend
 
 
@@ -21,7 +23,7 @@ class LocalEmbeddingBackend(EmbeddingBackend):
 
         self.model = SentenceTransformer(model_name)
         self.model_name = model_name
-        print(f"本地 Embedding 后端初始化完成: {model_name}")
+        logger.info(f"本地 Embedding 后端初始化完成: {model_name}")
 
     def embed(self, text: str) -> List[float]:
         """调用本地模型生成向量嵌入"""

@@ -5,6 +5,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from smartcard_kb.logger import logger
 from smartcard_kb.config import settings, MODELS_DIR
 from smartcard_kb.apis import docs_info_router, docs_items_router, docs_processing_router, search_router
 
@@ -42,9 +43,9 @@ async def startup_event():
     from smartcard_kb.docs_compile.database import init_database
     try:
         init_database()
-        print("数据库初始化成功")
+        logger.info("数据库初始化成功")
     except Exception as e:
-        print(f"数据库初始化失败（请检查 PostgreSQL 是否运行）: {e}")
+        logger.error(f"数据库初始化失败（请检查 PostgreSQL 是否运行）: {e}")
 
 
 @app.get("/")

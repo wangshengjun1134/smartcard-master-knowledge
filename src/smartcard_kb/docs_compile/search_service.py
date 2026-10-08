@@ -4,6 +4,8 @@ import json
 from typing import List, Dict, Any, Optional, Tuple
 import numpy as np
 
+from smartcard_kb.logger import logger
+
 from .database import query_chunks
 from ..llms.embedding_base import EmbeddingBackend
 from ..llms.reranker_base import RerankerBackend
@@ -108,7 +110,7 @@ class SearchService:
                     embedding_json = str(embedding_bytes)
                 chunk_embedding = json.loads(embedding_json)
             except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
-                print(f"Warning: Failed to parse embedding for chunk {chunk.get('id')}: {e}")
+                logger.warning(f"Warning: Failed to parse embedding for chunk {chunk.get('id')}: {e}")
                 continue
 
             chunk_vec = np.array(chunk_embedding)

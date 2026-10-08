@@ -4,6 +4,8 @@ from typing import Any, Dict, List, Optional
 
 from PIL import Image
 
+from smartcard_kb.logger import logger
+
 from .vlm_base import VLMBackend
 
 
@@ -25,34 +27,34 @@ class LocalQwenVLMBackend(VLMBackend):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.torch = torch
 
-        print(f"Loading local VLM model: {model_path}")
+        logger.info(f"Loading local VLM model: {model_path}")
         self.model = Qwen3VLForConditionalGeneration.from_pretrained(
             model_path, dtype="auto", device_map="auto"
         )
         self.processor = AutoProcessor.from_pretrained(model_path)
-        print(f"Local VLM loaded, device: {self.model.device}")
+        logger.info(f"Local VLM loaded, device: {self.model.device}")
 
     def generate(self, image: Image.Image, messages: List[Dict[str, Any]], max_new_tokens: int = 2048) -> str:
         """Call local VLM to generate response"""
         # Print request details
-        print("\n" + "="*80)
-        print("📤 Local VLM Request")
-        print("="*80)
-        print(f"Model: {self.model.config._name_or_path}")
-        print(f"Device: {self.device}")
-        print(f"Max tokens: {max_new_tokens}")
-        print(f"\n📋 Messages ({len(messages)} messages):")
+        logger.debug("\n" + "="*80)
+        logger.debug("📤 Local VLM Request")
+        logger.debug("="*80)
+        logger.debug(f"Model: {self.model.config._name_or_path}")
+        logger.debug(f"Device: {self.device}")
+        logger.debug(f"Max tokens: {max_new_tokens}")
+        logger.debug(f"\n📋 Messages ({len(messages)} messages):")
         for i, msg in enumerate(messages, 1):
-            print(f"\n  [{i}] Role: {msg['role']}")
+            logger.debug(f"\n  [{i}] Role: {msg['role']}")
             if isinstance(msg["content"], str):
-                print(f"      Content: {msg['content'][:200]}...")
+                logger.debug(f"      Content: {msg['content'][:200]}...")
             elif isinstance(msg["content"], list):
                 for part in msg["content"]:
                     if part["type"] == "image":
-                        print(f"      [Image] Size: {part['image'].size}, Mode: {part['image'].mode}")
+                        logger.debug(f"      [Image] Size: {part['image'].size}, Mode: {part['image'].mode}")
                     elif part["type"] == "text":
-                        print(f"      [Text] {part['text'][:200]}...")
-        print("="*80)
+                        logger.debug(f"      [Text] {part['text'][:200]}...")
+        logger.debug("="*80)
 
         # Process and generate
         inputs = self.processor.apply_chat_template(
@@ -71,13 +73,13 @@ class LocalQwenVLMBackend(VLMBackend):
         )[0]
 
         # Print response details
-        print("\n" + "="*80)
-        print("📥 Local VLM Response")
-        print("="*80)
-        print(f"Input tokens: {inputs.input_ids.shape[1]}")
-        print(f"Output tokens: {generated_ids_trimmed[0].shape[0]}")
-        print(f"\n💬 Response Content ({len(content)} chars):")
-        print(f"  {content[:500]}...")
-        print("="*80 + "\n")
+        logger.debug("\n" + "="*80)
+        logger.debug("📥 Local VLM Response")
+        logger.debug("="*80)
+        logger.debug(f"Input tokens: {inputs.input_ids.shape[1]}")
+        logger.debug(f"Output tokens: {generated_ids_trimmed[0].shape[0]}")
+        logger.debug(f"\n💬 Response Content ({len(content)} chars):")
+        logger.debug(f"  {content[:500]}...")
+        logger.debug("="*80 + "\n")
 
         return content

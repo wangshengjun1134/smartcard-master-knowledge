@@ -6,6 +6,8 @@ from typing import Any, Dict, List
 
 from PIL import Image
 
+from smartcard_kb.logger import logger
+
 from .vlm_base import VLMBackend
 
 
@@ -27,7 +29,7 @@ class OpenAICompatibleBackend(VLMBackend):
 
         self.client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
         self.model = model
-        print(f"OpenAI compatible backend initialized: {base_url}, model: {model}")
+        logger.info(f"OpenAI compatible backend initialized: {base_url}, model: {model}")
 
     def _encode_image(self, image: Image.Image) -> str:
         """Encode PIL Image to base64"""
@@ -57,24 +59,24 @@ class OpenAICompatibleBackend(VLMBackend):
                 api_messages.append({"role": "user", "content": content_parts})
 
         # Print request details
-        print("\n" + "="*80)
-        print("📤 VLM API Request")
-        print("="*80)
-        print(f"Model: {self.model}")
-        print(f"Max tokens: {max_new_tokens}")
-        print(f"Temperature: 0.1")
-        print(f"\n📋 Messages ({len(api_messages)} messages):")
+        logger.debug("\n" + "="*80)
+        logger.debug("📤 VLM API Request")
+        logger.debug("="*80)
+        logger.debug(f"Model: {self.model}")
+        logger.debug(f"Max tokens: {max_new_tokens}")
+        logger.debug(f"Temperature: 0.1")
+        logger.debug(f"\n📋 Messages ({len(api_messages)} messages):")
         for i, msg in enumerate(api_messages, 1):
-            print(f"\n  [{i}] Role: {msg['role']}")
+            logger.debug(f"\n  [{i}] Role: {msg['role']}")
             if isinstance(msg["content"], str):
-                print(f"      Content: {msg['content'][:200]}...")
+                logger.debug(f"      Content: {msg['content'][:200]}...")
             elif isinstance(msg["content"], list):
                 for part in msg["content"]:
                     if part["type"] == "image_url":
-                        print(f"      [Image] URL: {part['image_url']['url'][:100]}... (detail: {part['image_url']['detail']})")
+                        logger.debug(f"      [Image] URL: {part['image_url']['url'][:100]}... (detail: {part['image_url']['detail']})")
                     elif part["type"] == "text":
-                        print(f"      [Text] {part['text'][:200]}...")
-        print("="*80)
+                        logger.debug(f"      [Text] {part['text'][:200]}...")
+        logger.debug("="*80)
 
         # Call API
         response = self.client.chat.completions.create(
@@ -82,21 +84,21 @@ class OpenAICompatibleBackend(VLMBackend):
         )
 
         # Print response details
-        print("\n" + "="*80)
-        print("📥 VLM API Response")
-        print("="*80)
-        print(f"Response ID: {response.id}")
-        print(f"Model: {response.model}")
-        print(f"Created: {response.created}")
+        logger.debug("\n" + "="*80)
+        logger.debug("📥 VLM API Response")
+        logger.debug("="*80)
+        logger.debug(f"Response ID: {response.id}")
+        logger.debug(f"Model: {response.model}")
+        logger.debug(f"Created: {response.created}")
         if hasattr(response, 'usage') and response.usage:
-            print(f"\n📊 Token Usage:")
-            print(f"  Prompt tokens: {response.usage.prompt_tokens}")
-            print(f"  Completion tokens: {response.usage.completion_tokens}")
-            print(f"  Total tokens: {response.usage.total_tokens}")
-        
+            logger.debug(f"\n📊 Token Usage:")
+            logger.debug(f"  Prompt tokens: {response.usage.prompt_tokens}")
+            logger.debug(f"  Completion tokens: {response.usage.completion_tokens}")
+            logger.debug(f"  Total tokens: {response.usage.total_tokens}")
+
         content = response.choices[0].message.content
-        print(f"\n💬 Response Content ({len(content)} chars):")
-        print(f"  {content[:500]}...")
-        print("="*80 + "\n")
+        logger.debug(f"\n💬 Response Content ({len(content)} chars):")
+        logger.debug(f"  {content[:500]}...")
+        logger.debug("="*80 + "\n")
 
         return content

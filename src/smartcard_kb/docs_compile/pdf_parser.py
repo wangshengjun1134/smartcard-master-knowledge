@@ -8,6 +8,9 @@ from typing import List, Dict, Any, Optional
 from docling.document_converter import DocumentConverter, PdfFormatOption, WordFormatOption
 from docling.datamodel.pipeline_options import PdfPipelineOptions, HeadingHierarchyOptions
 from docling.datamodel.base_models import InputFormat, DocItemLabel
+
+from smartcard_kb.logger import logger
+
 from .database import init_database, insert_document_items
 
 
@@ -86,7 +89,7 @@ class PDFParser:
         insert_document_items(items)
         t2 = time.time()
 
-        print(f"convert: {t1-t0:.2f}s, items: {t2-t1:.2f}s")
+        logger.debug(f"convert: {t1-t0:.2f}s, items: {t2-t1:.2f}s")
 
         return {"items": items}
 

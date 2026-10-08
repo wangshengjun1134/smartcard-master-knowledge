@@ -4,6 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from smartcard_kb.logger import logger
 from smartcard_kb.docs_compile.search_service import SearchService
 from smartcard_kb.docs_compile.embedding_service import EmbeddingService
 from smartcard_kb.llms.reranker_local import LocalRerankerBackend
@@ -77,7 +78,7 @@ def search_documents(request: SearchRequest):
             try:
                 reranker_backend = LocalRerankerBackend(model_path=settings.reranker_model)
             except Exception as e:
-                print(f"Warning: 重排模型加载失败: {e}")
+                logger.warning(f"Warning: 重排模型加载失败: {e}")
 
         # 初始化检索服务
         service = SearchService(

@@ -2,6 +2,8 @@
 
 from typing import List
 
+from smartcard_kb.logger import logger
+
 from .embedding_base import EmbeddingBackend
 
 
@@ -24,7 +26,7 @@ class OpenAIEmbeddingBackend(EmbeddingBackend):
 
         self.client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
         self.model = model
-        print(f"OpenAI Embedding 后端初始化完成: {base_url}, 模型: {model}")
+        logger.info(f"OpenAI Embedding 后端初始化完成: {base_url}, 模型: {model}")
 
     def embed(self, text: str) -> List[float]:
         """调用 OpenAI 兼容 API 生成向量嵌入"""
