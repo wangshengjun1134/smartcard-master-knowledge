@@ -791,9 +791,10 @@ async def generate_vlm_descriptions(request: VLMRequest, background_tasks: Backg
         )
 
     # Validate document status - only allow VLM for parsed documents
-    doc_info = query_document_info(request.document_id)
-    if not doc_info:
+    doc_list = query_document_info(request.document_id)
+    if not doc_list:
         raise HTTPException(status_code=404, detail=f"文档 {request.document_id} 不存在")
+    doc_info = doc_list[0]
     if doc_info.get("processing_status") != "parsed":
         raise HTTPException(
             status_code=400,
