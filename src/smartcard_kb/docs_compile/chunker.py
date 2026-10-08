@@ -59,7 +59,7 @@ class Chunker:
         )
 
         # HybridChunker - 使用自定义 serializer provider
-        tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, local_files_only=True)
         self.chunker = HybridChunker(
             tokenizer=HuggingFaceTokenizer(
                 tokenizer=tokenizer,
