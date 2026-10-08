@@ -12,6 +12,7 @@ from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTok
 from transformers import AutoTokenizer
 
 from smartcard_kb.logger import logger
+from smartcard_kb.config import settings
 
 from .database import init_database, query_document_items, insert_chunks
 from .serializers import CustomChunkingSerializerProvider
@@ -24,18 +25,18 @@ class Chunker:
         self,
         do_ocr: bool = True,
         max_tokens: int = 512,
-        tokenizer_name: str = "BAAI/bge-m3",
+        tokenizer_name: Optional[str] = None,
     ):
         """
         初始化分块器
 
         :param do_ocr: 是否启用 OCR
         :param max_tokens: 分块最大 token 数
-        :param tokenizer_name: tokenizer 名称
+        :param tokenizer_name: tokenizer 路径或 HuggingFace 模型 ID，默认使用本地 embedding_model 路径
         """
         self.do_ocr = do_ocr
         self.max_tokens = max_tokens
-        self.tokenizer_name = tokenizer_name
+        self.tokenizer_name = tokenizer_name or str(settings.embedding_model)
 
         self.pipeline_options = PdfPipelineOptions()
         self.pipeline_options.do_ocr = do_ocr

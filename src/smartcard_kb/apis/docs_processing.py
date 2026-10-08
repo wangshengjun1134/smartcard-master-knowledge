@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional, Dict
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from smartcard_kb.logger import logger
 from smartcard_kb.docs_compile.pdf_parser import PDFParser
@@ -107,7 +107,7 @@ class ChunkRequest(BaseModel):
     document_id: str
     page_range: Optional[tuple] = None
     max_tokens: int = 512
-    tokenizer_name: str = "BAAI/bge-m3"
+    tokenizer_name: str = Field(default_factory=lambda: str(settings.embedding_model))
     do_ocr: bool = True
 
 
@@ -121,7 +121,7 @@ class ChunkAllRequest(BaseModel):
     """批量分块请求"""
     parallel_count: int = 1
     max_tokens: int = 512
-    tokenizer_name: str = "BAAI/bge-m3"
+    tokenizer_name: str = Field(default_factory=lambda: str(settings.embedding_model))
     do_ocr: bool = True
 
 
