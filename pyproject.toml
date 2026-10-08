@@ -30,6 +30,7 @@ dependencies = [
     
     # 文档处理
     "docling>=2.0.0",
+    "pymupdf>=1.24.0",
     
     # 向量数据库
     "qdrant-client>=1.10.0",

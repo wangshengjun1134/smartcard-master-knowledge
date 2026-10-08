@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel
 
 from smartcard_kb.docs_compile.pdf_parser import PDFParser
@@ -1132,4 +1132,88 @@ async def get_document_file(document_id: str, image_path: Optional[str] = None):
         filename=file_name,
         media_type=media_type,
         headers={"Content-Disposition": f'inline; filename="{file_name}"'},
+    )
+
+
+@router.get("/docs/{document_id}/pages")
+async def get_document_pages(
+    document_id: str,
+    start_page: int = 1,
+    end_page: int = 1,
+):
+    """
+    获取文档指定页码范围的 PDF 内容
+
+    - **document_id**: 文档 ID
+    - **start_page**: 起始页码（从 1 开始，默认 1）
+    - **end_page**: 结束页码（从 1 开始，默认 1）
+    """
+    import fitz  # PyMuPDF
+
+    # Query document info
+    doc_info = query_document_info(document_id=document_id)
+    if not doc_info:
+        raise HTTPException(status_code=404, detail=f"文档 {document_id} 不存在")
+
+    file_path = doc_info.get("file_path")
+    if not file_path:
+        raise HTTPException(status_code=404, detail=f"文档 {document_id} 没有文件路径")
+
+    resolved_path = Path(file_path)
+    if not resolved_path.is_absolute():
+        resolved_path = Path(settings.data_dir) / resolved_path
+
+    if not resolved_path.exists():
+        raise HTTPException(status_code=404, detail=f"文件不存在: {resolved_path}")
+
+    # Validate page range
+    try:
+        src_doc = fitz.open(str(resolved_path))
+        total_pages = len(src_doc)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"无法打开 PDF 文件: {str(e)}")
+
+    if start_page < 1 or end_page < 1 or start_page > total_pages or end_page > total_pages:
+        src_doc.close()
+        raise HTTPException(
+            status_code=400,
+            detail=f"页码范围无效: start_page={start_page}, end_page={end_page}, 总页数={total_pages}"
+        )
+
+    if start_page > end_page:
+        src_doc.close()
+        raise HTTPException(
+            status_code=400,
+            detail=f"起始页码不能大于结束页码: start_page={start_page}, end_page={end_page}"
+        )
+
+    # Create new PDF with selected pages
+    try:
+        new_doc = fitz.open()
+        # Insert pages (page numbers are 0-based in fitz)
+        new_doc.insert_pdf(src_doc, from_page=start_page - 1, to_page=end_page - 1)
+
+        # Save to bytes buffer
+        pdf_bytes = new_doc.tobytes()
+        new_doc.close()
+        src_doc.close()
+    except Exception as e:
+        src_doc.close()
+        raise HTTPException(status_code=500, detail=f"PDF 处理失败: {str(e)}")
+
+    # Generate filename with page range
+    original_name = doc_info.get("file_name", "document.pdf")
+    name_without_ext = Path(original_name).stem
+    ext = Path(original_name).suffix
+    page_range_str = f"_pages_{start_page}-{end_page}"
+    output_filename = f"{name_without_ext}{page_range_str}{ext}"
+
+    return StreamingResponse(
+        iter([pdf_bytes]),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{output_filename}"',
+            "Content-Length": str(len(pdf_bytes)),
+            "Cache-Control": "no-cache",
+        },
     )
