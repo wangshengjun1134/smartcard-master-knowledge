@@ -1162,7 +1162,8 @@ async def get_document_pages(
 
     resolved_path = Path(file_path)
     if not resolved_path.is_absolute():
-        resolved_path = Path(settings.data_dir) / resolved_path
+        project_root = Path(__file__).resolve().parent.parent.parent.parent
+        resolved_path = project_root / resolved_path
 
     if not resolved_path.exists():
         raise HTTPException(status_code=404, detail=f"文件不存在: {resolved_path}")
