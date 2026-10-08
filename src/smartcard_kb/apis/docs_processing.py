@@ -1135,7 +1135,7 @@ async def get_document_file(document_id: str, image_path: Optional[str] = None):
     )
 
 
-@router.get("/docs/{document_id}/pages")
+@router.get("/{document_id}/pages")
 async def get_document_pages(
     document_id: str,
     start_page: int = 1,
