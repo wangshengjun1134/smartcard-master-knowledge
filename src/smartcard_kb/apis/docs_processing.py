@@ -1151,9 +1151,10 @@ async def get_document_pages(
     import fitz  # PyMuPDF
 
     # Query document info
-    doc_info = query_document_info(document_id=document_id)
-    if not doc_info:
+    doc_list = query_document_info(document_id=document_id)
+    if not doc_list:
         raise HTTPException(status_code=404, detail=f"文档 {document_id} 不存在")
+    doc_info = doc_list[0]
 
     file_path = doc_info.get("file_path")
     if not file_path:
