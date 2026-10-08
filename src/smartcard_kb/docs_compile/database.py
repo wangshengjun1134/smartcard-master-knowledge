@@ -191,6 +191,32 @@ def init_database():
         END $$;
     """)
 
+    # 为已存在的 doc_chunks 表添加 chunk_token_limit 字段（如果不存在）
+    cursor.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'doc_chunks' AND column_name = 'chunk_token_limit'
+            ) THEN
+                ALTER TABLE doc_chunks ADD COLUMN chunk_token_limit INTEGER;
+            END IF;
+        END $$;
+    """)
+
+    # 为已存在的 doc_chunks 表添加 tokenizer 字段（如果不存在）
+    cursor.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'doc_chunks' AND column_name = 'tokenizer'
+            ) THEN
+                ALTER TABLE doc_chunks ADD COLUMN tokenizer TEXT;
+            END IF;
+        END $$;
+    """)
+
     conn.commit()
     cursor.close()
     conn.close()
@@ -840,6 +866,8 @@ def insert_chunks(chunks: List[Dict[str, Any]]) -> None:
             chunk.get("is_rag_enabled", True),
             None,  # embedding 字段后续写入
             now,
+            chunk.get("chunk_token_limit"),
+            chunk.get("tokenizer"),
         ))
 
     execute_values(
@@ -848,13 +876,13 @@ def insert_chunks(chunks: List[Dict[str, Any]]) -> None:
         INSERT INTO doc_chunks (
             id, document_id, chunk_index, text, headings, heading_path,
             linked_item_ids, page_nos, token_count, is_rag_enabled,
-            embedding, created_at
+            embedding, created_at, chunk_token_limit, tokenizer
         ) VALUES %s
         ON CONFLICT (id) DO UPDATE SET
             text = EXCLUDED.text
         """,
         data,
-        template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+        template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
     )
 
     conn.commit()

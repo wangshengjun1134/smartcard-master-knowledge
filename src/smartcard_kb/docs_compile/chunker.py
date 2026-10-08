@@ -31,6 +31,10 @@ class Chunker:
         :param max_tokens: 分块最大 token 数
         :param tokenizer_name: tokenizer 名称
         """
+        self.do_ocr = do_ocr
+        self.max_tokens = max_tokens
+        self.tokenizer_name = tokenizer_name
+
         self.pipeline_options = PdfPipelineOptions()
         self.pipeline_options.do_ocr = do_ocr
         self.pipeline_options.heading_hierarchy_options = HeadingHierarchyOptions(
@@ -184,6 +188,8 @@ class Chunker:
                 "page_nos": sorted(page_nos),
                 "token_count": token_count,
                 "is_rag_enabled": True,
+                "chunk_token_limit": self.max_tokens,
+                "tokenizer": self.tokenizer_name,
             })
 
         return chunks
