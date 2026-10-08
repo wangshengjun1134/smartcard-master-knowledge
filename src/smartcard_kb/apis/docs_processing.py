@@ -240,7 +240,6 @@ async def _async_parse_all(
     """
     async with _parse_all_lock:
         semaphore = asyncio.Semaphore(parallel_count)
-        t_start = time.time()
 
         async def _parse_single_doc(doc):
             """解析单个文档"""
@@ -305,7 +304,7 @@ async def _async_parse_all(
         # 并发执行所有文档解析
         tasks = [_parse_single_doc(doc) for doc in docs]
         await asyncio.gather(*tasks)
-        logger.info(f"Batch parse completed: {len(docs)} documents processed in {time.time() - t_start:.2f}s")
+        logger.info(f"Batch parse completed: {len(docs)} documents processed")
 
 
 async def _async_vlm(
@@ -397,7 +396,6 @@ async def _async_vlm_all(
     """
     async with _vlm_all_lock:
         semaphore = asyncio.Semaphore(parallel_count)
-        t_start = time.time()
 
         # 从参数或环境变量获取配置
         resolved_api_key = api_key or settings.vlm_openai_api_key
@@ -457,7 +455,7 @@ async def _async_vlm_all(
         # 并发执行所有文档 VLM 增强
         tasks = [_vlm_single_doc(doc) for doc in docs]
         await asyncio.gather(*tasks)
-        logger.info(f"Batch VLM completed: {len(docs)} documents processed in {time.time() - t_start:.2f}s")
+        logger.info(f"Batch VLM completed: {len(docs)} documents processed")
 
 
 async def _async_chunk(
@@ -520,7 +518,6 @@ async def _async_chunk_all(
     """
     async with _chunk_all_lock:
         semaphore = asyncio.Semaphore(parallel_count)
-        t_start = time.time()
 
         async def _chunk_single_doc(doc):
             """分块单个文档"""
@@ -575,7 +572,7 @@ async def _async_chunk_all(
         # 并发执行所有文档分块
         tasks = [_chunk_single_doc(doc) for doc in docs]
         await asyncio.gather(*tasks)
-        logger.info(f"Batch chunk completed: {len(docs)} documents processed in {time.time() - t_start:.2f}s")
+        logger.info(f"Batch chunk completed: {len(docs)} documents processed")
 
 
 async def _async_embedding(
@@ -652,7 +649,6 @@ async def _async_embedding_all(
     """
     async with _embedding_all_lock:
         semaphore = asyncio.Semaphore(parallel_count)
-        t_start = time.time()
 
         async def _embedding_single_doc(doc):
             """嵌入单个文档"""
@@ -707,7 +703,7 @@ async def _async_embedding_all(
         # 并发执行所有文档嵌入
         tasks = [_embedding_single_doc(doc) for doc in docs]
         await asyncio.gather(*tasks)
-        logger.info(f"Batch embedding completed: {len(docs)} documents processed in {time.time() - t_start:.2f}s")
+        logger.info(f"Batch embedding completed: {len(docs)} documents processed")
 
 
 # ==================== API 接口 ====================
