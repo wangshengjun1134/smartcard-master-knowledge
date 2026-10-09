@@ -88,7 +88,7 @@ export default function Home() {
   })
   const [chunkAllForm, setChunkAllForm] = useState({
     parallel_count: 1,
-    max_tokens: 512,
+    token_limits: [256, 512, 1024],
     tokenizer_name: 'BAAI/bge-m3',
     do_ocr: true,
   })
@@ -273,7 +273,7 @@ export default function Home() {
     try {
       const result = await chunkAllDocuments({
         parallel_count: chunkAllForm.parallel_count,
-        max_tokens: chunkAllForm.max_tokens,
+        token_limits: chunkAllForm.token_limits,
         tokenizer_name: chunkAllForm.tokenizer_name,
         do_ocr: chunkAllForm.do_ocr,
       })
@@ -1068,15 +1068,25 @@ export default function Home() {
                         />
                       </div>
                       <div className="grid gap-2">
-                        <Label htmlFor="chunk-max-tokens">最大 Token 数</Label>
-                        <Input
-                          id="chunk-max-tokens"
-                          type="number"
-                          min={128}
-                          step={128}
-                          value={chunkAllForm.max_tokens}
-                          onChange={(e) => setChunkAllForm({ ...chunkAllForm, max_tokens: parseInt(e.target.value) || 512 })}
-                        />
+                        <Label htmlFor="chunk-token-limits">Token 限制（同时生成多个分块粒度）</Label>
+                        <div className="flex items-center gap-4 mt-2">
+                          {[256, 512, 1024].map((limit) => (
+                            <label key={limit} className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={chunkAllForm.token_limits.includes(limit)}
+                                onChange={(e) => {
+                                  const limits = e.target.checked
+                                    ? [...chunkAllForm.token_limits, limit].sort((a, b) => a - b)
+                                    : chunkAllForm.token_limits.filter((l: number) => l !== limit)
+                                  setChunkAllForm({ ...chunkAllForm, token_limits: limits })
+                                }}
+                                className="h-4 w-4 rounded border-gray-300"
+                              />
+                              <span className="text-sm">{limit} tokens</span>
+                            </label>
+                          ))}
+                        </div>
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="chunk-tokenizer">Tokenizer</Label>

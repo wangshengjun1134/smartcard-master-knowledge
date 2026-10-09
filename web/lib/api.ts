@@ -216,7 +216,7 @@ export async function chunkDocument(request: {
 
 export async function chunkAllDocuments(request: {
   parallel_count?: number
-  max_tokens?: number
+  token_limits?: number[]
   tokenizer_name?: string
   do_ocr?: boolean
 }): Promise<{ success: boolean; message: string; total: number; parallel_count: number }> {
