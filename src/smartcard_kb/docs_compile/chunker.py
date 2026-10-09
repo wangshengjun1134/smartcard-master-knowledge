@@ -126,9 +126,9 @@ class Chunker:
         """构建 self_ref -> vlm_description 映射"""
         vlm_map = {}
         for item in picture_items:
-            metadata = item.get("metadata") or {}
             self_ref = item.get("self_ref")
-            vlm_desc = metadata.get("vlm_description")
+            # VLM descriptions are stored in the text field, not metadata.vlm_description
+            vlm_desc = item.get("text")
 
             if self_ref and vlm_desc:
                 vlm_map[self_ref] = vlm_desc
