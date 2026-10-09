@@ -4,7 +4,7 @@ import asyncio
 import os
 import time
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional, Dict, List, Tuple
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel, Field
@@ -106,7 +106,7 @@ class ChunkRequest(BaseModel):
     pdf_path: str  # 文件路径（支持 .pdf 和 .docx）
     document_id: str
     page_range: Optional[tuple] = None
-    max_tokens: int = 512
+    token_limits: Optional[List[int]] = None  # 默认 [256, 512, 1024]
     tokenizer_name: str = Field(default_factory=lambda: str(settings.embedding_model))
     do_ocr: bool = True
 
@@ -120,7 +120,7 @@ class ChunkResponse(BaseModel):
 class ChunkAllRequest(BaseModel):
     """批量分块请求"""
     parallel_count: int = 1
-    max_tokens: int = 512
+    token_limits: Optional[List[int]] = None  # 默认 [256, 512, 1024]
     tokenizer_name: str = Field(default_factory=lambda: str(settings.embedding_model))
     do_ocr: bool = True
 
@@ -457,7 +457,7 @@ async def _async_chunk(
     pdf_path: str,
     document_id: str,
     page_range: Optional[tuple],
-    max_tokens: int,
+    token_limits: Optional[List[int]],
     tokenizer_name: str,
     do_ocr: bool,
 ):
@@ -471,7 +471,7 @@ async def _async_chunk(
         # 使用线程池执行同步阻塞操作，避免阻塞事件循环
         chunker = Chunker(
             do_ocr=do_ocr,
-            max_tokens=max_tokens,
+            token_limits=token_limits,
             tokenizer_name=tokenizer_name,
         )
         result = await asyncio.to_thread(
@@ -498,7 +498,7 @@ async def _async_chunk(
 async def _async_chunk_all(
     docs: list,
     parallel_count: int,
-    max_tokens: int,
+    token_limits: Optional[List[int]],
     tokenizer_name: str,
     do_ocr: bool,
 ):
@@ -507,7 +507,7 @@ async def _async_chunk_all(
 
     :param docs: 文档列表
     :param parallel_count: 并行数量
-    :param max_tokens: 分块最大 token 数
+    :param token_limits: token 限制列表，默认 [256, 512, 1024]
     :param tokenizer_name: tokenizer 名称
     :param do_ocr: 是否启用 OCR
     """
@@ -540,7 +540,7 @@ async def _async_chunk_all(
 
                     chunker = Chunker(
                         do_ocr=do_ocr,
-                        max_tokens=max_tokens,
+                        token_limits=token_limits,
                         tokenizer_name=tokenizer_name,
                     )
                     result = await asyncio.to_thread(
@@ -893,7 +893,7 @@ async def chunk_document(request: ChunkRequest, background_tasks: BackgroundTask
     - **pdf_path**: 文件路径（支持 .pdf 和 .docx）
     - **document_id**: 文档 ID
     - **page_range**: 页码范围 (start, end)，1-based（可选，仅对 PDF 有效）
-    - **max_tokens**: 分块最大 token 数
+    - **token_limits**: token 限制列表，默认 [256, 512, 1024]
     - **tokenizer_name**: tokenizer 名称
     - **do_ocr**: 是否启用 OCR（仅对 PDF 有效）
     """
@@ -902,7 +902,7 @@ async def chunk_document(request: ChunkRequest, background_tasks: BackgroundTask
         request.pdf_path,
         request.document_id,
         request.page_range,
-        request.max_tokens,
+        request.token_limits,
         request.tokenizer_name,
         request.do_ocr,
     )
@@ -918,7 +918,7 @@ async def chunk_all_documents(request: ChunkAllRequest, background_tasks: Backgr
     异步批量分块所有 vlm_completed 状态的文档
 
     - **parallel_count**: 并行数量（默认1）
-    - **max_tokens**: 分块最大 token 数
+    - **token_limits**: token 限制列表，默认 [256, 512, 1024]
     - **tokenizer_name**: tokenizer 名称
     - **do_ocr**: 是否启用 OCR
     """
@@ -946,7 +946,7 @@ async def chunk_all_documents(request: ChunkAllRequest, background_tasks: Backgr
         _async_chunk_all,
         docs,
         request.parallel_count,
-        request.max_tokens,
+        request.token_limits,
         request.tokenizer_name,
         request.do_ocr,
     )
