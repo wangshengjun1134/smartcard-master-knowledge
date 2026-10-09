@@ -26,7 +26,13 @@ class PDFParser:
 
         :param do_ocr: 是否启用 OCR（默认启用）
         """
-        self.pipeline_options = PdfPipelineOptions()
+        # Resolve artifacts_path to pre-downloaded docling models
+        project_root = Path(__file__).resolve().parent.parent.parent.parent
+        artifacts_path = project_root / "models" / "docling-models"
+        if not artifacts_path.is_dir():
+            artifacts_path = None  # Fall back to default (may require network)
+
+        self.pipeline_options = PdfPipelineOptions(artifacts_path=artifacts_path)
         self.pipeline_options.do_ocr = do_ocr
         self.pipeline_options.heading_hierarchy_options = HeadingHierarchyOptions(
             enabled=True,
