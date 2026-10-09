@@ -45,10 +45,7 @@ class Chunker:
         self.tokenizer_name = str(tokenizer_path)
 
         # Resolve artifacts_path to pre-downloaded docling models
-        project_root = Path(__file__).resolve().parent.parent.parent.parent
-        artifacts_path = project_root / "models" / "docling-models"
-        if not artifacts_path.is_dir():
-            artifacts_path = None  # Fall back to default (may require network)
+        artifacts_path = settings.docling_models_path
 
         self.pipeline_options = PdfPipelineOptions(artifacts_path=artifacts_path)
         self.pipeline_options.do_ocr = do_ocr

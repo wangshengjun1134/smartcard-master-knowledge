@@ -10,6 +10,7 @@ from docling.datamodel.pipeline_options import PdfPipelineOptions, HeadingHierar
 from docling.datamodel.base_models import InputFormat, DocItemLabel
 
 from smartcard_kb.logger import logger
+from smartcard_kb.config import settings
 
 from .database import init_database, insert_document_items
 
@@ -27,10 +28,7 @@ class PDFParser:
         :param do_ocr: 是否启用 OCR（默认启用）
         """
         # Resolve artifacts_path to pre-downloaded docling models
-        project_root = Path(__file__).resolve().parent.parent.parent.parent
-        artifacts_path = project_root / "models" / "docling-models"
-        if not artifacts_path.is_dir():
-            artifacts_path = None  # Fall back to default (may require network)
+        artifacts_path = settings.docling_models_path
 
         self.pipeline_options = PdfPipelineOptions(artifacts_path=artifacts_path)
         self.pipeline_options.do_ocr = do_ocr
