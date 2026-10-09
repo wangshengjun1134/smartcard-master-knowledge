@@ -42,7 +42,9 @@ class Chunker:
         if not tokenizer_path.is_absolute():
             project_root = Path(__file__).resolve().parent.parent.parent.parent
             tokenizer_path = project_root / raw_tokenizer
-        self.tokenizer_name = str(tokenizer_path)
+        # Store resolved path for loading, and model name for DB storage
+        self._tokenizer_path = str(tokenizer_path)
+        self.tokenizer_name = Path(raw_tokenizer).name  # Just the model name
 
         # Resolve artifacts_path to pre-downloaded docling models
         artifacts_path = settings.docling_models_path
@@ -68,7 +70,7 @@ class Chunker:
         )
 
         # HybridChunker - 使用自定义 serializer provider
-        tokenizer = AutoTokenizer.from_pretrained(self.tokenizer_name, local_files_only=True)
+        tokenizer = AutoTokenizer.from_pretrained(self._tokenizer_path, local_files_only=True)
         self.chunker = HybridChunker(
             tokenizer=HuggingFaceTokenizer(
                 tokenizer=tokenizer,
