@@ -65,6 +65,8 @@ export interface Chunk {
   page_nos?: number[]
   token_count?: number
   is_rag_enabled: boolean
+  chunk_token_limit?: number
+  tokenizer?: string
   created_at?: string
 }
 

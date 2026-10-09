@@ -42,6 +42,7 @@ export default function DocumentDetail() {
   const [chunksLoading, setChunksLoading] = useState(false)
   const [expandedChunks, setExpandedChunks] = useState<Set<string>>(new Set())
   const [chunkFilterRag, setChunkFilterRag] = useState<boolean | undefined>(undefined)
+  const [chunkTokenLimit, setChunkTokenLimit] = useState<number | undefined>(undefined)
   const [chunkPage, setChunkPage] = useState(1)
   const [chunkTotalPages, setChunkTotalPages] = useState(1)
   const [chunkTotalItems, setChunkTotalItems] = useState(0)
@@ -110,6 +111,7 @@ export default function DocumentDetail() {
     try {
       const data = await listDocumentChunks(documentId, {
         is_rag_enabled: chunkFilterRag,
+        chunk_token_limit: chunkTokenLimit,
         page: chunkPage,
         page_size: chunkPageSize,
       })
@@ -132,7 +134,7 @@ export default function DocumentDetail() {
     if (activeTab === 'chunks') {
       loadChunks()
     }
-  }, [documentId, chunkFilterRag, chunkPage, activeTab])
+  }, [documentId, chunkFilterRag, chunkTokenLimit, chunkPage, activeTab])
 
   const filteredItems = filterLabel
     ? items.filter(item => item.label === filterLabel)
@@ -564,9 +566,27 @@ export default function DocumentDetail() {
                   <CardDescription>
                     共 {chunkTotalItems} 个 Chunk
                     {chunkFilterRag !== undefined && ` (RAG: ${chunkFilterRag ? '启用' : '禁用'})`}
+                    {chunkTokenLimit && ` (${chunkTokenLimit} tokens)`}
                   </CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Token 限制过滤 */}
+                  <div className="flex items-center gap-1">
+                    {[undefined, 256, 512, 1024].map((limit) => (
+                      <button
+                        key={limit ?? 'all'}
+                        onClick={() => { setChunkTokenLimit(limit); setChunkPage(1) }}
+                        className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                          chunkTokenLimit === limit
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                        }`}
+                      >
+                        {limit ? `${limit}` : '全部'}
+                      </button>
+                    ))}
+                  </div>
+                  {/* RAG 状态过滤 */}
                   <select
                     value={chunkFilterRag === undefined ? 'all' : chunkFilterRag ? 'enabled' : 'disabled'}
                     onChange={(e) => {

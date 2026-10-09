@@ -142,6 +142,7 @@ export async function listDocumentChunks(
   documentId: string,
   params?: {
     is_rag_enabled?: boolean
+    chunk_token_limit?: number
     page?: number
     page_size?: number
   }

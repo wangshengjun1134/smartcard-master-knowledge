@@ -899,6 +899,7 @@ def insert_chunks(chunks: List[Dict[str, Any]]) -> None:
 def query_chunks(
     document_id: Optional[str] = None,
     is_rag_enabled: Optional[bool] = None,
+    chunk_token_limit: Optional[int] = None,
     order_by: str = "chunk_index"
 ) -> List[Dict[str, Any]]:
     """
@@ -906,6 +907,7 @@ def query_chunks(
 
     :param document_id: 文档 ID
     :param is_rag_enabled: 是否启用 RAG
+    :param chunk_token_limit: 按 token 限制过滤
     :param order_by: 排序字段
     :return: 查询结果列表
     """
@@ -921,6 +923,9 @@ def query_chunks(
     if is_rag_enabled is not None:
         conditions.append("is_rag_enabled = %s")
         params.append(is_rag_enabled)
+    if chunk_token_limit is not None:
+        conditions.append("chunk_token_limit = %s")
+        params.append(chunk_token_limit)
 
     where_clause = " AND ".join(conditions) if conditions else "TRUE"
     query = f"SELECT * FROM doc_chunks WHERE {where_clause} ORDER BY {order_by}"

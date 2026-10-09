@@ -461,10 +461,11 @@ def get_document_statistics(document_id: str):
 def list_document_chunks(
     document_id: str,
     is_rag_enabled: Optional[bool] = None,
+    chunk_token_limit: Optional[int] = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
 ):
-    """获取文档的 Chunk 列表（支持分页）"""
+    """获取文档的 Chunk 列表（支持分页和 token 限制过滤）"""
     # 检查文档是否存在
     docs = query_document_info(document_id=document_id)
     if not docs:
@@ -473,6 +474,7 @@ def list_document_chunks(
     all_chunks = query_chunks(
         document_id=document_id,
         is_rag_enabled=is_rag_enabled,
+        chunk_token_limit=chunk_token_limit,
         order_by="chunk_index",
     )
 
