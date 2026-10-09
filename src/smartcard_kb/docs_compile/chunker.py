@@ -26,16 +26,18 @@ class Chunker:
         do_ocr: bool = True,
         max_tokens: int = 512,
         tokenizer_name: Optional[str] = None,
+        token_limits: Optional[List[int]] = None,
     ):
         """
         初始化分块器
 
         :param do_ocr: 是否启用 OCR
-        :param max_tokens: 分块最大 token 数
+        :param max_tokens: 分块最大 token 数（保留兼容，实际使用 token_limits）
         :param tokenizer_name: tokenizer 路径或 HuggingFace 模型 ID，默认使用本地 embedding_model 路径
+        :param token_limits: 要生成的 token 限制列表，默认 [256, 512, 1024]
         """
         self.do_ocr = do_ocr
-        self.max_tokens = max_tokens
+        self.token_limits = token_limits or [256, 512, 1024]
         raw_tokenizer = tokenizer_name or str(settings.embedding_model)
         # Resolve to absolute path if relative
         tokenizer_path = Path(raw_tokenizer)
@@ -71,14 +73,17 @@ class Chunker:
 
         # HybridChunker - 使用自定义 serializer provider
         tokenizer = AutoTokenizer.from_pretrained(self._tokenizer_path, local_files_only=True)
-        self.chunker = HybridChunker(
-            tokenizer=HuggingFaceTokenizer(
-                tokenizer=tokenizer,
-                max_tokens=max_tokens,
-            ),
-            merge_peers=True,
-            serializer_provider=CustomChunkingSerializerProvider(),
-        )
+        # Create chunkers for each token limit
+        self.chunkers = {}
+        for limit in self.token_limits:
+            self.chunkers[limit] = HybridChunker(
+                tokenizer=HuggingFaceTokenizer(
+                    tokenizer=tokenizer,
+                    max_tokens=limit,
+                ),
+                merge_peers=True,
+                serializer_provider=CustomChunkingSerializerProvider(),
+            )
 
     def generate_chunks(
         self,
@@ -115,14 +120,17 @@ class Chunker:
         VLMPictureSerializer.vlm_map = vlm_map
         t2 = time.time()
 
-        # 4. 执行分块
-        chunks = self._extract_chunks(result.document, document_id, all_items)
-        insert_chunks(chunks)
+        # 4. 对每个 token limit 执行分块
+        all_chunks = []
+        for limit in self.token_limits:
+            chunks = self._extract_chunks(result.document, document_id, all_items, limit)
+            all_chunks.extend(chunks)
+        insert_chunks(all_chunks)
         t3 = time.time()
 
-        logger.debug(f"convert: {t1-t0:.2f}s, inject: {t2-t1:.2f}s, chunks: {t3-t2:.2f}s")
+        logger.info(f"convert: {t1-t0:.2f}s, inject: {t2-t1:.2f}s, chunks ({len(self.token_limits)} limits): {t3-t2:.2f}s, total: {len(all_chunks)} chunks")
 
-        return {"chunks": chunks}
+        return {"chunks": all_chunks}
 
     def _build_vlm_map(self, picture_items: List[Dict[str, Any]]) -> Dict[str, str]:
         """构建 self_ref -> vlm_description 映射"""
@@ -142,6 +150,7 @@ class Chunker:
         doc,
         document_id: str,
         items: List[Dict[str, Any]],
+        token_limit: int,
     ) -> List[Dict[str, Any]]:
         """
         使用 HybridChunker 对文档进行语义分块
@@ -149,8 +158,11 @@ class Chunker:
         :param doc: Docling 转换后的文档对象
         :param document_id: 文档 ID
         :param items: 已提取的 item 列表（用于关联）
+        :param token_limit: 当前 token 限制
         :return: chunk 列表
         """
+        chunker = self.chunkers[token_limit]
+
         # self_ref → item_id 映射
         ref_to_id = {
             it["self_ref"]: it["id"]
@@ -159,7 +171,7 @@ class Chunker:
         }
 
         chunks = []
-        for idx, chunk in enumerate(self.chunker.chunk(doc)):
+        for idx, chunk in enumerate(chunker.chunk(doc)):
             if not chunk.text.strip():
                 continue
 
@@ -184,7 +196,7 @@ class Chunker:
 
             # 计算 token 数
             try:
-                tokenizer_obj = self.chunker.tokenizer.tokenizer
+                tokenizer_obj = chunker.tokenizer.tokenizer
                 encoded = tokenizer_obj.encode(chunk.text)
                 token_count = len(encoded)
             except Exception as e:
@@ -202,7 +214,7 @@ class Chunker:
                 "page_nos": sorted(page_nos),
                 "token_count": token_count,
                 "is_rag_enabled": True,
-                "chunk_token_limit": self.max_tokens,
+                "chunk_token_limit": token_limit,
                 "tokenizer": self.tokenizer_name,
             })
 
