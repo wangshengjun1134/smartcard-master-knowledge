@@ -36,7 +36,13 @@ class Chunker:
         """
         self.do_ocr = do_ocr
         self.max_tokens = max_tokens
-        self.tokenizer_name = tokenizer_name or str(settings.embedding_model)
+        raw_tokenizer = tokenizer_name or str(settings.embedding_model)
+        # Resolve to absolute path if relative
+        tokenizer_path = Path(raw_tokenizer)
+        if not tokenizer_path.is_absolute():
+            project_root = Path(__file__).resolve().parent.parent.parent.parent
+            tokenizer_path = project_root / raw_tokenizer
+        self.tokenizer_name = str(tokenizer_path)
 
         # Resolve artifacts_path to pre-downloaded docling models
         project_root = Path(__file__).resolve().parent.parent.parent.parent
@@ -65,7 +71,7 @@ class Chunker:
         )
 
         # HybridChunker - 使用自定义 serializer provider
-        tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, local_files_only=True)
+        tokenizer = AutoTokenizer.from_pretrained(self.tokenizer_name, local_files_only=True)
         self.chunker = HybridChunker(
             tokenizer=HuggingFaceTokenizer(
                 tokenizer=tokenizer,

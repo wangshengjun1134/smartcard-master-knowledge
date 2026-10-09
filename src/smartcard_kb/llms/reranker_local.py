@@ -1,9 +1,11 @@
 """本地重排模型后端（基于 BGE-Reranker）"""
 
 import os
-from typing import List, Tuple
+from pathlib import Path
+from typing import List, Optional, Tuple
 
 from smartcard_kb.logger import logger
+from smartcard_kb.config import settings, MODELS_DIR
 
 from .reranker_base import RerankerBackend
 
@@ -11,11 +13,11 @@ from .reranker_base import RerankerBackend
 class LocalRerankerBackend(RerankerBackend):
     """本地重排模型后端"""
 
-    def __init__(self, model_path: str = "D:/softdata/workspaces/ai-models/bge-reranker-v2-m3"):
+    def __init__(self, model_path: Optional[str] = None):
         """
         初始化本地重排模型后端
 
-        :param model_path: 模型路径或 HuggingFace 模型 ID
+        :param model_path: 模型路径或 HuggingFace 模型 ID，默认使用 settings.reranker_model
         """
         try:
             from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -25,6 +27,13 @@ class LocalRerankerBackend(RerankerBackend):
                 "使用本地重排模型需要安装 transformers 和 torch: "
                 "pip install transformers torch"
             )
+
+        model_path = model_path or str(settings.reranker_model)
+        # Resolve to absolute path if relative
+        resolved_path = Path(model_path)
+        if not resolved_path.is_absolute():
+            resolved_path = MODELS_DIR / model_path
+        model_path = str(resolved_path)
 
         self.torch = torch
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

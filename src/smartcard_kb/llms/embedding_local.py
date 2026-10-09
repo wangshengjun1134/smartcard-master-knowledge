@@ -1,9 +1,10 @@
 """本地 Embedding 后端（基于 sentence-transformers）"""
 
+from pathlib import Path
 from typing import List, Optional
 
 from smartcard_kb.logger import logger
-from smartcard_kb.config import settings
+from smartcard_kb.config import settings, MODELS_DIR
 
 from .embedding_base import EmbeddingBackend
 
@@ -23,9 +24,13 @@ class LocalEmbeddingBackend(EmbeddingBackend):
             raise ImportError("使用本地 Embedding 后端需要安装 sentence-transformers: pip install sentence-transformers")
 
         model_name = model_name or str(settings.embedding_model)
-        self.model = SentenceTransformer(model_name)
-        self.model_name = model_name
-        logger.info(f"本地 Embedding 后端初始化完成: {model_name}")
+        # Resolve to absolute path if relative
+        model_path = Path(model_name)
+        if not model_path.is_absolute():
+            model_path = MODELS_DIR / model_name
+        self.model = SentenceTransformer(str(model_path))
+        self.model_name = str(model_path)
+        logger.info(f"本地 Embedding 后端初始化完成: {self.model_name}")
 
     def embed(self, text: str) -> List[float]:
         """调用本地模型生成向量嵌入"""

@@ -10,17 +10,18 @@ import numpy as np
 from PIL import Image
 
 from smartcard_kb.logger import logger
+from smartcard_kb.config import settings
 
 from .llms import LocalQwenVLMBackend, OpenAICompatibleBackend, VLMBackend
 
 class ImageContentExtractor:
     """
     结合 OCR 空间坐标与 VLM 的图片内容提取器
-    
+
     使用示例：
         # 使用本地模型
-        extractor = ImageContentExtractor(backend_type="local", model_path="/path/to/model")
-        
+        extractor = ImageContentExtractor(backend_type="local")
+
         # 使用 DashScope API
         extractor = ImageContentExtractor(
             backend_type="openai",
@@ -34,7 +35,7 @@ class ImageContentExtractor:
         self,
         backend_type: str = "openai",
         *,
-        model_path: str = r"D:\softdata\workspaces\ai-models\Qwen3-VL-8B-Instruct",
+        model_path: Optional[str] = None,
         device: Optional[str] = None,
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
@@ -44,7 +45,7 @@ class ImageContentExtractor:
         """
         初始化提取器
         :param backend_type: 后端类型 ("local" 或 "openai")
-        :param model_path: 本地模型路径（仅 local 后端）
+        :param model_path: 本地模型路径（仅 local 后端，默认使用 settings.vlm_local_model_path）
         :param device: 运行设备（仅 local 后端）
         :param api_key: API Key（仅 openai 后端）
         :param base_url: API 基础 URL（仅 openai 后端）
@@ -61,7 +62,8 @@ class ImageContentExtractor:
 
         # 初始化 VLM 后端
         if backend_type == "local":
-            self.backend = LocalQwenVLMBackend(model_path=model_path, device=device)
+            resolved_model_path = model_path or str(settings.vlm_local_model_path)
+            self.backend = LocalQwenVLMBackend(model_path=resolved_model_path, device=device)
         elif backend_type == "openai":
             if not api_key or not base_url:
                 raise ValueError("使用 openai 后端需要提供 api_key 和 base_url")

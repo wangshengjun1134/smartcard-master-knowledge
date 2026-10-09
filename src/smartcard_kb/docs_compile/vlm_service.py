@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 from PIL import Image
 
 from smartcard_kb.logger import logger
+from smartcard_kb.config import settings
 
 from .database import query_document_items, get_connection
 from ..llms.vlm_base import VLMBackend
@@ -41,8 +42,9 @@ class VLMService:
                 model=kwargs["model"],
             )
         elif backend_type == "local":
+            model_path = kwargs.get("model_path") or str(settings.vlm_local_model_path)
             return LocalQwenVLMBackend(
-                model_path=kwargs["model_path"],
+                model_path=model_path,
             )
         else:
             raise ValueError(f"Unsupported VLM backend type: {backend_type}")
