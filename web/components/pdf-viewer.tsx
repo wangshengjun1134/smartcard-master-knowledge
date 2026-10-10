@@ -26,10 +26,10 @@ export default function PdfViewer({ documentId, startPage }: PdfViewerProps) {
     const init = async () => {
       try {
         // Dynamically import pdf.js only on client side
-        const pdfjsLib = (await import('pdfjs-dist')).default
-        const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.min.mjs')
+        const pdfjsLib = await import('pdfjs-dist')
 
-        pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker.default
+        // Use worker served from /public (copied from pdfjs-dist package)
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
 
         // Fetch PDF blob
         const response = await fetch(`/api/docs/${documentId}/file`)
