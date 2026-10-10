@@ -6,7 +6,7 @@ import numpy as np
 
 from smartcard_kb.logger import logger
 
-from .database import query_chunks
+from .database import query_chunks, query_document_info
 from ..llms.embedding_base import EmbeddingBackend
 from ..llms.reranker_base import RerankerBackend
 
@@ -80,6 +80,9 @@ class SearchService:
 
         if not results:
             logger.warning(f"Search: no results passed threshold (query='{query}')")
+
+        # 4. 补充文档信息
+        results = self._enrich_with_doc_info(results)
 
         return {
             "query": query,
@@ -220,8 +223,33 @@ class SearchService:
         """计算余弦相似度"""
         norm1 = np.linalg.norm(vec1)
         norm2 = np.linalg.norm(vec2)
-        
+
         if norm1 == 0 or norm2 == 0:
             return 0.0
-        
+
         return float(np.dot(vec1, vec2) / (norm1 * norm2))
+
+    def _enrich_with_doc_info(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """为检索结果补充文档信息（文档名称、文件路径）"""
+        # 收集所有唯一的 document_id
+        doc_ids = set(r.get("document_id") for r in results if r.get("document_id"))
+
+        # 批量查询文档信息
+        doc_map = {}
+        for doc_id in doc_ids:
+            docs = query_document_info(document_id=doc_id)
+            if docs:
+                doc = docs[0]
+                doc_map[doc_id] = {
+                    "document_name": doc.get("file_name", ""),
+                    "file_path": doc.get("file_path", ""),
+                }
+
+        # 补充到结果中
+        for result in results:
+            doc_id = result.get("document_id")
+            doc_info = doc_map.get(doc_id, {})
+            result["document_name"] = doc_info.get("document_name", "")
+            result["file_path"] = doc_info.get("file_path", "")
+
+        return results

@@ -66,6 +66,8 @@ class SearchResult(BaseModel):
     """检索结果项"""
     id: str
     document_id: str
+    document_name: str
+    file_path: str
     chunk_index: int
     text: str
     score: float
