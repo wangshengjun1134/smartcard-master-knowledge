@@ -28,9 +28,10 @@ class LocalEmbeddingBackend(EmbeddingBackend):
         model_path = Path(raw_model_name)
         if not model_path.is_absolute():
             model_path = MODELS_DIR / raw_model_name
-        self._model_name = str(model_path)
-        self.model = SentenceTransformer(self._model_name)
-        logger.info(f"本地 Embedding 后端初始化完成: {self._model_name}")
+        self._model_path = str(model_path)
+        self._model_name = Path(raw_model_name).name  # Just the model directory name
+        self.model = SentenceTransformer(self._model_path)
+        logger.info(f"本地 Embedding 后端初始化完成: {self._model_path}")
 
     @property
     def model_name(self) -> str:
