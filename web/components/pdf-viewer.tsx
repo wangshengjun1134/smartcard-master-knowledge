@@ -9,46 +9,27 @@ interface PdfViewerProps {
   documentName: string
 }
 
-export default function PdfViewer({ documentId, startPage, documentName }: PdfViewerProps) {
+export default function PdfViewer({ documentId, startPage }: PdfViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const canvasRefs = useRef<Map<number, HTMLCanvasElement | null>>(new Map())
+  const canvasContainerRef = useRef<HTMLDivElement>(null)
   const [totalPages, setTotalPages] = useState(0)
   const [loadedEndPage, setLoadedEndPage] = useState(0)
   const [rendering, setRendering] = useState<Set<number>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const pdfDocRef = useRef<any>(null)
+  const isRenderingRef = useRef(false)
 
-  // Load pdf.js v3.x from CDN (better compatibility)
+  // Load pdf.js and PDF document
   useEffect(() => {
-    const loadPdfJs = () => {
-      return new Promise<void>((resolve, reject) => {
-        if ((window as any).pdfjsLib) {
-          resolve()
-          return
-        }
-        const link = document.createElement('link')
-        link.rel = 'stylesheet'
-        link.href = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css'
-        document.head.appendChild(link)
+    let cancelled = false
 
-        const script = document.createElement('script')
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
-        script.onload = () => resolve()
-        script.onerror = () => reject(new Error('Failed to load pdf.js'))
-        document.head.appendChild(script)
-      })
-    }
-
-    loadPdfJs().then(async () => {
+    const init = async () => {
       try {
-        const pdfjsLib = (window as any).pdfjsLib
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+        // Dynamically import pdf.js only on client side
+        const pdfjsLib = (await import('pdfjs-dist')).default
+        const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.min.mjs')
 
-        // Get total pages first
-        const countResp = await fetch(`/api/docs/${documentId}/page-count`)
-        if (!countResp.ok) throw new Error('Failed to get page count')
-        const countData = await countResp.json()
-        setTotalPages(countData.total_pages)
+        pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker.default
 
         // Fetch PDF blob
         const response = await fetch(`/api/docs/${documentId}/file`)
@@ -57,6 +38,8 @@ export default function PdfViewer({ documentId, startPage, documentName }: PdfVi
         const arrayBuffer = await blob.arrayBuffer()
 
         const doc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+        if (cancelled) return
+
         pdfDocRef.current = doc
         setTotalPages(doc.numPages)
 
@@ -64,29 +47,36 @@ export default function PdfViewer({ documentId, startPage, documentName }: PdfVi
         const initialEnd = Math.min(doc.numPages, startPage + 1)
         setLoadedEndPage(initialEnd)
       } catch (err: any) {
-        console.error('PDF load error:', err)
-        setError(err.message || 'Failed to load PDF')
+        console.error('PDF init error:', err)
+        if (!cancelled) {
+          setError(err.message || 'Failed to load PDF')
+        }
       }
-    }).catch((err) => {
-      setError(err.message || 'Failed to load PDF library')
-    })
+    }
+
+    init()
+
+    return () => { cancelled = true }
   }, [documentId, startPage])
 
   // Render a single page
   const renderPage = useCallback(async (pageNum: number) => {
     if (!pdfDocRef.current) return
-    if (canvasRefs.current.has(pageNum)) return
 
     try {
       setRendering(prev => new Set(prev).add(pageNum))
       const page = await pdfDocRef.current.getPage(pageNum)
-      const canvas = canvasRefs.current.get(pageNum)
+
+      const container = canvasContainerRef.current
+      if (!container) return
+
+      // Find the canvas for this page
+      const canvas = container.querySelector(`canvas[data-page="${pageNum}"]`) as HTMLCanvasElement
       if (!canvas) return
 
-      const container = containerRef.current
-      const containerWidth = container ? container.clientWidth - 32 : 800
+      const containerWidth = container.clientWidth - 32
       const viewport = page.getViewport({ scale: 1 })
-      const scale = containerWidth / viewport.width
+      const scale = Math.min(containerWidth / viewport.width, 2) // max 2x scale
       const scaledViewport = page.getViewport({ scale })
 
       canvas.width = scaledViewport.width
@@ -115,16 +105,32 @@ export default function PdfViewer({ documentId, startPage, documentName }: PdfVi
     }
   }, [])
 
-  // Render pages in range
+  // Render pages when loadedEndPage changes
   useEffect(() => {
-    if (!loadedEndPage) return
+    if (!loadedEndPage || !pdfDocRef.current || isRenderingRef.current) return
+
+    isRenderingRef.current = true
     const pagesToRender: number[] = []
     for (let i = 1; i <= loadedEndPage; i++) {
-      if (!canvasRefs.current.has(i)) {
+      const canvas = canvasContainerRef.current?.querySelector(`canvas[data-page="${i}"]`) as HTMLCanvasElement | null
+      if (!canvas || !canvas.width) {
         pagesToRender.push(i)
       }
     }
-    pagesToRender.forEach(pageNum => renderPage(pageNum))
+
+    // Render sequentially to avoid overwhelming CPU
+    let idx = 0
+    const renderNext = async () => {
+      if (idx >= pagesToRender.length) {
+        isRenderingRef.current = false
+        return
+      }
+      await renderPage(pagesToRender[idx])
+      idx++
+      // Small delay between pages to keep UI responsive
+      setTimeout(renderNext, 100)
+    }
+    renderNext()
   }, [loadedEndPage, renderPage])
 
   // Handle scroll - load more pages
@@ -133,7 +139,7 @@ export default function PdfViewer({ documentId, startPage, documentName }: PdfVi
     if (!container || !totalPages) return
 
     const { scrollTop, scrollHeight, clientHeight } = container
-    if (scrollTop + clientHeight >= scrollHeight * 0.8 && loadedEndPage < totalPages) {
+    if (scrollTop + clientHeight >= scrollHeight * 0.75 && loadedEndPage < totalPages) {
       const newEnd = Math.min(totalPages, loadedEndPage + 2)
       if (newEnd > loadedEndPage) {
         setLoadedEndPage(newEnd)
@@ -160,35 +166,38 @@ export default function PdfViewer({ documentId, startPage, documentName }: PdfVi
 
   return (
     <div className="flex flex-col h-full">
-      <div className="text-xs text-muted-foreground mb-2">
-        共 {totalPages} 页，已加载 1-{loadedEndPage} 页
+      <div className="text-xs text-muted-foreground mb-2 flex items-center justify-between">
+        <span>共 {totalPages} 页，已加载 1-{loadedEndPage} 页</span>
+        <span className="text-[10px] text-muted-foreground/60">向下滚动加载更多</span>
       </div>
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-4 py-2"
+        className="flex-1 overflow-y-auto"
         style={{ maxHeight: '70vh' }}
       >
-        {Array.from({ length: loadedEndPage }, (_, i) => i + 1).map(pageNum => (
-          <div key={pageNum} className="mb-4">
-            <canvas
-              ref={el => { canvasRefs.current.set(pageNum, el) }}
-              className="border rounded shadow-sm"
-            />
-            {rendering.has(pageNum) && (
-              <div className="text-center text-xs text-muted-foreground mt-1">
-                <Loader2 className="h-3 w-3 animate-spin inline mr-1" />
-                渲染中...
-              </div>
-            )}
-          </div>
-        ))}
-        {loadedEndPage < totalPages && (
-          <div className="text-center py-4">
-            <Loader2 className="h-4 w-4 animate-spin inline mr-1 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">向下滚动加载更多页面...</span>
-          </div>
-        )}
+        <div ref={canvasContainerRef} className="px-4 py-2">
+          {/* Render canvas placeholders for all loaded pages */}
+          {Array.from({ length: loadedEndPage }, (_, i) => i + 1).map(pageNum => (
+            <div key={pageNum} className="mb-4 relative">
+              <canvas
+                data-page={pageNum}
+                className="border rounded shadow-sm"
+              />
+              {rendering.has(pageNum) && (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              )}
+            </div>
+          ))}
+          {loadedEndPage < totalPages && (
+            <div className="text-center py-6">
+              <Loader2 className="h-4 w-4 animate-spin inline mr-1 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">加载中...</span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

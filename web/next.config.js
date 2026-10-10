@@ -4,6 +4,13 @@ const nextConfig = {
     unoptimized: true,
   },
   allowedDevOrigins: ['localhost', '127.0.0.1'],
+  transpilePackages: ['pdfjs-dist'],
+  webpack: (config) => {
+    // Resolve pdfjs-dist worker
+    config.resolve.alias.canvas = false
+    config.resolve.alias.jsdom = false
+    return config
+  },
   async rewrites() {
     return [
       {
