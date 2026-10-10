@@ -70,7 +70,7 @@ class EmbeddingService:
                 continue
 
             # 检查是否已有 embedding
-            if chunk.get("embedding"):
+            if chunk.get("embedding_vec"):
                 processed_count += 1
                 continue
 
@@ -102,19 +102,18 @@ class EmbeddingService:
             return None
 
     def _update_chunk_embedding(self, chunk_id: str, embedding: List[float]) -> None:
-        """更新 chunk 的 embedding 和 embedder 字段（存储为 JSON 字节）"""
+        """更新 chunk 的 embedding_vec 和 embedder 字段"""
         conn = get_connection()
         cursor = conn.cursor()
 
-        # 将 float 列表转换为 JSON 字节存储
-        embedding_json = json.dumps(embedding)
-        embedding_bytes = embedding_json.encode('utf-8')
+        # 转换为 vector 格式（用于 HNSW 索引检索）
+        embedding_vec = json.dumps(embedding)
 
         cursor.execute("""
             UPDATE doc_chunks
-            SET embedding = %s, embedder = %s, updated_at = CURRENT_TIMESTAMP
+            SET embedding_vec = %s, embedder = %s, updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
-        """, (embedding_bytes, self.embedder_name, chunk_id))
+        """, (embedding_vec, self.embedder_name, chunk_id))
         conn.commit()
         cursor.close()
         conn.close()

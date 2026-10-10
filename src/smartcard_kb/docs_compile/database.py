@@ -162,7 +162,10 @@ def init_database():
             page_nos JSONB,
             token_count INTEGER,
             is_rag_enabled BOOLEAN DEFAULT TRUE,
-            embedding BYTEA,
+            embedding_vec vector(1024),
+            embedder TEXT,
+            chunk_token_limit INTEGER,
+            tokenizer TEXT,
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         )
@@ -226,6 +229,32 @@ def init_database():
                 WHERE table_name = 'doc_chunks' AND column_name = 'embedder'
             ) THEN
                 ALTER TABLE doc_chunks ADD COLUMN embedder TEXT;
+            END IF;
+        END $$;
+    """)
+
+    # 为已存在的 doc_chunks 表添加 embedding_vec 字段（如果不存在）
+    cursor.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'doc_chunks' AND column_name = 'embedding_vec'
+            ) THEN
+                ALTER TABLE doc_chunks ADD COLUMN embedding_vec vector(1024);
+            END IF;
+        END $$;
+    """)
+
+    # 删除旧的 embedding bytea 字段（如果存在）
+    cursor.execute("""
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'doc_chunks' AND column_name = 'embedding' AND data_type = 'bytea'
+            ) THEN
+                ALTER TABLE doc_chunks DROP COLUMN embedding;
             END IF;
         END $$;
     """)
@@ -883,7 +912,7 @@ def insert_chunks(chunks: List[Dict[str, Any]]) -> None:
             json.dumps(chunk.get("page_nos")) if chunk.get("page_nos") else None,
             chunk.get("token_count"),
             chunk.get("is_rag_enabled", True),
-            None,  # embedding 字段后续写入
+            None,  # embedding_vec 字段后续写入
             now,
             chunk.get("chunk_token_limit"),
             chunk.get("tokenizer"),
@@ -895,7 +924,7 @@ def insert_chunks(chunks: List[Dict[str, Any]]) -> None:
         INSERT INTO doc_chunks (
             id, document_id, chunk_index, text, headings, heading_path,
             linked_item_ids, page_nos, token_count, is_rag_enabled,
-            embedding, created_at, chunk_token_limit, tokenizer
+            embedding_vec, created_at, chunk_token_limit, tokenizer
         ) VALUES %s
         ON CONFLICT (id) DO UPDATE SET
             text = EXCLUDED.text
