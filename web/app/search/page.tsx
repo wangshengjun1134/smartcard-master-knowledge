@@ -53,12 +53,13 @@ export default function SearchPage() {
   const [results, setResults] = useState<SearchResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set())
-  const [pdfViewer, setPdfViewer] = useState<{ open: boolean; documentId: string; currentPage: number; totalPages: number; documentName: string }>({
+  const [pdfViewer, setPdfViewer] = useState<{ open: boolean; documentId: string; currentPage: number; totalPages: number; documentName: string; targetPages: number[] }>({
     open: false,
     documentId: '',
     currentPage: 1,
     totalPages: 0,
     documentName: '',
+    targetPages: [],
   })
 
   const handleSearch = async () => {
@@ -100,6 +101,7 @@ export default function SearchPage() {
       currentPage: firstPage,
       totalPages: 0,
       documentName: result.document_name || '',
+      targetPages: result.page_nos || [],
     })
     try {
       const total = await getDocumentPageCount(result.document_id)
@@ -380,6 +382,24 @@ export default function SearchPage() {
                   (第 {pdfViewer.currentPage}{pdfViewer.totalPages > 0 ? ` / ${pdfViewer.totalPages}` : ''} 页)
                 </span>
               </DialogTitle>
+              {pdfViewer.targetPages.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap pt-1">
+                  <span className="text-xs text-muted-foreground">目标页:</span>
+                  {pdfViewer.targetPages.map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => setPdfViewer(prev => ({ ...prev, currentPage: page }))}
+                      className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                        pdfViewer.currentPage === page
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+              )}
             </DialogHeader>
             <div className="flex-1 overflow-hidden">
               <iframe
