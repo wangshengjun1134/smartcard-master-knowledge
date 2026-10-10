@@ -20,7 +20,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import PdfViewer from '@/components/pdf-viewer'
 
 interface SearchResult {
   id: string
@@ -376,10 +375,10 @@ export default function SearchPage() {
               </DialogTitle>
             </DialogHeader>
             <div className="flex-1 overflow-hidden">
-              <PdfViewer
-                documentId={pdfViewer.documentId}
-                startPage={pdfViewer.startPage}
-                documentName={pdfViewer.documentName}
+              <iframe
+                src={`/api/docs/${pdfViewer.documentId}/pages?start_page=${pdfViewer.startPage}&end_page=${pdfViewer.endPage}`}
+                className="w-full h-[70vh] border-0"
+                title="PDF Viewer"
               />
             </div>
           </DialogContent>
