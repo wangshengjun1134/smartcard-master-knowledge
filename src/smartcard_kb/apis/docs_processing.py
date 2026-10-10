@@ -1226,3 +1226,45 @@ async def get_document_pages(
             "Cache-Control": "no-cache",
         },
     )
+
+
+class PageCountResponse(BaseModel):
+    """页码统计响应"""
+    total_pages: int
+
+
+@router.get("/{document_id}/page-count", response_model=PageCountResponse)
+async def get_document_page_count(document_id: str):
+    """
+    获取文档总页数
+
+    - **document_id**: 文档 ID
+    """
+    import fitz  # PyMuPDF
+
+    # Query document info
+    doc_list = query_document_info(document_id=document_id)
+    if not doc_list:
+        raise HTTPException(status_code=404, detail=f"文档 {document_id} 不存在")
+    doc_info = doc_list[0]
+
+    file_path = doc_info.get("file_path")
+    if not file_path:
+        raise HTTPException(status_code=404, detail=f"文档 {document_id} 没有文件路径")
+
+    resolved_path = Path(file_path)
+    if not resolved_path.is_absolute():
+        project_root = Path(__file__).resolve().parent.parent.parent.parent
+        resolved_path = project_root / resolved_path
+
+    if not resolved_path.exists():
+        raise HTTPException(status_code=404, detail=f"文件不存在: {resolved_path}")
+
+    try:
+        src_doc = fitz.open(str(resolved_path))
+        total_pages = len(src_doc)
+        src_doc.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"无法打开 PDF 文件: {str(e)}")
+
+    return PageCountResponse(total_pages=total_pages)

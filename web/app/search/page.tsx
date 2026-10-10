@@ -13,13 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Search, FileText, Highlighter, ChevronDown, ChevronUp, Home, Eye } from 'lucide-react'
+import { Search, FileText, Highlighter, ChevronDown, ChevronUp, Home } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import PdfViewer from '@/components/pdf-viewer'
 
 interface SearchResult {
   id: string
@@ -53,10 +54,10 @@ export default function SearchPage() {
   const [results, setResults] = useState<SearchResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set())
-  const [pdfViewer, setPdfViewer] = useState<{ open: boolean; documentId: string; pageNos: number[]; documentName: string }>({
+  const [pdfViewer, setPdfViewer] = useState<{ open: boolean; documentId: string; startPage: number; documentName: string }>({
     open: false,
     documentId: '',
-    pageNos: [],
+    startPage: 1,
     documentName: '',
   })
 
@@ -281,12 +282,15 @@ export default function SearchPage() {
                               </Badge>
                               {result.document_name && (
                                 <button
-                                  onClick={() => setPdfViewer({
-                                    open: true,
-                                    documentId: result.document_id,
-                                    pageNos: result.page_nos,
-                                    documentName: result.document_name || '',
-                                  })}
+                                  onClick={() => {
+                                    const firstPage = result.page_nos[0] || 1
+                                    setPdfViewer({
+                                      open: true,
+                                      documentId: result.document_id,
+                                      startPage: firstPage,
+                                      documentName: result.document_name || '',
+                                    })
+                                  }}
                                   className="text-xs font-medium text-primary hover:underline cursor-pointer"
                                 >
                                   {result.document_name}
@@ -358,23 +362,21 @@ export default function SearchPage() {
 
         {/* PDF 查看器对话框 */}
         <Dialog open={pdfViewer.open} onOpenChange={(open) => setPdfViewer(prev => ({ ...prev, open }))}>
-          <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
                 {pdfViewer.documentName}
-                {pdfViewer.pageNos.length > 0 && (
-                  <span className="text-sm font-normal text-muted-foreground">
-                    (页码: {pdfViewer.pageNos.join(', ')})
-                  </span>
-                )}
+                <span className="text-sm font-normal text-muted-foreground">
+                  (第 {pdfViewer.startPage} 页)
+                </span>
               </DialogTitle>
             </DialogHeader>
-            <div className="overflow-auto flex-1">
-              <iframe
-                src={`/api/docs/${pdfViewer.documentId}/pages?start_page=${pdfViewer.pageNos[0] || 1}&end_page=${pdfViewer.pageNos[pdfViewer.pageNos.length - 1] || pdfViewer.pageNos[0] || 1}`}
-                className="w-full h-[70vh] border-0"
-                title="PDF Viewer"
+            <div className="flex-1 overflow-hidden">
+              <PdfViewer
+                documentId={pdfViewer.documentId}
+                startPage={pdfViewer.startPage}
+                documentName={pdfViewer.documentName}
               />
             </div>
           </DialogContent>
