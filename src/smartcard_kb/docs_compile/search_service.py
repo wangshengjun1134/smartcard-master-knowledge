@@ -3,10 +3,11 @@
 import json
 from typing import List, Dict, Any, Optional, Tuple
 import numpy as np
+import psycopg2.extras
 
 from smartcard_kb.logger import logger
 
-from .database import query_chunks, query_document_info
+from .database import query_chunks, query_document_info, get_connection
 from ..llms.embedding_base import EmbeddingBackend
 from ..llms.reranker_base import RerankerBackend
 
@@ -98,52 +99,44 @@ class SearchService:
         top_k: int,
         threshold: float,
     ) -> List[Dict[str, Any]]:
-        """向量检索"""
+        """向量检索（使用 HNSW 索引）"""
         # 生成查询向量
         query_embedding = self.embedding_backend.embed(query)
-        query_vec = np.array(query_embedding)
+        query_embedding_json = json.dumps(query_embedding)
 
-        # 计算相似度
+        # 使用 HNSW 索引进行相似度搜索
+        conn = get_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        cursor.execute("""
+            SELECT id, document_id, chunk_index, text, headings, heading_path,
+                   linked_item_ids, page_nos, token_count, is_rag_enabled,
+                   chunk_token_limit, tokenizer, embedder, created_at,
+                   1 - (embedding_vec <=> %s::vector) as score
+            FROM doc_chunks
+            WHERE embedding_vec IS NOT NULL
+              AND 1 - (embedding_vec <=> %s::vector) >= %s
+            ORDER BY embedding_vec <=> %s::vector
+            LIMIT %s
+        """, (query_embedding_json, query_embedding_json, threshold, query_embedding_json, top_k))
+
         scored_chunks = []
-        skipped_no_embedding = 0
-        for chunk in chunks:
-            embedding_bytes = chunk.get("embedding")
-            if not embedding_bytes:
-                skipped_no_embedding += 1
-                continue
+        for row in cursor.fetchall():
+            # 反序列化 JSON 字段
+            for json_field in ["headings", "linked_item_ids", "page_nos"]:
+                if row.get(json_field) and isinstance(row[json_field], str):
+                    try:
+                        row[json_field] = json.loads(row[json_field])
+                    except (json.JSONDecodeError, TypeError):
+                        row[json_field] = None
+            scored_chunks.append(dict(row))
 
-            # 解析 embedding（JSON 字节格式）
-            try:
-                # PostgreSQL bytea 返回 memoryview，需要转换
-                if isinstance(embedding_bytes, memoryview):
-                    embedding_bytes = embedding_bytes.tobytes()
-                if isinstance(embedding_bytes, bytes):
-                    embedding_json = embedding_bytes.decode('utf-8')
-                else:
-                    embedding_json = str(embedding_bytes)
-                chunk_embedding = json.loads(embedding_json)
-            except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
-                logger.warning(f"Warning: Failed to parse embedding for chunk {chunk.get('id')}: {e}")
-                continue
+        cursor.close()
+        conn.close()
 
-            chunk_vec = np.array(chunk_embedding)
+        logger.info(f"Vector search (HNSW): {len(scored_chunks)} chunks matched (threshold={threshold})")
 
-            # 计算余弦相似度
-            similarity = self._cosine_similarity(query_vec, chunk_vec)
-
-            if similarity >= threshold:
-                scored_chunks.append({
-                    **chunk,
-                    "score": float(similarity),
-                })
-
-        # 按相似度降序排序
-        scored_chunks.sort(key=lambda x: x["score"], reverse=True)
-
-        if skipped_no_embedding > 0:
-            logger.warning(f"Vector search: {skipped_no_embedding} chunks skipped (no embedding)")
-
-        return scored_chunks[:top_k]
+        return scored_chunks
 
     def _keyword_search(
         self,
