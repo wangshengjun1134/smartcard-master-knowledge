@@ -102,9 +102,11 @@ class SearchService:
 
         # 计算相似度
         scored_chunks = []
+        skipped_no_embedding = 0
         for chunk in chunks:
             embedding_bytes = chunk.get("embedding")
             if not embedding_bytes:
+                skipped_no_embedding += 1
                 continue
 
             # 解析 embedding（JSON 字节格式）
@@ -134,6 +136,9 @@ class SearchService:
 
         # 按相似度降序排序
         scored_chunks.sort(key=lambda x: x["score"], reverse=True)
+
+        if skipped_no_embedding > 0:
+            logger.warning(f"Vector search: {skipped_no_embedding} chunks skipped (no embedding)")
 
         return scored_chunks[:top_k]
 
