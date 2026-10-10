@@ -23,14 +23,19 @@ class LocalEmbeddingBackend(EmbeddingBackend):
         except ImportError:
             raise ImportError("使用本地 Embedding 后端需要安装 sentence-transformers: pip install sentence-transformers")
 
-        model_name = model_name or str(settings.embedding_model)
+        raw_model_name = model_name or str(settings.embedding_model)
         # Resolve to absolute path if relative
-        model_path = Path(model_name)
+        model_path = Path(raw_model_name)
         if not model_path.is_absolute():
-            model_path = MODELS_DIR / model_name
-        self.model = SentenceTransformer(str(model_path))
-        self.model_name = str(model_path)
-        logger.info(f"本地 Embedding 后端初始化完成: {self.model_name}")
+            model_path = MODELS_DIR / raw_model_name
+        self._model_name = str(model_path)
+        self.model = SentenceTransformer(self._model_name)
+        logger.info(f"本地 Embedding 后端初始化完成: {self._model_name}")
+
+    @property
+    def model_name(self) -> str:
+        """返回模型名称"""
+        return self._model_name
 
     def embed(self, text: str) -> List[float]:
         """调用本地模型生成向量嵌入"""
