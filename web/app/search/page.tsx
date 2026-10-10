@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { searchDocuments } from '@/lib/api'
+import { searchDocuments, getDocumentPageCount } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Search, FileText, Highlighter, ChevronDown, ChevronUp, Home } from 'lucide-react'
+import { Search, FileText, Highlighter, ChevronDown, ChevronUp, Home, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -53,11 +53,11 @@ export default function SearchPage() {
   const [results, setResults] = useState<SearchResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set())
-  const [pdfViewer, setPdfViewer] = useState<{ open: boolean; documentId: string; startPage: number; endPage: number; documentName: string }>({
+  const [pdfViewer, setPdfViewer] = useState<{ open: boolean; documentId: string; currentPage: number; totalPages: number; documentName: string }>({
     open: false,
     documentId: '',
-    startPage: 1,
-    endPage: 1,
+    currentPage: 1,
+    totalPages: 0,
     documentName: '',
   })
 
@@ -90,6 +90,23 @@ export default function SearchPage() {
       newExpanded.add(index)
     }
     setExpandedChunks(newExpanded)
+  }
+
+  const openPdfViewer = async (result: SearchResult) => {
+    const firstPage = result.page_nos[0] || 1
+    setPdfViewer({
+      open: true,
+      documentId: result.document_id,
+      currentPage: firstPage,
+      totalPages: 0,
+      documentName: result.document_name || '',
+    })
+    try {
+      const total = await getDocumentPageCount(result.document_id)
+      setPdfViewer(prev => ({ ...prev, totalPages: total }))
+    } catch (error) {
+      console.error('Failed to get page count:', error)
+    }
   }
 
   const getScoreColor = (score: number) => {
@@ -282,17 +299,7 @@ export default function SearchPage() {
                               </Badge>
                               {result.document_name && (
                                 <button
-                                  onClick={() => {
-                                    const firstPage = result.page_nos[0] || 1
-                                    const lastPage = result.page_nos[result.page_nos.length - 1] || firstPage
-                                    setPdfViewer({
-                                      open: true,
-                                      documentId: result.document_id,
-                                      startPage: firstPage,
-                                      endPage: lastPage,
-                                      documentName: result.document_name || '',
-                                    })
-                                  }}
+                                  onClick={() => openPdfViewer(result)}
                                   className="text-xs font-medium text-primary hover:underline cursor-pointer"
                                 >
                                   {result.document_name}
@@ -370,16 +377,43 @@ export default function SearchPage() {
                 <FileText className="h-5 w-5" />
                 {pdfViewer.documentName}
                 <span className="text-sm font-normal text-muted-foreground">
-                  (第 {pdfViewer.startPage}-{pdfViewer.endPage} 页)
+                  (第 {pdfViewer.currentPage}{pdfViewer.totalPages > 0 ? ` / ${pdfViewer.totalPages}` : ''} 页)
                 </span>
               </DialogTitle>
             </DialogHeader>
             <div className="flex-1 overflow-hidden">
               <iframe
-                src={`/api/docs/${pdfViewer.documentId}/pages?start_page=${pdfViewer.startPage}&end_page=${pdfViewer.endPage}`}
+                key={`${pdfViewer.documentId}-${pdfViewer.currentPage}`}
+                src={`/api/docs/${pdfViewer.documentId}/pages?start_page=${pdfViewer.currentPage}&end_page=${pdfViewer.currentPage}`}
                 className="w-full h-[70vh] border-0"
                 title="PDF Viewer"
               />
+            </div>
+            {/* 翻页按钮 */}
+            <div className="flex items-center justify-center gap-4 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                disabled={pdfViewer.currentPage <= 1}
+                onClick={() => setPdfViewer(prev => ({ ...prev, currentPage: Math.max(1, prev.currentPage - 1) }))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                上一页
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                {pdfViewer.currentPage}{pdfViewer.totalPages > 0 ? ` / ${pdfViewer.totalPages}` : ''}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                disabled={pdfViewer.totalPages > 0 && pdfViewer.currentPage >= pdfViewer.totalPages}
+                onClick={() => setPdfViewer(prev => ({ ...prev, currentPage: prev.totalPages > 0 ? Math.min(prev.totalPages, prev.currentPage + 1) : prev.currentPage + 1 }))}
+              >
+                下一页
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
           </DialogContent>
         </Dialog>

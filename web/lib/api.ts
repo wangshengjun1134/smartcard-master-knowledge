@@ -151,6 +151,11 @@ export async function listDocumentChunks(
   return response.data
 }
 
+export async function getDocumentPageCount(documentId: string): Promise<number> {
+  const response = await api.get(`/api/docs/${documentId}/page-count`)
+  return response.data.total_pages
+}
+
 // ==================== 文档处理流程 API ====================
 
 export async function parseDocument(request: {
