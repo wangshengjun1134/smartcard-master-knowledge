@@ -113,11 +113,12 @@ def search_documents(request: SearchRequest):
             enable_rerank=request.enable_rerank,
         )
 
+        top_score = result['results'][0]['score'] if result['results'] else 0.0
         logger.info(
             f"Search completed: query='{request.query}', "
             f"total={result['total']}, "
             f"reranked={result['reranked']}, "
-            f"top_score={result['results'][0]['score']:.4f if result['results'] else 0}"
+            f"top_score={top_score:.4f}"
         )
 
         return SearchResponse(
