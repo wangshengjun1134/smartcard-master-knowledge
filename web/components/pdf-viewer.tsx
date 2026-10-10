@@ -3,12 +3,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Loader2 } from 'lucide-react'
 
-declare global {
-  interface Window {
-    pdfjsLib: any
-  }
-}
-
 interface PdfViewerProps {
   documentId: string
   startPage: number
@@ -18,68 +12,74 @@ interface PdfViewerProps {
 export default function PdfViewer({ documentId, startPage, documentName }: PdfViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRefs = useRef<Map<number, HTMLCanvasElement | null>>(new Map())
-  const [pdfLib, setPdfLib] = useState<any>(null)
-  const [pdfDoc, setPdfDoc] = useState<any>(null)
   const [totalPages, setTotalPages] = useState(0)
   const [loadedEndPage, setLoadedEndPage] = useState(0)
   const [rendering, setRendering] = useState<Set<number>>(new Set())
   const [error, setError] = useState<string | null>(null)
+  const pdfDocRef = useRef<any>(null)
 
-  // Load pdf.js from CDN
+  // Load pdf.js v3.x from CDN (better compatibility)
   useEffect(() => {
-    if (window.pdfjsLib) {
-      setPdfLib(window.pdfjsLib)
-      return
+    const loadPdfJs = () => {
+      return new Promise<void>((resolve, reject) => {
+        if ((window as any).pdfjsLib) {
+          resolve()
+          return
+        }
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css'
+        document.head.appendChild(link)
+
+        const script = document.createElement('script')
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
+        script.onload = () => resolve()
+        script.onerror = () => reject(new Error('Failed to load pdf.js'))
+        document.head.appendChild(script)
+      })
     }
 
-    const script = document.createElement('script')
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs'
-    script.type = 'module'
-    script.onload = () => {
-      setPdfLib(window.pdfjsLib)
-    }
-    script.onerror = () => setError('Failed to load PDF viewer library')
-    document.head.appendChild(script)
-  }, [])
+    loadPdfJs().then(async () => {
+      try {
+        const pdfjsLib = (window as any).pdfjsLib
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
 
-  // Load PDF document
-  const loadDocument = useCallback(async (lib: any) => {
-    try {
-      lib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs'
+        // Get total pages first
+        const countResp = await fetch(`/api/docs/${documentId}/page-count`)
+        if (!countResp.ok) throw new Error('Failed to get page count')
+        const countData = await countResp.json()
+        setTotalPages(countData.total_pages)
 
-      // Fetch PDF blob
-      const response = await fetch(`/api/docs/${documentId}/file`)
-      if (!response.ok) throw new Error('Failed to fetch PDF')
-      const blob = await response.blob()
-      const arrayBuffer = await blob.arrayBuffer()
+        // Fetch PDF blob
+        const response = await fetch(`/api/docs/${documentId}/file`)
+        if (!response.ok) throw new Error(`Failed to fetch PDF: ${response.status}`)
+        const blob = await response.blob()
+        const arrayBuffer = await blob.arrayBuffer()
 
-      const doc = await lib.getDocument({ data: arrayBuffer }).promise
-      setPdfDoc(doc)
-      setTotalPages(doc.numPages)
+        const doc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+        pdfDocRef.current = doc
+        setTotalPages(doc.numPages)
 
-      // Calculate initial page range
-      const initialStart = Math.max(1, startPage - 2)
-      const initialEnd = Math.min(doc.numPages, startPage + 2)
-      setLoadedEndPage(initialEnd)
-    } catch (err: any) {
-      setError(err.message || 'Failed to load PDF')
-    }
+        // Initial: load startPage ± 1
+        const initialEnd = Math.min(doc.numPages, startPage + 1)
+        setLoadedEndPage(initialEnd)
+      } catch (err: any) {
+        console.error('PDF load error:', err)
+        setError(err.message || 'Failed to load PDF')
+      }
+    }).catch((err) => {
+      setError(err.message || 'Failed to load PDF library')
+    })
   }, [documentId, startPage])
 
-  useEffect(() => {
-    if (pdfLib && !pdfDoc) {
-      loadDocument(pdfLib)
-    }
-  }, [pdfLib, pdfDoc, loadDocument])
-
   // Render a single page
-  const renderPage = async (pageNum: number) => {
-    if (!pdfDoc || !pdfLib) return
-    if (canvasRefs.current.has(pageNum)) return // Already rendered
+  const renderPage = useCallback(async (pageNum: number) => {
+    if (!pdfDocRef.current) return
+    if (canvasRefs.current.has(pageNum)) return
 
     try {
       setRendering(prev => new Set(prev).add(pageNum))
-      const page = await pdfDoc.getPage(pageNum)
+      const page = await pdfDocRef.current.getPage(pageNum)
       const canvas = canvasRefs.current.get(pageNum)
       if (!canvas) return
 
@@ -113,11 +113,11 @@ export default function PdfViewer({ documentId, startPage, documentName }: PdfVi
         return next
       })
     }
-  }
+  }, [])
 
   // Render pages in range
   useEffect(() => {
-    if (!pdfDoc || !loadedEndPage) return
+    if (!loadedEndPage) return
     const pagesToRender: number[] = []
     for (let i = 1; i <= loadedEndPage; i++) {
       if (!canvasRefs.current.has(i)) {
@@ -125,7 +125,7 @@ export default function PdfViewer({ documentId, startPage, documentName }: PdfVi
       }
     }
     pagesToRender.forEach(pageNum => renderPage(pageNum))
-  }, [pdfDoc, loadedEndPage])
+  }, [loadedEndPage, renderPage])
 
   // Handle scroll - load more pages
   const handleScroll = useCallback(() => {
@@ -133,7 +133,6 @@ export default function PdfViewer({ documentId, startPage, documentName }: PdfVi
     if (!container || !totalPages) return
 
     const { scrollTop, scrollHeight, clientHeight } = container
-    // Load more when scrolled to 80% of the way down
     if (scrollTop + clientHeight >= scrollHeight * 0.8 && loadedEndPage < totalPages) {
       const newEnd = Math.min(totalPages, loadedEndPage + 2)
       if (newEnd > loadedEndPage) {
@@ -150,7 +149,7 @@ export default function PdfViewer({ documentId, startPage, documentName }: PdfVi
     )
   }
 
-  if (!pdfDoc) {
+  if (!pdfDocRef.current) {
     return (
       <div className="text-center py-8">
         <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-muted-foreground" />

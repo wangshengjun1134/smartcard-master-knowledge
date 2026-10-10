@@ -20,7 +20,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import PdfViewer from '@/components/pdf-viewer'
 
 interface SearchResult {
   id: string
@@ -54,10 +53,11 @@ export default function SearchPage() {
   const [results, setResults] = useState<SearchResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set())
-  const [pdfViewer, setPdfViewer] = useState<{ open: boolean; documentId: string; startPage: number; documentName: string }>({
+  const [pdfViewer, setPdfViewer] = useState<{ open: boolean; documentId: string; startPage: number; endPage: number; documentName: string }>({
     open: false,
     documentId: '',
     startPage: 1,
+    endPage: 1,
     documentName: '',
   })
 
@@ -284,10 +284,12 @@ export default function SearchPage() {
                                 <button
                                   onClick={() => {
                                     const firstPage = result.page_nos[0] || 1
+                                    const lastPage = result.page_nos[result.page_nos.length - 1] || firstPage
                                     setPdfViewer({
                                       open: true,
                                       documentId: result.document_id,
                                       startPage: firstPage,
+                                      endPage: lastPage,
                                       documentName: result.document_name || '',
                                     })
                                   }}
@@ -368,15 +370,15 @@ export default function SearchPage() {
                 <FileText className="h-5 w-5" />
                 {pdfViewer.documentName}
                 <span className="text-sm font-normal text-muted-foreground">
-                  (第 {pdfViewer.startPage} 页)
+                  (第 {pdfViewer.startPage}-{pdfViewer.endPage} 页)
                 </span>
               </DialogTitle>
             </DialogHeader>
             <div className="flex-1 overflow-hidden">
-              <PdfViewer
-                documentId={pdfViewer.documentId}
-                startPage={pdfViewer.startPage}
-                documentName={pdfViewer.documentName}
+              <iframe
+                src={`/api/docs/${pdfViewer.documentId}/pages?start_page=${pdfViewer.startPage}&end_page=${pdfViewer.endPage}`}
+                className="w-full h-[70vh] border-0"
+                title="PDF Viewer"
               />
             </div>
           </DialogContent>
