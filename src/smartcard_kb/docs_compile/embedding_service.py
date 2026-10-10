@@ -21,6 +21,7 @@ class EmbeddingService:
         :param embedding_backend: Embedding 后端实例（必需）
         """
         self.embedding_backend = embedding_backend
+        self.embedder_name = embedding_backend.model_name
 
     @staticmethod
     def create_backend(backend_type: str, **kwargs) -> EmbeddingBackend:
@@ -101,7 +102,7 @@ class EmbeddingService:
             return None
 
     def _update_chunk_embedding(self, chunk_id: str, embedding: List[float]) -> None:
-        """更新 chunk 的 embedding 字段（存储为 JSON 字节）"""
+        """更新 chunk 的 embedding 和 embedder 字段（存储为 JSON 字节）"""
         conn = get_connection()
         cursor = conn.cursor()
 
@@ -111,9 +112,9 @@ class EmbeddingService:
 
         cursor.execute("""
             UPDATE doc_chunks
-            SET embedding = %s, updated_at = CURRENT_TIMESTAMP
+            SET embedding = %s, embedder = %s, updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
-        """, (embedding_bytes, chunk_id))
+        """, (embedding_bytes, self.embedder_name, chunk_id))
         conn.commit()
         cursor.close()
         conn.close()

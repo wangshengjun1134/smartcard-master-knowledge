@@ -67,6 +67,7 @@ export interface Chunk {
   is_rag_enabled: boolean
   chunk_token_limit?: number
   tokenizer?: string
+  embedder?: string
   created_at?: string
 }
 

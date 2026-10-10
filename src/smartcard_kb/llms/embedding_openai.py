@@ -28,6 +28,11 @@ class OpenAIEmbeddingBackend(EmbeddingBackend):
         self.model = model
         logger.info(f"OpenAI Embedding 后端初始化完成: {base_url}, 模型: {model}")
 
+    @property
+    def model_name(self) -> str:
+        """返回模型名称"""
+        return self.model
+
     def embed(self, text: str) -> List[float]:
         """调用 OpenAI 兼容 API 生成向量嵌入"""
         response = self.client.embeddings.create(

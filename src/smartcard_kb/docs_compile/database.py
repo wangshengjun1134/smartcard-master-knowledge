@@ -217,6 +217,19 @@ def init_database():
         END $$;
     """)
 
+    # 为已存在的 doc_chunks 表添加 embedder 字段（如果不存在）
+    cursor.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'doc_chunks' AND column_name = 'embedder'
+            ) THEN
+                ALTER TABLE doc_chunks ADD COLUMN embedder TEXT;
+            END IF;
+        END $$;
+    """)
+
     conn.commit()
     cursor.close()
     conn.close()
