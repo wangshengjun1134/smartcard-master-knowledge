@@ -13,6 +13,41 @@ from smartcard_kb.config import settings
 router = APIRouter(prefix="/api", tags=["文档检索"])
 
 
+# ==================== 全局模型实例（单例，启动时加载一次） ====================
+
+_embedding_backend = None
+_reranker_backend = None
+_search_service = None
+
+
+def _get_search_service() -> SearchService:
+    """获取 SearchService 单例，首次调用时初始化"""
+    global _embedding_backend, _reranker_backend, _search_service
+
+    if _search_service is None:
+        logger.info("正在加载 Embedding 模型...")
+        _embedding_backend = EmbeddingService.create_backend(
+            backend_type="local",
+            model_name=settings.embedding_model,
+        )
+
+        _reranker_backend = None
+        try:
+            logger.info("正在加载 Reranker 模型...")
+            _reranker_backend = LocalRerankerBackend(model_path=settings.reranker_model)
+            logger.info("Reranker 模型加载完成")
+        except Exception as e:
+            logger.warning(f"Warning: 重排模型加载失败: {e}")
+
+        _search_service = SearchService(
+            embedding_backend=_embedding_backend,
+            reranker_backend=_reranker_backend,
+        )
+        logger.info("检索服务初始化完成")
+
+    return _search_service
+
+
 # ==================== Pydantic 模型 ====================
 
 
@@ -66,25 +101,7 @@ def search_documents(request: SearchRequest):
     - **enable_rerank**: 是否启用重排
     """
     try:
-        # 创建 Embedding 后端（使用本地模型）
-        embedding_backend = EmbeddingService.create_backend(
-            backend_type="local",
-            model_name=settings.embedding_model,
-        )
-
-        # 创建重排后端（可选）
-        reranker_backend = None
-        if request.enable_rerank:
-            try:
-                reranker_backend = LocalRerankerBackend(model_path=settings.reranker_model)
-            except Exception as e:
-                logger.warning(f"Warning: 重排模型加载失败: {e}")
-
-        # 初始化检索服务
-        service = SearchService(
-            embedding_backend=embedding_backend,
-            reranker_backend=reranker_backend,
-        )
+        service = _get_search_service()
 
         result = service.search(
             query=request.query,
@@ -96,6 +113,13 @@ def search_documents(request: SearchRequest):
             enable_rerank=request.enable_rerank,
         )
 
+        logger.info(
+            f"Search completed: query='{request.query}', "
+            f"total={result['total']}, "
+            f"reranked={result['reranked']}, "
+            f"top_score={result['results'][0]['score']:.4f if result['results'] else 0}"
+        )
+
         return SearchResponse(
             query=result["query"],
             total=result["total"],
@@ -103,4 +127,5 @@ def search_documents(request: SearchRequest):
             reranked=result["reranked"],
         )
     except Exception as e:
+        logger.error(f"Search failed: {e}")
         raise HTTPException(status_code=500, detail=f"检索失败: {str(e)}")

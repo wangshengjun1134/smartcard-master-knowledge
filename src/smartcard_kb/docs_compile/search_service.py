@@ -53,8 +53,10 @@ class SearchService:
         """
         # 1. 获取所有 chunks
         all_chunks = query_chunks(document_id=document_id)
-        
+        logger.info(f"Search step 1: loaded {len(all_chunks)} chunks (document_id={document_id or 'all'})")
+
         if not all_chunks:
+            logger.warning(f"Search: no chunks found for document_id={document_id or 'all'}")
             return {
                 "query": query,
                 "total": 0,
@@ -68,10 +70,16 @@ class SearchService:
         else:
             results = self._keyword_search(query, all_chunks, top_k)
 
+        logger.info(f"Search step 2: {len(results)} chunks passed threshold (threshold={threshold})")
+
         # 3. 重排
         reranked = False
         if enable_rerank and len(results) > 1:
             results, reranked = self._rerank(query, results, rerank_top_k, threshold)
+            logger.info(f"Search step 3: {len(results)} chunks after rerank (rerank_top_k={rerank_top_k})")
+
+        if not results:
+            logger.warning(f"Search: no results passed threshold (query='{query}')")
 
         return {
             "query": query,
