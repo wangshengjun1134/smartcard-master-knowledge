@@ -172,7 +172,7 @@ export default function SearchPage() {
             <CardContent className="space-y-6">
               {/* 参数设置（顶部） */}
               <div className="space-y-4">
-                {/* 选项类参数 */}
+                {/* 检索策略 */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
                     <Label htmlFor="search-type">检索类型</Label>
@@ -187,74 +187,6 @@ export default function SearchPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
-                    <Label htmlFor="version-policy">版本策略 (version_policy)</Label>
-                    <Select value={versionPolicy} onValueChange={setVersionPolicy}>
-                      <SelectTrigger className="mt-2">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">all（全部版本）</SelectItem>
-                        <SelectItem value="latest">latest（每个系列最新版）</SelectItem>
-                        <SelectItem value="exact">exact（指定版本）</SelectItem>
-                        <SelectItem value="selected">selected（多版本）</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="series-id">规范系列 (series_id)</Label>
-                    <Input
-                      id="series-id"
-                      className="mt-2"
-                      placeholder="如 SGP.27，多个用逗号分隔"
-                      value={seriesId}
-                      onChange={(e) => setSeriesId(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="revision">版本 (revision)</Label>
-                    <Input
-                      id="revision"
-                      className="mt-2"
-                      placeholder="如 1.16，多个用逗号分隔"
-                      value={revision}
-                      onChange={(e) => setRevision(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="language">语言 (language)</Label>
-                    <Input
-                      id="language"
-                      className="mt-2"
-                      placeholder="如 en"
-                      value={language}
-                      onChange={(e) => setLanguage(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="page-id">页码 (page_id)</Label>
-                    <Input
-                      id="page-id"
-                      className="mt-2"
-                      placeholder="如 19,20，多个用逗号分隔"
-                      value={pageId}
-                      onChange={(e) => setPageId(e.target.value)}
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <Label htmlFor="heading-path">章节路径 (heading_path)</Label>
-                    <Input
-                      id="heading-path"
-                      className="mt-2"
-                      placeholder="模糊匹配，如 4.2.18"
-                      value={headingPath}
-                      onChange={(e) => setHeadingPath(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {/* 数值参数 */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                   <div>
                     <Label htmlFor="top-k">初始召回数量 (Top K)</Label>
                     <div className="mt-2">
@@ -301,7 +233,6 @@ export default function SearchPage() {
                   </div>
                 </div>
 
-                {/* 开关 */}
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
                   <div className="flex items-center space-x-2">
                     <Switch
@@ -319,6 +250,88 @@ export default function SearchPage() {
                     />
                     <Label htmlFor="enable-threshold">启用相似度阈值</Label>
                   </div>
+                </div>
+
+                <Separator />
+
+                {/* 检索范围 */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="version-policy">版本策略 (version_policy)</Label>
+                    <Select value={versionPolicy} onValueChange={setVersionPolicy}>
+                      <SelectTrigger className="mt-2">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">all（全部版本）</SelectItem>
+                        <SelectItem value="latest">latest（每个系列最新版）</SelectItem>
+                        <SelectItem value="exact">exact（指定版本）</SelectItem>
+                        <SelectItem value="selected">selected（多版本）</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="series-id">规范系列 (series_id)</Label>
+                    <Input
+                      id="series-id"
+                      className="mt-2"
+                      placeholder="如 SGP.27，多个用逗号分隔"
+                      value={seriesId}
+                      onChange={(e) => setSeriesId(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="revision">版本 (revision)</Label>
+                    <Input
+                      id="revision"
+                      className="mt-2"
+                      placeholder="如 1.16，多个用逗号分隔"
+                      value={revision}
+                      onChange={(e) => setRevision(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* 过滤条件 */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="language">语言 (language)</Label>
+                    <Input
+                      id="language"
+                      className="mt-2"
+                      placeholder="如 en"
+                      value={language}
+                      onChange={(e) => setLanguage(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="page-id">页码 (page_id)</Label>
+                    <Input
+                      id="page-id"
+                      className="mt-2"
+                      placeholder="如 19,20，多个用逗号分隔"
+                      value={pageId}
+                      onChange={(e) => setPageId(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="heading-path">章节路径 (heading_path)</Label>
+                    <Input
+                      id="heading-path"
+                      className="mt-2"
+                      placeholder="模糊匹配，如 4.2.18"
+                      value={headingPath}
+                      onChange={(e) => setHeadingPath(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* 返回选项 */}
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
                   <div className="flex items-center space-x-2">
                     <Switch id="inc-content" checked={includeContent} onCheckedChange={setIncludeContent} />
                     <Label htmlFor="inc-content">返回正文</Label>
