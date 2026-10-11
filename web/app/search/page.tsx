@@ -291,49 +291,47 @@ export default function SearchPage() {
                   </div>
                 </div>
 
-                {/* 第三列：过滤条件 + 返回选项 */}
+                {/* 第三列：过滤条件 */}
                 <div className="space-y-4">
+                  <div className="text-sm font-semibold">过滤条件</div>
                   <div>
-                    <div className="text-sm font-semibold">过滤条件</div>
-                    <div className="mt-2 space-y-4">
-                      <div>
-                        <Label htmlFor="language">语言 (language)</Label>
-                        <Input
-                          id="language"
-                          className="mt-2"
-                          placeholder="如 en"
-                          value={language}
-                          onChange={(e) => setLanguage(e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="page-id">页码 (page_id)</Label>
-                        <Input
-                          id="page-id"
-                          className="mt-2"
-                          placeholder="如 19,20，多个用逗号分隔"
-                          value={pageId}
-                          onChange={(e) => setPageId(e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="heading-path">章节路径 (heading_path)</Label>
-                        <Input
-                          id="heading-path"
-                          className="mt-2"
-                          placeholder="模糊匹配，如 4.2.18"
-                          value={headingPath}
-                          onChange={(e) => setHeadingPath(e.target.value)}
-                        />
-                      </div>
-                    </div>
+                    <Label htmlFor="language">语言 (language)</Label>
+                    <Input
+                      id="language"
+                      className="mt-2"
+                      placeholder="如 en"
+                      value={language}
+                      onChange={(e) => setLanguage(e.target.value)}
+                    />
                   </div>
-
-                  <Separator />
-
                   <div>
-                    <div className="text-sm font-semibold">返回选项</div>
-                    <div className="mt-2 flex flex-col gap-3">
+                    <Label htmlFor="page-id">页码 (page_id)</Label>
+                    <Input
+                      id="page-id"
+                      className="mt-2"
+                      placeholder="如 19,20，多个用逗号分隔"
+                      value={pageId}
+                      onChange={(e) => setPageId(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="heading-path">章节路径 (heading_path)</Label>
+                    <Input
+                      id="heading-path"
+                      className="mt-2"
+                      placeholder="模糊匹配，如 4.2.18"
+                      value={headingPath}
+                      onChange={(e) => setHeadingPath(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* 返回选项：横跨第2、3列 */}
+                <div className="md:col-span-2">
+                  <Separator />
+                  <div className="pt-4">
+                    <div className="text-sm font-semibold mb-3">返回选项</div>
+                    <div className="flex items-center gap-6">
                       <div className="flex items-center space-x-2">
                         <Switch id="inc-content" checked={includeContent} onCheckedChange={setIncludeContent} />
                         <Label htmlFor="inc-content">返回正文</Label>
