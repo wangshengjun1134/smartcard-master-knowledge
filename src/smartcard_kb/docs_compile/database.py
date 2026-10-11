@@ -259,6 +259,18 @@ def init_database():
         END $$;
     """)
 
+    # 关键词检索：全文检索表达式索引（无需新增列/扩展，使用 simple 配置）
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_doc_chunks_fts
+        ON doc_chunks USING gin (to_tsvector('simple', coalesce(text, '')));
+    """)
+
+    # 页码过滤：jsonb GIN 索引（支持 page_nos @> '[n]'）
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_doc_chunks_page_nos
+        ON doc_chunks USING gin (page_nos);
+    """)
+
     conn.commit()
     cursor.close()
     conn.close()
@@ -779,6 +791,86 @@ def query_document_info(
     cursor.close()
     conn.close()
     return results
+
+
+def _revision_key(revision: Optional[str]) -> tuple:
+    """
+    将 revision 字符串解析为可比较的数字元组
+
+    用于 version_policy=latest 判定（日期字段为空，只能用 revision）：
+    - "1.16"   -> (1, 16)
+    - "2.0"    -> (2, 0)
+    - "1.15-1" -> (1, 15, 1)
+    """
+    if not revision:
+        return (0,)
+    nums = [int(n) for n in __import__("re").findall(r"\d+", revision)]
+    return tuple(nums) if nums else (0,)
+
+
+def resolve_document_ids(
+    series_ids: Optional[List[str]] = None,
+    revisions: Optional[List[str]] = None,
+    language: Optional[str] = None,
+    version_policy: str = "all",
+) -> Optional[List[str]]:
+    """
+    根据 scope 从 doc_info 解析出 document_id 列表（不做 join）
+
+    :param series_ids: 规范系列列表，空表示不限制
+    :param revisions: 版本列表
+    :param language: 语言
+    :param version_policy: all / latest / exact / selected
+    :return: document_id 列表；返回 None 表示不限制（全库检索）
+    """
+    series_ids = series_ids or []
+    revisions = revisions or []
+
+    # 完全无 scope 约束 -> 不限制
+    if not series_ids and not revisions and not language and version_policy == "all":
+        return None
+
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    conditions = []
+    params = []
+    if series_ids:
+        conditions.append("series_id = ANY(%s)")
+        params.append(series_ids)
+    if language:
+        conditions.append("language = %s")
+        params.append(language)
+
+    where_clause = " AND ".join(conditions) if conditions else "TRUE"
+    cursor.execute(
+        f"SELECT id, series_id, revision FROM doc_info WHERE {where_clause}",
+        params,
+    )
+    rows = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    if not rows:
+        return []
+
+    # latest：每个系列取版本号最大的文档
+    if version_policy == "latest":
+        best = {}  # series_id -> (rev_key, document_id)
+        for row in rows:
+            series = row["series_id"] or ""
+            key = _revision_key(row["revision"])
+            if series not in best or key > best[series][0]:
+                best[series] = (key, row["id"])
+        return [v[1] for v in best.values()]
+
+    # exact / selected：按指定版本过滤
+    if revisions:
+        rev_set = set(revisions)
+        return [row["id"] for row in rows if row["revision"] in rev_set]
+
+    # all：仅按 series / language 过滤
+    return [row["id"] for row in rows]
 
 
 def update_document_info_stats(

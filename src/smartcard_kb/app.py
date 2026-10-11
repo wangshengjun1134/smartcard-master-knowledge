@@ -7,7 +7,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from smartcard_kb.logger import logger
 from smartcard_kb.config import settings, MODELS_DIR
-from smartcard_kb.apis import docs_info_router, docs_items_router, docs_processing_router, search_router
+from smartcard_kb.apis import (
+    docs_info_router,
+    docs_items_router,
+    docs_processing_router,
+    search_router,
+    rag_search_router,
+)
 
 # 设置 Docling 模型路径（使用相对路径，支持 Linux 和 Windows）
 os.environ["DOCLING_MODELS_PATH"] = str(MODELS_DIR / "docling-models")
@@ -35,6 +41,7 @@ app.include_router(docs_info_router)
 app.include_router(docs_items_router)
 app.include_router(docs_processing_router)
 app.include_router(search_router)
+app.include_router(rag_search_router)
 
 
 @app.on_event("startup")

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { searchDocuments, getDocumentPageCount } from '@/lib/api'
+import { ragSearchDocuments, getDocumentPageCount, RAGSearchResult, RAGSearchResponse } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -21,36 +21,28 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
-interface SearchResult {
-  id: string
-  document_id: string
-  document_name?: string
-  file_path?: string
-  chunk_index: number
-  text: string
-  score: number
-  headings: string[]
-  heading_path: string
-  page_nos: number[]
-  token_count: number
-  linked_item_ids: string[]
-}
-
-interface SearchResponse {
-  query: string
-  total: number
-  results: SearchResult[]
-  reranked: boolean
-}
-
 export default function SearchPage() {
   const [query, setQuery] = useState('')
   const [searchType, setSearchType] = useState('hybrid')
-  const [topK, setTopK] = useState(20)
+  const [topK, setTopK] = useState(50)
   const [rerankTopK, setRerankTopK] = useState(10)
   const [threshold, setThreshold] = useState(0.3)
+  const [enableThreshold, setEnableThreshold] = useState(false)
   const [enableRerank, setEnableRerank] = useState(true)
-  const [results, setResults] = useState<SearchResponse | null>(null)
+  // scope
+  const [seriesId, setSeriesId] = useState('')
+  const [revision, setRevision] = useState('')
+  const [versionPolicy, setVersionPolicy] = useState('all')
+  // filters
+  const [language, setLanguage] = useState('')
+  const [pageId, setPageId] = useState('')
+  const [headingPath, setHeadingPath] = useState('')
+  // options
+  const [includeContent, setIncludeContent] = useState(true)
+  const [includeMetadata, setIncludeMetadata] = useState(true)
+  const [includeCitations, setIncludeCitations] = useState(true)
+  const [results, setResults] = useState<RAGSearchResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set())
   const [pdfViewer, setPdfViewer] = useState<{ open: boolean; documentId: string; currentPage: number; totalPages: number; documentName: string; targetPages: number[] }>({
@@ -62,22 +54,45 @@ export default function SearchPage() {
     targetPages: [],
   })
 
+  const splitList = (s: string) =>
+    s.split(',').map((x) => x.trim()).filter(Boolean)
+
   const handleSearch = async () => {
     if (!query.trim()) return
 
     setLoading(true)
+    setError(null)
     try {
-      const response = await searchDocuments({
+      const response = await ragSearchDocuments({
         query: query.trim(),
-        search_type: searchType,
-        top_k: topK,
-        rerank_top_k: rerankTopK,
-        threshold: threshold,
-        enable_rerank: enableRerank,
+        scope: {
+          series_id: splitList(seriesId),
+          revision: splitList(revision),
+          version_policy: versionPolicy,
+        },
+        retrieval: {
+          retrieval_type: searchType,
+          top_k: topK,
+          rerank_enabled: enableRerank,
+          rerank_top_k: rerankTopK,
+          similarity_threshold: enableThreshold ? threshold : null,
+        },
+        filters: {
+          page_id: splitList(pageId),
+          heading_path: headingPath.trim() || null,
+          language: language.trim() || null,
+        },
+        options: {
+          include_content: includeContent,
+          include_metadata: includeMetadata,
+          include_citations: includeCitations,
+        },
       })
       setResults(response)
-    } catch (error) {
-      console.error('Search failed:', error)
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail || '检索失败'
+      setError(typeof detail === 'string' ? detail : JSON.stringify(detail))
+      setResults(null)
     } finally {
       setLoading(false)
     }
@@ -93,15 +108,16 @@ export default function SearchPage() {
     setExpandedChunks(newExpanded)
   }
 
-  const openPdfViewer = async (result: SearchResult) => {
-    const firstPage = result.page_nos[0] || 1
+  const openPdfViewer = async (result: RAGSearchResult) => {
+    const pageNos = result.metadata?.page_nos || result.citation?.page_nos || []
+    const firstPage = pageNos[0] || 1
     setPdfViewer({
       open: true,
       documentId: result.document_id,
       currentPage: firstPage,
       totalPages: 0,
-      documentName: result.document_name || '',
-      targetPages: result.page_nos || [],
+      documentName: result.citation?.document_name || '',
+      targetPages: pageNos,
     })
     try {
       const total = await getDocumentPageCount(result.document_id)
@@ -111,15 +127,16 @@ export default function SearchPage() {
     }
   }
 
-  const getScoreColor = (score: number) => {
-    if (score >= 0.7) return 'bg-green-500'
-    if (score >= 0.5) return 'bg-yellow-500'
+  // 分数按排名着色（vector/keyword/hybrid/rerank 量纲不同，不做绝对值判断）
+  const getRankColor = (idx: number) => {
+    if (idx < 3) return 'bg-green-500'
+    if (idx < 6) return 'bg-yellow-500'
     return 'bg-red-500'
   }
 
-  const getScoreLabel = (score: number) => {
-    if (score >= 0.7) return '高相关'
-    if (score >= 0.5) return '中相关'
+  const getRankLabel = (idx: number) => {
+    if (idx < 3) return '高相关'
+    if (idx < 6) return '中相关'
     return '低相关'
   }
 
@@ -232,6 +249,103 @@ export default function SearchPage() {
                     />
                     <Label htmlFor="enable-rerank">启用重排 (Rerank)</Label>
                   </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="enable-threshold"
+                      checked={enableThreshold}
+                      onCheckedChange={setEnableThreshold}
+                    />
+                    <Label htmlFor="enable-threshold">启用相似度阈值</Label>
+                  </div>
+
+                  <Separator />
+
+                  <div className="text-sm font-semibold">检索范围 (Scope)</div>
+                  <div>
+                    <Label htmlFor="series-id">规范系列 (series_id)</Label>
+                    <Input
+                      id="series-id"
+                      className="mt-2"
+                      placeholder="如 SGP.27，多个用逗号分隔"
+                      value={seriesId}
+                      onChange={(e) => setSeriesId(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="revision">版本 (revision)</Label>
+                    <Input
+                      id="revision"
+                      className="mt-2"
+                      placeholder="如 1.16，多个用逗号分隔"
+                      value={revision}
+                      onChange={(e) => setRevision(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="version-policy">版本策略 (version_policy)</Label>
+                    <Select value={versionPolicy} onValueChange={setVersionPolicy}>
+                      <SelectTrigger className="mt-2">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">all（全部版本）</SelectItem>
+                        <SelectItem value="latest">latest（每个系列最新版）</SelectItem>
+                        <SelectItem value="exact">exact（指定版本）</SelectItem>
+                        <SelectItem value="selected">selected（多版本）</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <Separator />
+
+                  <div className="text-sm font-semibold">过滤条件 (Filters)</div>
+                  <div>
+                    <Label htmlFor="language">语言 (language)</Label>
+                    <Input
+                      id="language"
+                      className="mt-2"
+                      placeholder="如 en"
+                      value={language}
+                      onChange={(e) => setLanguage(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="page-id">页码 (page_id)</Label>
+                    <Input
+                      id="page-id"
+                      className="mt-2"
+                      placeholder="如 19,20，多个用逗号分隔"
+                      value={pageId}
+                      onChange={(e) => setPageId(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="heading-path">章节路径 (heading_path)</Label>
+                    <Input
+                      id="heading-path"
+                      className="mt-2"
+                      placeholder="模糊匹配，如 4.2.18"
+                      value={headingPath}
+                      onChange={(e) => setHeadingPath(e.target.value)}
+                    />
+                  </div>
+
+                  <Separator />
+
+                  <div className="text-sm font-semibold">返回选项 (Options)</div>
+                  <div className="flex items-center space-x-2">
+                    <Switch id="inc-content" checked={includeContent} onCheckedChange={setIncludeContent} />
+                    <Label htmlFor="inc-content">返回正文 (content)</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch id="inc-meta" checked={includeMetadata} onCheckedChange={setIncludeMetadata} />
+                    <Label htmlFor="inc-meta">返回元数据 (metadata)</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch id="inc-cite" checked={includeCitations} onCheckedChange={setIncludeCitations} />
+                    <Label htmlFor="inc-cite">返回引用 (citations)</Label>
+                  </div>
                 </div>
 
                 {/* 右侧：查询输入 */}
@@ -257,6 +371,15 @@ export default function SearchPage() {
             </CardContent>
           </Card>
 
+          {/* 错误提示 */}
+          {error && (
+            <Card className="mb-6 border-destructive">
+              <CardContent className="p-4 text-sm text-destructive">
+                检索失败：{error}
+              </CardContent>
+            </Card>
+          )}
+
           {/* 结果展示 */}
           {results && (
             <Card>
@@ -266,6 +389,9 @@ export default function SearchPage() {
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">
                       共 {results.total} 条
+                    </Badge>
+                    <Badge variant="outline">
+                      {results.profile}
                     </Badge>
                     {results.reranked && (
                       <Badge variant="secondary">
@@ -286,84 +412,104 @@ export default function SearchPage() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {results.results.map((result, idx) => (
-                      <Card key={result.id} className="overflow-hidden">
+                    {results.results.map((result, idx) => {
+                      const content = result.content || ''
+                      const headingPath = result.metadata?.heading_path
+                      const pageNos = result.metadata?.page_nos || result.citation?.page_nos || []
+                      const docName = result.citation?.document_name
+                      return (
+                      <Card key={result.chunk_id} className="overflow-hidden">
                         <CardContent className="p-4">
                           {/* 结果头部 */}
                           <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <FileText className="h-4 w-4 text-muted-foreground" />
                               <span className="text-sm font-medium">
                                 结果 #{idx + 1}
                               </span>
-                              <Badge variant="outline" className="text-xs">
-                                Chunk {result.chunk_index}
-                              </Badge>
-                              {result.document_name && (
+                              {result.chunk_index != null && (
+                                <Badge variant="outline" className="text-xs">
+                                  Chunk {result.chunk_index}
+                                </Badge>
+                              )}
+                              {result.citation?.series_id && (
+                                <Badge variant="outline" className="text-xs">
+                                  {result.citation.series_id}
+                                  {result.citation.revision ? ` v${result.citation.revision}` : ''}
+                                </Badge>
+                              )}
+                              {docName && (
                                 <button
                                   onClick={() => openPdfViewer(result)}
                                   className="text-xs font-medium text-primary hover:underline cursor-pointer"
                                 >
-                                  {result.document_name}
+                                  {docName}
                                 </button>
                               )}
                             </div>
                             <div className="flex items-center gap-2">
-                              <div className={`w-3 h-3 rounded-full ${getScoreColor(result.score)}`} />
+                              <div className={`w-3 h-3 rounded-full ${getRankColor(idx)}`} />
                               <span className="text-sm font-medium">
-                                {result.score.toFixed(3)}
+                                {typeof result.score === 'number' ? result.score.toFixed(3) : '-'}
                               </span>
                               <Badge variant="outline" className="text-xs">
-                                {getScoreLabel(result.score)}
+                                {getRankLabel(idx)}
                               </Badge>
                             </div>
                           </div>
 
                           {/* 标题路径 */}
-                          {result.heading_path && (
+                          {headingPath && (
                             <div className="text-xs text-muted-foreground mb-2">
-                              📍 {result.heading_path}
+                              📍 {headingPath}
                             </div>
                           )}
 
                           {/* 页面信息 */}
-                          {result.page_nos.length > 0 && (
+                          {pageNos.length > 0 && (
                             <div className="text-xs text-muted-foreground mb-2">
-                              📄 页码: {result.page_nos.join(', ')}
+                              📄 页码: {pageNos.join(', ')}
                             </div>
                           )}
 
                           {/* 文本内容 */}
-                          <div className="text-sm bg-muted p-3 rounded-md whitespace-pre-wrap">
-                            {expandedChunks.has(idx)
-                              ? result.text
-                              : result.text.substring(0, 300) + (result.text.length > 300 ? '...' : '')}
-                          </div>
-
-                          {/* 展开/折叠按钮 */}
-                          {result.text.length > 300 && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="mt-2"
-                              onClick={() => toggleChunk(idx)}
-                            >
-                              {expandedChunks.has(idx) ? (
-                                <>
-                                  <ChevronUp className="h-4 w-4 mr-1" />
-                                  收起
-                                </>
-                              ) : (
-                                <>
-                                  <ChevronDown className="h-4 w-4 mr-1" />
-                                  展开完整内容
-                                </>
+                          {content ? (
+                            <>
+                              <div className="text-sm bg-muted p-3 rounded-md whitespace-pre-wrap">
+                                {expandedChunks.has(idx)
+                                  ? content
+                                  : content.substring(0, 300) + (content.length > 300 ? '...' : '')}
+                              </div>
+                              {content.length > 300 && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="mt-2"
+                                  onClick={() => toggleChunk(idx)}
+                                >
+                                  {expandedChunks.has(idx) ? (
+                                    <>
+                                      <ChevronUp className="h-4 w-4 mr-1" />
+                                      收起
+                                    </>
+                                  ) : (
+                                    <>
+                                      <ChevronDown className="h-4 w-4 mr-1" />
+                                      展开完整内容
+                                    </>
+                                  )}
+                                </Button>
                               )}
-                            </Button>
+                            </>
+                          ) : (
+                            <div className="text-xs text-muted-foreground italic">
+                              （未返回正文，include_content=false）
+                            </div>
                           )}
                         </CardContent>
                       </Card>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </CardContent>

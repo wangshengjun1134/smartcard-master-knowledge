@@ -284,3 +284,71 @@ export async function searchDocuments(request: {
   const response = await api.post('/api/search', request)
   return response.data
 }
+
+// ==================== RAG 检索 API (v2) ====================
+
+export interface RAGSearchResult {
+  chunk_id: string
+  document_id: string
+  score: number
+  score_stage: string
+  chunk_index?: number
+  content?: string
+  metadata?: {
+    headings?: string[]
+    heading_path?: string
+    page_nos?: number[]
+    token_count?: number
+    chunk_token_limit?: number
+    chunk_tokenizer?: string
+  }
+  citation?: {
+    document_name?: string
+    document_code?: string
+    series_id?: string
+    revision?: string
+    file_path?: string
+    page_nos?: number[]
+    linked_item_ids?: string[]
+  }
+}
+
+export interface RAGSearchResponse {
+  query: string
+  total: number
+  reranked: boolean
+  profile: string
+  results: RAGSearchResult[]
+}
+
+export async function ragSearchDocuments(request: {
+  query: string
+  scope?: {
+    series_id?: string[]
+    document_id?: string[]
+    revision?: string[]
+    version_policy?: string
+  }
+  retrieval?: {
+    retrieval_type?: string
+    top_k?: number
+    rerank_enabled?: boolean
+    rerank_top_k?: number
+    similarity_threshold?: number | null
+    search_profile?: string
+  }
+  filters?: {
+    page_id?: string[]
+    heading_path?: string | null
+    label?: string[]
+    language?: string | null
+  }
+  options?: {
+    include_content?: boolean
+    include_metadata?: boolean
+    include_citations?: boolean
+  }
+}): Promise<RAGSearchResponse> {
+  const response = await api.post('/api/v1/rag/search', request)
+  return response.data
+}
