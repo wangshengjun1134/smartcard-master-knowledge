@@ -169,10 +169,11 @@ export default function SearchPage() {
                 输入查询内容，系统将从知识库中检索最相关的文档片段
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="flex flex-col md:flex-row gap-6">
-                {/* 左侧：参数设置 */}
-                <div className="w-full md:w-80 lg:w-96 space-y-4 border-r pr-6">
+            <CardContent className="space-y-6">
+              {/* 参数设置（顶部） */}
+              <div className="space-y-4">
+                {/* 选项类参数 */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
                     <Label htmlFor="search-type">检索类型</Label>
                     <Select value={searchType} onValueChange={setSearchType}>
@@ -186,82 +187,20 @@ export default function SearchPage() {
                       </SelectContent>
                     </Select>
                   </div>
-
-                  <Separator />
-
                   <div>
-                    <Label htmlFor="top-k">初始召回数量 (Top K)</Label>
-                    <div className="mt-2">
-                      <div className="text-sm text-muted-foreground mb-1">{topK} 条</div>
-                      <Slider
-                        id="top-k"
-                        value={[topK]}
-                        onValueChange={([v]) => setTopK(v)}
-                        min={5}
-                        max={100}
-                        step={5}
-                      />
-                    </div>
+                    <Label htmlFor="version-policy">版本策略 (version_policy)</Label>
+                    <Select value={versionPolicy} onValueChange={setVersionPolicy}>
+                      <SelectTrigger className="mt-2">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">all（全部版本）</SelectItem>
+                        <SelectItem value="latest">latest（每个系列最新版）</SelectItem>
+                        <SelectItem value="exact">exact（指定版本）</SelectItem>
+                        <SelectItem value="selected">selected（多版本）</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-
-                  <Separator />
-
-                  <div>
-                    <Label htmlFor="rerank-top-k">重排数量 (Rerank Top K)</Label>
-                    <div className="mt-2">
-                      <div className="text-sm text-muted-foreground mb-1">{rerankTopK} 条</div>
-                      <Slider
-                        id="rerank-top-k"
-                        value={[rerankTopK]}
-                        onValueChange={([v]) => setRerankTopK(v)}
-                        min={1}
-                        max={50}
-                        step={1}
-                        disabled={!enableRerank}
-                      />
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  <div>
-                    <Label htmlFor="threshold">相似度阈值</Label>
-                    <div className="mt-2">
-                      <div className="text-sm text-muted-foreground mb-1">{threshold.toFixed(2)}</div>
-                      <Slider
-                        id="threshold"
-                        value={[threshold]}
-                        onValueChange={([v]) => setThreshold(v)}
-                        min={0}
-                        max={1}
-                        step={0.05}
-                      />
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="enable-rerank"
-                      checked={enableRerank}
-                      onCheckedChange={setEnableRerank}
-                    />
-                    <Label htmlFor="enable-rerank">启用重排 (Rerank)</Label>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="enable-threshold"
-                      checked={enableThreshold}
-                      onCheckedChange={setEnableThreshold}
-                    />
-                    <Label htmlFor="enable-threshold">启用相似度阈值</Label>
-                  </div>
-
-                  <Separator />
-
-                  <div className="text-sm font-semibold">检索范围 (Scope)</div>
                   <div>
                     <Label htmlFor="series-id">规范系列 (series_id)</Label>
                     <Input
@@ -283,24 +222,6 @@ export default function SearchPage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="version-policy">版本策略 (version_policy)</Label>
-                    <Select value={versionPolicy} onValueChange={setVersionPolicy}>
-                      <SelectTrigger className="mt-2">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">all（全部版本）</SelectItem>
-                        <SelectItem value="latest">latest（每个系列最新版）</SelectItem>
-                        <SelectItem value="exact">exact（指定版本）</SelectItem>
-                        <SelectItem value="selected">selected（多版本）</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <Separator />
-
-                  <div className="text-sm font-semibold">过滤条件 (Filters)</div>
-                  <div>
                     <Label htmlFor="language">语言 (language)</Label>
                     <Input
                       id="language"
@@ -320,7 +241,7 @@ export default function SearchPage() {
                       onChange={(e) => setPageId(e.target.value)}
                     />
                   </div>
-                  <div>
+                  <div className="sm:col-span-2">
                     <Label htmlFor="heading-path">章节路径 (heading_path)</Label>
                     <Input
                       id="heading-path"
@@ -330,41 +251,107 @@ export default function SearchPage() {
                       onChange={(e) => setHeadingPath(e.target.value)}
                     />
                   </div>
+                </div>
 
-                  <Separator />
-
-                  <div className="text-sm font-semibold">返回选项 (Options)</div>
-                  <div className="flex items-center space-x-2">
-                    <Switch id="inc-content" checked={includeContent} onCheckedChange={setIncludeContent} />
-                    <Label htmlFor="inc-content">返回正文 (content)</Label>
+                {/* 数值参数 */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                  <div>
+                    <Label htmlFor="top-k">初始召回数量 (Top K)</Label>
+                    <div className="mt-2">
+                      <div className="text-sm text-muted-foreground mb-1">{topK} 条</div>
+                      <Slider
+                        id="top-k"
+                        value={[topK]}
+                        onValueChange={([v]) => setTopK(v)}
+                        min={5}
+                        max={100}
+                        step={5}
+                      />
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch id="inc-meta" checked={includeMetadata} onCheckedChange={setIncludeMetadata} />
-                    <Label htmlFor="inc-meta">返回元数据 (metadata)</Label>
+                  <div>
+                    <Label htmlFor="rerank-top-k">重排数量 (Rerank Top K)</Label>
+                    <div className="mt-2">
+                      <div className="text-sm text-muted-foreground mb-1">{rerankTopK} 条</div>
+                      <Slider
+                        id="rerank-top-k"
+                        value={[rerankTopK]}
+                        onValueChange={([v]) => setRerankTopK(v)}
+                        min={1}
+                        max={50}
+                        step={1}
+                        disabled={!enableRerank}
+                      />
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch id="inc-cite" checked={includeCitations} onCheckedChange={setIncludeCitations} />
-                    <Label htmlFor="inc-cite">返回引用 (citations)</Label>
+                  <div>
+                    <Label htmlFor="threshold">相似度阈值</Label>
+                    <div className="mt-2">
+                      <div className="text-sm text-muted-foreground mb-1">{threshold.toFixed(2)}</div>
+                      <Slider
+                        id="threshold"
+                        value={[threshold]}
+                        onValueChange={([v]) => setThreshold(v)}
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        disabled={!enableThreshold}
+                      />
+                    </div>
                   </div>
                 </div>
 
-                {/* 右侧：查询输入 */}
-                <div className="flex-1">
-                  <Label htmlFor="query">查询内容</Label>
-                  <div className="flex flex-col gap-2 mt-2">
-                    <Textarea
-                      id="query"
-                      placeholder="输入您的问题，例如：eUICC 架构是什么？&#10;支持多行输入..."
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      className="min-h-[200px] resize-y"
+                {/* 开关 */}
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="enable-rerank"
+                      checked={enableRerank}
+                      onCheckedChange={setEnableRerank}
                     />
-                    <div className="flex justify-end">
-                      <Button onClick={handleSearch} disabled={loading || !query.trim()}>
-                        <Search className="h-4 w-4 mr-2" />
-                        {loading ? '检索中...' : '检索'}
-                      </Button>
-                    </div>
+                    <Label htmlFor="enable-rerank">启用重排 (Rerank)</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="enable-threshold"
+                      checked={enableThreshold}
+                      onCheckedChange={setEnableThreshold}
+                    />
+                    <Label htmlFor="enable-threshold">启用相似度阈值</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch id="inc-content" checked={includeContent} onCheckedChange={setIncludeContent} />
+                    <Label htmlFor="inc-content">返回正文</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch id="inc-meta" checked={includeMetadata} onCheckedChange={setIncludeMetadata} />
+                    <Label htmlFor="inc-meta">返回元数据</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch id="inc-cite" checked={includeCitations} onCheckedChange={setIncludeCitations} />
+                    <Label htmlFor="inc-cite">返回引用</Label>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* 查询输入（下方） */}
+              <div>
+                <Label htmlFor="query">查询内容</Label>
+                <div className="flex flex-col gap-2 mt-2">
+                  <Textarea
+                    id="query"
+                    placeholder="输入您的问题，例如：eUICC 架构是什么？&#10;支持多行输入..."
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    className="min-h-[160px] resize-y"
+                  />
+                  <div className="flex justify-end">
+                    <Button onClick={handleSearch} disabled={loading || !query.trim()}>
+                      <Search className="h-4 w-4 mr-2" />
+                      {loading ? '检索中...' : '检索'}
+                    </Button>
                   </div>
                 </div>
               </div>
