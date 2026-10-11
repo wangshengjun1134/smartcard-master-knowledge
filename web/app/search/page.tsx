@@ -171,9 +171,10 @@ export default function SearchPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               {/* 参数设置（顶部） */}
-              <div className="space-y-4">
-                {/* 检索策略 */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* 第一列：检索策略 */}
+                <div className="space-y-4">
+                  <div className="text-sm font-semibold">检索策略</div>
                   <div>
                     <Label htmlFor="search-type">检索类型</Label>
                     <Select value={searchType} onValueChange={setSearchType}>
@@ -231,31 +232,29 @@ export default function SearchPage() {
                       />
                     </div>
                   </div>
+                  <div className="flex flex-col gap-2 pt-2">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="enable-rerank"
+                        checked={enableRerank}
+                        onCheckedChange={setEnableRerank}
+                      />
+                      <Label htmlFor="enable-rerank">启用重排 (Rerank)</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="enable-threshold"
+                        checked={enableThreshold}
+                        onCheckedChange={setEnableThreshold}
+                      />
+                      <Label htmlFor="enable-threshold">启用相似度阈值</Label>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="enable-rerank"
-                      checked={enableRerank}
-                      onCheckedChange={setEnableRerank}
-                    />
-                    <Label htmlFor="enable-rerank">启用重排 (Rerank)</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="enable-threshold"
-                      checked={enableThreshold}
-                      onCheckedChange={setEnableThreshold}
-                    />
-                    <Label htmlFor="enable-threshold">启用相似度阈值</Label>
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* 检索范围 */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* 第二列：检索范围 */}
+                <div className="space-y-4">
+                  <div className="text-sm font-semibold">检索范围</div>
                   <div>
                     <Label htmlFor="version-policy">版本策略 (version_policy)</Label>
                     <Select value={versionPolicy} onValueChange={setVersionPolicy}>
@@ -292,10 +291,9 @@ export default function SearchPage() {
                   </div>
                 </div>
 
-                <Separator />
-
-                {/* 过滤条件 */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* 第三列：过滤条件 */}
+                <div className="space-y-4">
+                  <div className="text-sm font-semibold">过滤条件</div>
                   <div>
                     <Label htmlFor="language">语言 (language)</Label>
                     <Input
@@ -327,23 +325,24 @@ export default function SearchPage() {
                     />
                   </div>
                 </div>
+              </div>
 
-                <Separator />
+              <Separator />
 
-                {/* 返回选项 */}
-                <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-                  <div className="flex items-center space-x-2">
-                    <Switch id="inc-content" checked={includeContent} onCheckedChange={setIncludeContent} />
-                    <Label htmlFor="inc-content">返回正文</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch id="inc-meta" checked={includeMetadata} onCheckedChange={setIncludeMetadata} />
-                    <Label htmlFor="inc-meta">返回元数据</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch id="inc-cite" checked={includeCitations} onCheckedChange={setIncludeCitations} />
-                    <Label htmlFor="inc-cite">返回引用</Label>
-                  </div>
+              {/* 返回选项（横跨底部） */}
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                <div className="text-sm font-semibold">返回选项</div>
+                <div className="flex items-center space-x-2">
+                  <Switch id="inc-content" checked={includeContent} onCheckedChange={setIncludeContent} />
+                  <Label htmlFor="inc-content">返回正文</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch id="inc-meta" checked={includeMetadata} onCheckedChange={setIncludeMetadata} />
+                  <Label htmlFor="inc-meta">返回元数据</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch id="inc-cite" checked={includeCitations} onCheckedChange={setIncludeCitations} />
+                  <Label htmlFor="inc-cite">返回引用</Label>
                 </div>
               </div>
 
