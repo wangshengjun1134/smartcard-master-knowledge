@@ -183,9 +183,14 @@ def rewrite_query(request: RewriteRequest):
             "temperature": 0.2,
         }
 
+        # OpenAI 兼容协议：Base URL 后需追加 /chat/completions
+        api_url = request.api_url.rstrip("/")
+        if not api_url.endswith("/chat/completions"):
+            api_url = f"{api_url}/chat/completions"
+
         # 调用 LLM API
         with httpx.Client(timeout=60.0) as client:
-            response = client.post(request.api_url, headers=headers, json=payload)
+            response = client.post(api_url, headers=headers, json=payload)
             response.raise_for_status()
 
         result = response.json()
