@@ -195,7 +195,17 @@ def rewrite_query(request: RewriteRequest):
         # 调用 LLM API
         with httpx.Client(timeout=60.0) as client:
             response = client.post(api_url, headers=headers, json=payload)
-            response.raise_for_status()
+
+        # 上游返回错误时，把响应体一并记录/透出，便于定位真正原因
+        if response.status_code >= 400:
+            body = response.text[:2000]
+            logger.error(
+                f"LLM API error {response.status_code} for {api_url}: {body}"
+            )
+            raise HTTPException(
+                status_code=502,
+                detail=f"LLM API 返回 {response.status_code}: {body}",
+            )
 
         result = response.json()
 
