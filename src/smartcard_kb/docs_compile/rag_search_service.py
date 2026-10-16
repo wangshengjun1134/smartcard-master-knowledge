@@ -52,7 +52,7 @@ class RAGSearchService:
     def search(
         self,
         *,
-        query: str,
+        queries: List[str],
         scope: Dict[str, Any],
         retrieval: Dict[str, Any],
         filters: Dict[str, Any],
@@ -95,41 +95,65 @@ class RAGSearchService:
         threshold = retrieval.get("similarity_threshold")
         rerank_enabled = bool(retrieval.get("rerank_enabled", True))
         rerank_top_k = int(retrieval.get("rerank_top_k", 10))
+        original_query_weight = int(retrieval.get("original_query_weight", 1))
 
         logger.info(
-            f"RAG search: type={retrieval_type}, top_k={top_k}, "
+            f"RAG search: type={retrieval_type}, top_k={top_k}, queries={len(queries)}, "
             f"documents={len(document_ids) if document_ids is not None else 'all'}, "
-            f"page_ids={page_ints}, heading_path={heading_path!r}, threshold={threshold}"
+            f"page_ids={page_ints}, heading_path={heading_path!r}, threshold={threshold}, "
+            f"original_query_weight={original_query_weight}"
         )
 
-        # 4. 候选召回
-        if retrieval_type == "vector":
-            candidates = self._vector_search(query, document_ids, page_ints, heading_path, top_k, threshold)
-        elif retrieval_type == "keyword":
-            candidates = self._keyword_search(query, document_ids, page_ints, heading_path, top_k)
-        else:  # hybrid
-            vec_hits = self._vector_search(query, document_ids, page_ints, heading_path, top_k, threshold)
-            kw_hits = self._keyword_search(query, document_ids, page_ints, heading_path, top_k)
-            candidates = self._rrf_fuse(vec_hits, kw_hits, top_k)
-            logger.info(f"Hybrid RRF: vector={len(vec_hits)}, keyword={len(kw_hits)}, fused={len(candidates)}")
+        # 4. 多查询候选召回（每个查询保留各自的排名列表）
+        per_query_candidates: List[List[Dict[str, Any]]] = []
+        for i, query in enumerate(queries):
+            query_label = "original" if i == 0 else f"rewritten_{i}"
+            logger.info(f"Processing query {i+1}/{len(queries)} ({query_label}): {query!r}")
 
-        # 5. 重排
+            if retrieval_type == "vector":
+                candidates = self._vector_search(query, document_ids, page_ints, heading_path, top_k, threshold)
+            elif retrieval_type == "keyword":
+                candidates = self._keyword_search(query, document_ids, page_ints, heading_path, top_k)
+            else:  # hybrid
+                vec_hits = self._vector_search(query, document_ids, page_ints, heading_path, top_k, threshold)
+                kw_hits = self._keyword_search(query, document_ids, page_ints, heading_path, top_k)
+                candidates = self._rrf_fuse(vec_hits, kw_hits, top_k)
+                logger.info(f"Hybrid RRF (query {i+1}): vector={len(vec_hits)}, keyword={len(kw_hits)}, fused={len(candidates)}")
+
+            per_query_candidates.append(candidates)
+            logger.info(f"Query {i+1} collected {len(candidates)} candidates")
+
+        # 5. 跨查询 RRF 融合去重（方案 B：所有查询的候选一次性 RRF）
+        total_entries = sum(len(c) for c in per_query_candidates)
+        candidates = self._rrf_fuse_multi_query(per_query_candidates, top_k)
+        logger.info(f"Multi-query RRF: {total_entries} candidate entries -> {len(candidates)} fused")
+
+        # 6. 构造 rerank 查询（原始查询加权 + 改写查询）
+        if queries:
+            original_query = queries[0]
+            rewritten_queries = queries[1:] if len(queries) > 1 else []
+            rerank_query_parts = [original_query] * original_query_weight + rewritten_queries
+            rerank_query = " ".join(rerank_query_parts)
+        else:
+            rerank_query = ""
+
+        # 7. 重排
         reranked = False
         if rerank_enabled and self.reranker_backend is not None and len(candidates) > 1:
-            candidates = self._rerank(query, candidates, rerank_top_k)
+            candidates = self._rerank(rerank_query, candidates, rerank_top_k)
             reranked = True
         else:
             candidates = candidates[:rerank_top_k]
 
         if not candidates:
-            logger.warning(f"RAG search: no results (query={query!r})")
+            logger.warning(f"RAG search: no results (queries={queries!r})")
 
-        # 6. 补充文档信息 + 投影
+        # 8. 补充文档信息 + 投影
         candidates = self._enrich_with_doc_info(candidates)
         results = [self._project(c, options) for c in candidates]
 
         return {
-            "query": query,
+            "queries": queries,
             "total": len(results),
             "reranked": reranked,
             "profile": retrieval.get("search_profile", "default"),
@@ -289,6 +313,39 @@ class RAGSearchService:
         ranked = sorted(fused.items(), key=lambda kv: kv[1], reverse=True)[:top_k]
         results = []
         for cid, fscore in ranked:
+            item = dict(items[cid])
+            item["score"] = fscore
+            item["score_stage"] = "hybrid"
+            results.append(item)
+        return results
+
+    def _rrf_fuse_multi_query(
+        self,
+        ranked_lists: List[List[Dict[str, Any]]],
+        top_k: int,
+    ) -> List[Dict[str, Any]]:
+        """
+        跨查询 RRF 融合去重（方案 B）
+
+        将每个查询的候选列表视为一个有序列表，按排名位置做 RRF 融合。
+        同一 chunk 被多个查询命中时会累加分数，从而被自然提升。
+
+        :param ranked_lists: 每个查询各自的有序候选列表
+        :param top_k: 融合后保留数量
+        :return: 融合去重后的候选列表
+        """
+        fused: Dict[str, float] = {}
+        items: Dict[str, Dict[str, Any]] = {}
+
+        for ranked in ranked_lists:
+            for rank, hit in enumerate(ranked):
+                cid = hit["id"]
+                fused[cid] = fused.get(cid, 0.0) + 1.0 / (_RRF_K + rank + 1)
+                items.setdefault(cid, hit)
+
+        ranked_items = sorted(fused.items(), key=lambda kv: kv[1], reverse=True)[:top_k]
+        results = []
+        for cid, fscore in ranked_items:
             item = dict(items[cid])
             item["score"] = fscore
             item["score_stage"] = "hybrid"

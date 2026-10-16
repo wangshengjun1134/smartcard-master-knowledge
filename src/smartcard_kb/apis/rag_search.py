@@ -51,6 +51,7 @@ class Retrieval(BaseModel):
     rerank_top_k: int = 10
     similarity_threshold: Optional[float] = None
     search_profile: str = "default"
+    original_query_weight: int = 1  # 原始查询在 rerank 时的权重（重复次数）
 
 
 class Filters(BaseModel):
@@ -70,7 +71,7 @@ class Options(BaseModel):
 
 class RAGSearchRequest(BaseModel):
     """RAG 检索请求"""
-    query: str
+    queries: List[str]  # 第一个是原始查询，其余是改写查询
     scope: Scope = Field(default_factory=Scope)
     retrieval: Retrieval = Field(default_factory=Retrieval)
     filters: Filters = Field(default_factory=Filters)
@@ -79,24 +80,107 @@ class RAGSearchRequest(BaseModel):
 
 class RAGSearchResponse(BaseModel):
     """RAG 检索响应"""
-    query: str
+    queries: List[str]
     total: int
     reranked: bool
     profile: str
     results: List[Dict[str, Any]]
 
 
+class RewriteRequest(BaseModel):
+    """查询重写请求"""
+    query: str
+    api_url: str
+    api_key: str
+    model: str
+    prompt: str
+
+
+class RewriteResponse(BaseModel):
+    """查询重写响应"""
+    original_query: str
+    rewritten_queries: List[str]
+
+
 # ==================== API 接口 ====================
+
+
+@router.post("/rewrite", response_model=RewriteResponse)
+def rewrite_query(request: RewriteRequest):
+    """
+    查询重写 - 调用 LLM API 将单个查询改写为多个查询
+
+    - **query**: 原始查询
+    - **api_url**: LLM API 地址
+    - **api_key**: API Key
+    - **model**: 模型名称
+    - **prompt**: 提示词模板
+    """
+    import httpx
+    
+    logger.debug(f"Rewrite request: query={request.query!r}, model={request.model}")
+    
+    try:
+        # 构造 LLM 请求
+        headers = {
+            "Authorization": f"Bearer {request.api_key}",
+            "Content-Type": "application/json",
+        }
+        
+        # 将原始查询填入提示词
+        full_prompt = request.prompt.replace("{query}", request.query)
+        
+        payload = {
+            "model": request.model,
+            "messages": [
+                {"role": "user", "content": full_prompt}
+            ],
+            "temperature": 0.7,
+        }
+        
+        # 调用 LLM API
+        with httpx.Client(timeout=30.0) as client:
+            response = client.post(request.api_url, headers=headers, json=payload)
+            response.raise_for_status()
+        
+        result = response.json()
+        
+        # 提取 LLM 响应内容（兼容 OpenAI 格式）
+        if "choices" in result and len(result["choices"]) > 0:
+            content = result["choices"][0]["message"]["content"]
+        else:
+            raise ValueError(f"Unexpected LLM response format: {result}")
+        
+        # 解析改写查询（假设 LLM 返回多行，每行一个查询）
+        rewritten_queries = [line.strip() for line in content.strip().split("\n") if line.strip()]
+        
+        if not rewritten_queries:
+            rewritten_queries = [request.query]
+        
+        logger.info(f"Rewrite completed: {len(rewritten_queries)} queries generated")
+        logger.debug(f"Rewritten queries: {rewritten_queries}")
+        
+        return RewriteResponse(
+            original_query=request.query,
+            rewritten_queries=rewritten_queries,
+        )
+        
+    except httpx.HTTPError as e:
+        logger.error(f"LLM API call failed: {e}")
+        raise HTTPException(status_code=502, detail=f"LLM API 调用失败: {str(e)}")
+    except Exception as e:
+        logger.error(f"Rewrite failed: {e}")
+        raise HTTPException(status_code=500, detail=f"查询重写失败: {str(e)}")
 
 
 @router.post("/search", response_model=RAGSearchResponse)
 def rag_search(request: RAGSearchRequest):
     """
-    RAG 检索（v2）
+    RAG 检索（v2）- 支持多查询融合
 
-    - **query**: 检索问题
+    - **queries**: 查询列表（第一个是原始查询，其余是改写查询）
     - **scope**: 范围（series_id / document_id / revision / version_policy）
-    - **retrieval**: 策略（retrieval_type / top_k / rerank_* / similarity_threshold / search_profile）
+    - **retrieval**: 策略（retrieval_type / top_k / rerank_* / similarity_threshold / search_profile / original_query_weight）
     - **filters**: 过滤（page_id / heading_path / label[预留] / language）
     - **options**: 返回裁剪（include_content / include_metadata / include_citations）
     """
@@ -106,7 +190,7 @@ def rag_search(request: RAGSearchRequest):
     try:
         service = _get_rag_service()
         result = service.search(
-            query=request.query,
+            queries=request.queries,
             scope=request.scope.model_dump(),
             retrieval=request.retrieval.model_dump(),
             filters=request.filters.model_dump(),
@@ -117,16 +201,16 @@ def rag_search(request: RAGSearchRequest):
         
         # Log response summary (not full content to avoid huge logs)
         result_summary = {
-            "query": response.query,
+            "queries": response.queries,
             "total": response.total,
             "reranked": response.reranked,
             "profile": response.profile,
             "results_count": len(response.results),
-            "top_scores": [r.score for r in response.results[:3]],
+            "top_scores": [r["score"] for r in response.results[:3]],
         }
         logger.debug(f"RAG search response: {result_summary}")
         logger.info(
-            f"RAG search completed: query={request.query!r}, "
+            f"RAG search completed: queries={request.queries!r}, "
             f"total={result['total']}, reranked={result['reranked']}"
         )
         return response
