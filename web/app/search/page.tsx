@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ragSearchDocuments, getDocumentPageCount, RAGSearchResult, RAGSearchResponse } from '@/lib/api'
+import { ragSearchDocuments, getDocumentPageCount, rewriteQuery, RAGSearchResult, RAGSearchResponse } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Search, FileText, Highlighter, ChevronDown, ChevronUp, Home, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, FileText, Highlighter, ChevronDown, ChevronUp, Home, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -41,6 +41,14 @@ export default function SearchPage() {
   const [includeContent, setIncludeContent] = useState(true)
   const [includeMetadata, setIncludeMetadata] = useState(true)
   const [includeCitations, setIncludeCitations] = useState(true)
+  // rewrite
+  const [enableRewrite, setEnableRewrite] = useState(false)
+  const [rewriteApiUrl, setRewriteApiUrl] = useState('')
+  const [rewriteApiKey, setRewriteApiKey] = useState('')
+  const [rewriteModel, setRewriteModel] = useState('')
+  const [rewritePrompt, setRewritePrompt] = useState('请将以下查询改写为多个不同角度的查询，每行一个：\n{query}')
+  const [rewrittenQueries, setRewrittenQueries] = useState<string[]>([])
+  const [rewriting, setRewriting] = useState(false)
   const [results, setResults] = useState<RAGSearchResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -62,9 +70,34 @@ export default function SearchPage() {
 
     setLoading(true)
     setError(null)
+    setRewrittenQueries([])
+    
     try {
+      let queries = [query.trim()]
+      
+      // 如果启用重写，先调用重写接口
+      if (enableRewrite && rewriteApiUrl && rewriteApiKey && rewriteModel) {
+        setRewriting(true)
+        try {
+          const rewriteResponse = await rewriteQuery({
+            query: query.trim(),
+            api_url: rewriteApiUrl,
+            api_key: rewriteApiKey,
+            model: rewriteModel,
+            prompt: rewritePrompt,
+          })
+          queries = [query.trim(), ...rewriteResponse.rewritten_queries]
+          setRewrittenQueries(rewriteResponse.rewritten_queries)
+        } catch (rewriteErr: any) {
+          console.error('Rewrite failed, using original query:', rewriteErr)
+          // 重写失败时继续使用原始查询
+        } finally {
+          setRewriting(false)
+        }
+      }
+      
       const response = await ragSearchDocuments({
-        query: query.trim(),
+        queries,
         scope: {
           series_id: splitList(seriesId),
           revision: splitList(revision),
@@ -351,6 +384,69 @@ export default function SearchPage() {
 
               <Separator />
 
+              {/* 查询重写配置 */}
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="enable-rewrite"
+                    checked={enableRewrite}
+                    onCheckedChange={setEnableRewrite}
+                  />
+                  <Label htmlFor="enable-rewrite" className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4" />
+                    启用查询重写 (Query Rewrite)
+                  </Label>
+                </div>
+                
+                {enableRewrite && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6 border-l-2 border-primary/20">
+                    <div>
+                      <Label htmlFor="rewrite-api-url">API URL</Label>
+                      <Input
+                        id="rewrite-api-url"
+                        className="mt-2"
+                        placeholder="如 https://api.openai.com/v1/chat/completions"
+                        value={rewriteApiUrl}
+                        onChange={(e) => setRewriteApiUrl(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="rewrite-api-key">API Key</Label>
+                      <Input
+                        id="rewrite-api-key"
+                        type="password"
+                        className="mt-2"
+                        placeholder="sk-..."
+                        value={rewriteApiKey}
+                        onChange={(e) => setRewriteApiKey(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="rewrite-model">模型</Label>
+                      <Input
+                        id="rewrite-model"
+                        className="mt-2"
+                        placeholder="如 gpt-4o-mini"
+                        value={rewriteModel}
+                        onChange={(e) => setRewriteModel(e.target.value)}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label htmlFor="rewrite-prompt">提示词模板</Label>
+                      <Textarea
+                        id="rewrite-prompt"
+                        className="mt-2 min-h-[80px]"
+                        placeholder="使用 {query} 作为占位符"
+                        value={rewritePrompt}
+                        onChange={(e) => setRewritePrompt(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
               {/* 查询输入（下方） */}
               <div>
                 <Label htmlFor="query">查询内容</Label>
@@ -363,9 +459,9 @@ export default function SearchPage() {
                     className="min-h-[160px] resize-y"
                   />
                   <div className="flex justify-end">
-                    <Button onClick={handleSearch} disabled={loading || !query.trim()}>
+                    <Button onClick={handleSearch} disabled={loading || rewriting || !query.trim()}>
                       <Search className="h-4 w-4 mr-2" />
-                      {loading ? '检索中...' : '检索'}
+                      {rewriting ? '重写中...' : loading ? '检索中...' : '检索'}
                     </Button>
                   </div>
                 </div>
@@ -404,10 +500,23 @@ export default function SearchPage() {
                   </div>
                 </CardTitle>
                 <CardDescription>
-                  查询: "{results.query}"
+                  查询: "{results.queries.join(' | ')}"
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                {rewrittenQueries.length > 0 && (
+                  <div className="mb-4 p-3 rounded-md bg-muted/50 text-xs">
+                    <div className="flex items-center gap-1 font-medium mb-1">
+                      <Sparkles className="h-3 w-3" />
+                      重写查询 ({rewrittenQueries.length})
+                    </div>
+                    <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+                      {rewrittenQueries.map((q, i) => (
+                        <li key={i}>{q}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {results.results.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     没有找到相关的文档片段

@@ -314,7 +314,7 @@ export interface RAGSearchResult {
 }
 
 export interface RAGSearchResponse {
-  query: string
+  queries: string[]
   total: number
   reranked: boolean
   profile: string
@@ -322,7 +322,7 @@ export interface RAGSearchResponse {
 }
 
 export async function ragSearchDocuments(request: {
-  query: string
+  queries: string[]
   scope?: {
     series_id?: string[]
     document_id?: string[]
@@ -336,6 +336,7 @@ export async function ragSearchDocuments(request: {
     rerank_top_k?: number
     similarity_threshold?: number | null
     search_profile?: string
+    original_query_weight?: number
   }
   filters?: {
     page_id?: string[]
@@ -350,5 +351,21 @@ export async function ragSearchDocuments(request: {
   }
 }): Promise<RAGSearchResponse> {
   const response = await api.post('/api/v1/rag/search', request)
+  return response.data
+}
+
+export interface RewriteResponse {
+  original_query: string
+  rewritten_queries: string[]
+}
+
+export async function rewriteQuery(request: {
+  query: string
+  api_url: string
+  api_key: string
+  model: string
+  prompt: string
+}): Promise<RewriteResponse> {
+  const response = await api.post('/api/v1/rag/rewrite', request)
   return response.data
 }
