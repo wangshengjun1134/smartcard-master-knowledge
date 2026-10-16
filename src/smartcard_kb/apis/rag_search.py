@@ -160,9 +160,13 @@ def rewrite_query(request: RewriteRequest):
     logger.debug(f"Rewrite request: query={request.query!r}, model={request.model}")
     
     try:
+        # 去掉首尾空白，避免复制粘贴带入的空白/换行导致 401
+        api_key = request.api_key.strip()
+        model = request.model.strip()
+
         # 构造 LLM 请求
         headers = {
-            "Authorization": f"Bearer {request.api_key}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
         
@@ -178,13 +182,13 @@ def rewrite_query(request: RewriteRequest):
             ]
 
         payload = {
-            "model": request.model,
+            "model": model,
             "messages": messages,
             "temperature": 0.2,
         }
 
         # OpenAI 兼容协议：Base URL 后需追加 /chat/completions
-        api_url = request.api_url.rstrip("/")
+        api_url = request.api_url.strip().rstrip("/")
         if not api_url.endswith("/chat/completions"):
             api_url = f"{api_url}/chat/completions"
 
