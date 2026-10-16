@@ -100,6 +100,9 @@ def rag_search(request: RAGSearchRequest):
     - **filters**: 过滤（page_id / heading_path / label[预留] / language）
     - **options**: 返回裁剪（include_content / include_metadata / include_citations）
     """
+    # Log request payload
+    logger.debug(f"RAG search request: {request.model_dump_json()}")
+    
     try:
         service = _get_rag_service()
         result = service.search(
@@ -109,11 +112,24 @@ def rag_search(request: RAGSearchRequest):
             filters=request.filters.model_dump(),
             options=request.options.model_dump(),
         )
+        
+        response = RAGSearchResponse(**result)
+        
+        # Log response summary (not full content to avoid huge logs)
+        result_summary = {
+            "query": response.query,
+            "total": response.total,
+            "reranked": response.reranked,
+            "profile": response.profile,
+            "results_count": len(response.results),
+            "top_scores": [r.score for r in response.results[:3]],
+        }
+        logger.debug(f"RAG search response: {result_summary}")
         logger.info(
             f"RAG search completed: query={request.query!r}, "
             f"total={result['total']}, reranked={result['reranked']}"
         )
-        return RAGSearchResponse(**result)
+        return response
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
