@@ -4,6 +4,8 @@
 设计文档：docs/search-api-v2-design.md
 """
 
+import json
+import re
 from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, HTTPException
@@ -15,6 +17,43 @@ from smartcard_kb.docs_compile.rag_search_service import RAGSearchService
 from .search import _get_search_service
 
 router = APIRouter(prefix="/api/v1/rag", tags=["RAG 检索"])
+
+
+def _parse_rewrite_output(content: str) -> List[str]:
+    """
+    Parse the LLM rewrite output into a list of query strings.
+
+    Supports the JSON contract produced by the default rewrite prompt:
+        {"queries": [{"query_id": "q1", "query": "...", "filters": {}, "purpose": "..."}]}
+    Falls back to one-query-per-line parsing for plain-text responses.
+    """
+    text = (content or "").strip()
+
+    # Strip ```json ... ``` fences if present
+    if text.startswith("```"):
+        text = re.sub(r"^```[a-zA-Z0-9_-]*\s*", "", text)
+        text = re.sub(r"\s*```$", "", text.strip())
+
+    # Try JSON first
+    try:
+        parsed = json.loads(text)
+        items = parsed.get("queries") if isinstance(parsed, dict) else parsed
+        queries: List[str] = []
+        if isinstance(items, list):
+            for item in items:
+                if isinstance(item, dict):
+                    q = item.get("query")
+                    if q and str(q).strip():
+                        queries.append(str(q).strip())
+                elif isinstance(item, str) and item.strip():
+                    queries.append(item.strip())
+        if queries:
+            return queries
+    except (json.JSONDecodeError, TypeError, ValueError):
+        pass
+
+    # Fallback: one query per line
+    return [line.strip() for line in text.split("\n") if line.strip()]
 
 
 _rag_service: Optional[RAGSearchService] = None
@@ -127,36 +166,42 @@ def rewrite_query(request: RewriteRequest):
             "Content-Type": "application/json",
         }
         
-        # 将原始查询填入提示词
-        full_prompt = request.prompt.replace("{query}", request.query)
-        
+        # 构造消息：若提示词含 {query} 占位符则填入单条 user 消息，
+        # 否则把提示词作为 system、原始问题作为 user（适配新版 JSON 提示词）
+        if "{query}" in request.prompt:
+            user_content = request.prompt.replace("{query}", request.query)
+            messages = [{"role": "user", "content": user_content}]
+        else:
+            messages = [
+                {"role": "system", "content": request.prompt},
+                {"role": "user", "content": request.query},
+            ]
+
         payload = {
             "model": request.model,
-            "messages": [
-                {"role": "user", "content": full_prompt}
-            ],
-            "temperature": 0.7,
+            "messages": messages,
+            "temperature": 0.2,
         }
-        
+
         # 调用 LLM API
-        with httpx.Client(timeout=30.0) as client:
+        with httpx.Client(timeout=60.0) as client:
             response = client.post(request.api_url, headers=headers, json=payload)
             response.raise_for_status()
-        
+
         result = response.json()
-        
+
         # 提取 LLM 响应内容（兼容 OpenAI 格式）
         if "choices" in result and len(result["choices"]) > 0:
             content = result["choices"][0]["message"]["content"]
         else:
             raise ValueError(f"Unexpected LLM response format: {result}")
-        
-        # 解析改写查询（假设 LLM 返回多行，每行一个查询）
-        rewritten_queries = [line.strip() for line in content.strip().split("\n") if line.strip()]
-        
+
+        # 解析改写查询（优先 JSON：{"queries":[{"query": "..."}]}，回退按行拆分）
+        rewritten_queries = _parse_rewrite_output(content)
+
         if not rewritten_queries:
             rewritten_queries = [request.query]
-        
+
         logger.info(f"Rewrite completed: {len(rewritten_queries)} queries generated")
         logger.debug(f"Rewritten queries: {rewritten_queries}")
         
