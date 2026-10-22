@@ -1140,3 +1140,218 @@ async def get_document_file(document_id: str, image_path: Optional[str] = None):
         media_type=media_type,
         headers={"Content-Disposition": f'inline; filename="{file_name}"'},
     )
+
+
+# ==================== TOC 提取 ====================
+
+
+class ExtractTocRequest(BaseModel):
+    """TOC 提取请求"""
+    document_id: str
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    model: Optional[str] = None
+    max_pages: int = 5
+
+
+class ExtractTocResponse(BaseModel):
+    """TOC 提取响应"""
+    success: bool
+    message: str
+    toc: Optional[list] = None
+    toc_count: int = 0
+
+
+@router.post("/extract-toc", response_model=ExtractTocResponse)
+async def extract_toc(request: ExtractTocRequest):
+    """
+    使用 LLM 从 PDF 前 N 页提取目录结构（TOC）
+
+    - **document_id**: 文档 ID
+    - **api_key**: LLM API Key（可选，默认从环境变量读取）
+    - **base_url**: LLM API URL（可选）
+    - **model**: LLM 模型名（可选）
+    - **max_pages**: 提取的最大页数（默认 5）
+    """
+    import sys
+    import json as json_module
+    from pathlib import Path as PathLib
+
+    # 添加 tests 目录到 path（toc_extractor_llm 在 tests/ 下）
+    project_root = Path(__file__).parent.parent.parent.parent
+    tests_dir = str(project_root / "tests")
+    if tests_dir not in sys.path:
+        sys.path.insert(0, tests_dir)
+
+    from toc_extractor_llm import extract_toc_from_pdf
+
+    try:
+        # 查询文档信息获取 PDF 路径
+        docs = query_document_info(document_ids=[request.document_id])
+        if not docs:
+            raise HTTPException(status_code=404, detail=f"文档 {request.document_id} 不存在")
+
+        doc = docs[0]
+        pdf_path = doc.get("file_path", "")
+        if not pdf_path or not Path(pdf_path).exists():
+            raise HTTPException(status_code=404, detail=f"PDF 文件不存在: {pdf_path}")
+
+        # LLM 参数
+        api_key = request.api_key or settings.openai_api_key
+        base_url = request.base_url or settings.openai_base_url
+        model = request.model or settings.openai_model
+
+        if not api_key or not base_url:
+            raise HTTPException(
+                status_code=400,
+                detail="未配置 LLM API。请提供 api_key 和 base_url，或在环境变量中设置 OPENAI_API_KEY 和 OPENAI_BASE_URL"
+            )
+
+        logger.info(f"Extracting TOC for document {request.document_id} from {pdf_path}")
+
+        # 调用 LLM 提取 TOC
+        toc = await asyncio.to_thread(
+            extract_toc_from_pdf,
+            pdf_path=pdf_path,
+            api_url=base_url,
+            api_key=api_key,
+            model=model,
+            max_pages=request.max_pages,
+        )
+
+        # 保存 TOC 到文档输出目录
+        output_dir = Path("output") / "toc" / request.document_id
+        output_dir.mkdir(parents=True, exist_ok=True)
+        toc_path = output_dir / "toc.json"
+        with open(toc_path, "w", encoding="utf-8") as f:
+            json_module.dump(toc, f, ensure_ascii=False, indent=2)
+
+        logger.info(f"TOC extracted: {len(toc)} entries, saved to {toc_path}")
+
+        return ExtractTocResponse(
+            success=True,
+            message=f"成功提取 {len(toc)} 个目录条目",
+            toc=toc,
+            toc_count=len(toc),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"TOC extraction failed for {request.document_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"TOC 提取失败: {str(e)}")
+
+
+class ExtractTocAllRequest(BaseModel):
+    """批量 TOC 提取请求"""
+    parallel_count: int = 1
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    model: Optional[str] = None
+    max_pages: int = 5
+
+
+class ExtractTocAllResponse(BaseModel):
+    """批量 TOC 提取响应"""
+    success: bool
+    message: str
+    total: int
+    parallel_count: int
+
+
+@router.post("/extract-toc-all", response_model=ExtractTocAllResponse)
+async def extract_toc_all(request: ExtractTocAllRequest):
+    """
+    批量提取所有已解析文档的 TOC
+
+    - **parallel_count**: 并行数量（默认 1）
+    - **api_key**: LLM API Key（可选）
+    - **base_url**: LLM API URL（可选）
+    - **model**: LLM 模型名（可选）
+    - **max_pages**: 提取的最大页数（默认 5）
+    """
+    import sys
+    import json as json_module
+    from pathlib import Path as PathLib
+
+    project_root = Path(__file__).parent.parent.parent.parent
+    tests_dir = str(project_root / "tests")
+    if tests_dir not in sys.path:
+        sys.path.insert(0, tests_dir)
+
+    from toc_extractor_llm import extract_toc_from_pdf
+
+    try:
+        # 查询所有已解析的文档
+        docs = query_documents_by_status(processing_status="parsed")
+        if not docs:
+            return ExtractTocAllResponse(
+                success=True,
+                message="没有已解析的文档",
+                total=0,
+                parallel_count=request.parallel_count,
+            )
+
+        api_key = request.api_key or settings.openai_api_key
+        base_url = request.base_url or settings.openai_base_url
+        model = request.model or settings.openai_model
+
+        if not api_key or not base_url:
+            raise HTTPException(
+                status_code=400,
+                detail="未配置 LLM API。请提供 api_key 和 base_url，或在环境变量中设置"
+            )
+
+        semaphore = asyncio.Semaphore(request.parallel_count)
+        success_count = 0
+        fail_count = 0
+
+        async def extract_one(doc):
+            nonlocal success_count, fail_count
+            async with semaphore:
+                doc_id = doc["id"]
+                pdf_path = doc.get("file_path", "")
+                if not pdf_path or not Path(pdf_path).exists():
+                    logger.warning(f"Skip {doc_id}: PDF not found")
+                    fail_count += 1
+                    return
+
+                try:
+                    t0 = time.time()
+                    toc = await asyncio.to_thread(
+                        extract_toc_from_pdf,
+                        pdf_path=pdf_path,
+                        api_url=base_url,
+                        api_key=api_key,
+                        model=model,
+                        max_pages=request.max_pages,
+                    )
+
+                    # 保存 TOC
+                    output_dir = Path("output") / "toc" / doc_id
+                    output_dir.mkdir(parents=True, exist_ok=True)
+                    with open(output_dir / "toc.json", "w", encoding="utf-8") as f:
+                        json_module.dump(toc, f, ensure_ascii=False, indent=2)
+
+                    elapsed = time.time() - t0
+                    logger.info(f"TOC extracted for {doc_id}: {len(toc)} entries in {elapsed:.1f}s")
+                    success_count += 1
+                except Exception as e:
+                    logger.error(f"TOC extraction failed for {doc_id}: {e}")
+                    fail_count += 1
+
+        tasks = [extract_one(doc) for doc in docs]
+        await asyncio.gather(*tasks)
+
+        return ExtractTocAllResponse(
+            success=True,
+            message=f"完成: {success_count} 成功, {fail_count} 失败",
+            total=len(docs),
+            parallel_count=request.parallel_count,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Batch TOC extraction failed: {e}")
+        raise HTTPException(status_code=500, detail=f"批量 TOC 提取失败: {str(e)}")
