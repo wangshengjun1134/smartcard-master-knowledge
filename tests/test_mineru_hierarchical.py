@@ -47,7 +47,7 @@ def _extract_table_text(block) -> str:
     return ""
 
 
-def parse_pdf_with_mineru(pdf_path: str, page_range: str = "") -> list:
+def parse_pdf_with_mineru(pdf_path: str, page_range: str = "", image_output_dir: str = "tests/output/pictures") -> list:
     """
     使用 MinerU 4.0 解析 PDF，返回扁平化的 block 列表。
 
@@ -64,13 +64,60 @@ def parse_pdf_with_mineru(pdf_path: str, page_range: str = "") -> list:
     if page_range:
         print(f"  页面范围: {page_range}")
 
+    # 确保图片输出目录存在
+    Path(image_output_dir).mkdir(parents=True, exist_ok=True)
+
     result = parse(
         pdf_path,
         tier="basic",
-        ocr_mode="txt",
+        ocr_mode="auto",
         image_analysis=False,
         page_range=page_range,
     )
+
+    # 导出图片到指定目录（MinerU 4.0 图片以 base64 存储，需解码保存）
+    import base64
+    image_count = 0
+    for page in result.pages:
+        page_idx = page.page_idx
+        for block in page.blocks:
+            if block.type == "image":
+                for content_block in (block.content or []):
+                    if not hasattr(content_block, "type") or content_block.type != "image_body":
+                        continue
+                    # 优先用 image_path（文件路径），其次用 image_base64（base64 数据）
+                    saved_path = ""
+                    if hasattr(content_block, "image_path") and content_block.image_path:
+                        src = Path(content_block.image_path)
+                        if src.exists():
+                            import shutil
+                            dst = Path(image_output_dir) / f"page{page_idx+1}_img{image_count+1}{src.suffix}"
+                            shutil.copy2(str(src), str(dst))
+                            saved_path = str(dst)
+                    elif hasattr(content_block, "image_base64") and content_block.image_base64:
+                        img_data = base64.b64decode(content_block.image_base64)
+                        # MinerU 4.0 的 base64 数据可能包含未知头部，需跳过找到实际图片数据
+                        # 按优先级检测常见图片格式的 magic bytes
+                        jpeg_offset = img_data.find(b'\xff\xd8\xff')
+                        png_offset = img_data.find(b'\x89PNG\r\n\x1a\n')
+
+                        if jpeg_offset >= 0 and (png_offset < 0 or jpeg_offset <= png_offset):
+                            img_data = img_data[jpeg_offset:]
+                            ext = ".jpg"
+                        elif png_offset >= 0:
+                            img_data = img_data[png_offset:]
+                            ext = ".png"
+                        else:
+                            ext = ".png"  # fallback，可能无法打开
+
+                        dst = Path(image_output_dir) / f"page{page_idx+1}_img{image_count+1}{ext}"
+                        dst.write_bytes(img_data)
+                        saved_path = str(dst)
+                    if saved_path:
+                        content_block.image_path = saved_path
+                        image_count += 1
+
+    print(f"  导出 {image_count} 张图片到 {image_output_dir}")
 
     # 将 ParseResult 转换为扁平 block 列表
     blocks = []
