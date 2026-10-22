@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from toc_skeleton import SGP41_TOC, build_skeleton_tree, detect_page_offset, assign_blocks_to_skeleton
+from toc_extractor_llm import extract_toc_from_pdf
 
 
 # ==================== MinerU 4.0 解析 ====================
@@ -168,11 +169,29 @@ def parse_pdf_with_mineru(pdf_path: str, page_range: str = "", image_output_dir:
 
 # ==================== 测试入口 ====================
 
-def test_mineru_hierarchical():
-    """使用 MinerU 4.0 + TOC 骨架方案解析 PDF 并输出层级 JSON"""
+def test_mineru_hierarchical(
+    pdf_path: str = None,
+    toc_data: list = None,
+    llm_api_url: str = None,
+    llm_api_key: str = None,
+    llm_model: str = None,
+    output_json_path: str = None,
+):
+    """
+    使用 MinerU 4.0 + TOC 骨架方案解析 PDF 并输出层级 JSON。
 
-    pdf_path = "specs/03-management-provisioning/gsma/SGP.41/SGP.41-eSIM-IFPP-Architecture-and-Requirements-v1.0.pdf"
-    output_json_path = "tests/output/sgp41_mineru_hierarchical_full.json"
+    Args:
+        pdf_path: PDF 文件路径（默认 SGP.41）
+        toc_data: TOC 数据（默认 SGP41_TOC）。如果为 None 且提供了 LLM 参数，则用 LLM 提取
+        llm_api_url: LLM API URL（用于自动提取 TOC）
+        llm_api_key: LLM API Key
+        llm_model: LLM 模型名
+        output_json_path: 输出 JSON 路径
+    """
+    import os
+
+    pdf_path = pdf_path or "specs/03-management-provisioning/gsma/SGP.41/SGP.41-eSIM-IFPP-Architecture-and-Requirements-v1.0.pdf"
+    output_json_path = output_json_path or "tests/output/sgp41_mineru_hierarchical_full.json"
 
     print("=" * 80)
     print("MinerU 4.0 + TOC 骨架方案 PDF 层级解析测试")
@@ -199,9 +218,30 @@ def test_mineru_hierarchical():
         print(f"    {t}: {c}")
     print()
 
-    # 第 2 步：构建 TOC 骨架
-    print("步骤 2: 构建 TOC 骨架...")
-    skeleton = build_skeleton_tree(SGP41_TOC)
+    # 第 2 步：获取 TOC 数据
+    print("步骤 2: 获取 TOC 骨架...")
+    if toc_data is None:
+        # 尝试用 LLM 提取
+        api_url = llm_api_url or os.getenv("OPENAI_BASE_URL", "")
+        api_key = llm_api_key or os.getenv("OPENAI_API_KEY", "")
+        model = llm_model or os.getenv("OPENAI_MODEL", "qwen-plus")
+
+        if api_url and api_key:
+            print(f"  使用 LLM 提取 TOC（model={model}）...")
+            try:
+                toc_data = extract_toc_from_pdf(pdf_path, api_url, api_key, model)
+                print(f"  LLM 提取了 {len(toc_data)} 个 TOC 条目")
+            except Exception as e:
+                print(f"  ❌ LLM 提取失败: {e}")
+                print(f"  回退到默认 SGP41_TOC")
+                toc_data = SGP41_TOC
+        else:
+            print("  未提供 LLM 参数，使用默认 SGP41_TOC")
+            toc_data = SGP41_TOC
+    else:
+        print(f"  使用传入的 TOC 数据（{len(toc_data)} 个条目）")
+
+    skeleton = build_skeleton_tree(toc_data)
     skeleton_count = sum(1 for _ in _iter_nodes(skeleton))
     print(f"  骨架节点数: {skeleton_count}")
     print()
