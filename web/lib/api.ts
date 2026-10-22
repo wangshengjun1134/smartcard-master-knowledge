@@ -369,3 +369,41 @@ export async function rewriteQuery(request: {
   const response = await api.post('/api/v1/rag/rewrite', request)
   return response.data
 }
+
+// ==================== TOC 提取 API ====================
+
+export interface ExtractTocResponse {
+  success: boolean
+  message: string
+  toc?: Array<{level: number; number: string; title: string; page: number}>
+  toc_count: number
+}
+
+export async function extractToc(request: {
+  document_id: string
+  api_key?: string
+  base_url?: string
+  model?: string
+  max_pages?: number
+}): Promise<ExtractTocResponse> {
+  const response = await api.post('/api/docs/extract-toc', request)
+  return response.data
+}
+
+export interface ExtractTocAllResponse {
+  success: boolean
+  message: string
+  total: number
+  parallel_count: number
+}
+
+export async function extractTocAll(request: {
+  parallel_count?: number
+  api_key?: string
+  base_url?: string
+  model?: string
+  max_pages?: number
+}): Promise<ExtractTocAllResponse> {
+  const response = await api.post('/api/docs/extract-toc-all', request)
+  return response.data
+}

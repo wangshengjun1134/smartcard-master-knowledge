@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { listDocuments, uploadDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings, embeddingAllDocuments, getStatusCounts } from '@/lib/api'
+import { listDocuments, uploadDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings, embeddingAllDocuments, getStatusCounts, extractTocAll } from '@/lib/api'
 import type { DocumentInfo } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -66,10 +66,12 @@ export default function Home() {
   const [vlmAll, setVlmAll] = useState(false)
   const [chunkingAll, setChunkingAll] = useState(false)
   const [embeddingAll, setEmbeddingAll] = useState(false)
+  const [extractingToc, setExtractingToc] = useState(false)
   const [parseAllDialogOpen, setParseAllDialogOpen] = useState(false)
   const [vlmAllDialogOpen, setVlmAllDialogOpen] = useState(false)
   const [chunkAllDialogOpen, setChunkAllDialogOpen] = useState(false)
   const [embeddingAllDialogOpen, setEmbeddingAllDialogOpen] = useState(false)
+  const [tocAllDialogOpen, setTocAllDialogOpen] = useState(false)
   const [parseAllForm, setParseAllForm] = useState({
     parallel_count: 1,
     do_ocr: true,
@@ -99,6 +101,13 @@ export default function Home() {
     base_url: '',
     model: '',
     model_name: '',
+  })
+  const [tocAllForm, setTocAllForm] = useState({
+    parallel_count: 1,
+    api_key: '',
+    base_url: '',
+    model: '',
+    max_pages: 5,
   })
   // Pipeline filter state
   const [pipelineFilter, setPipelineFilter] = useState<string>('')
@@ -319,6 +328,33 @@ export default function Home() {
       })
     } finally {
       setEmbeddingAll(false)
+    }
+  }
+
+  const handleExtractTocAll = async () => {
+    setExtractingToc(true)
+    try {
+      const result = await extractTocAll({
+        parallel_count: tocAllForm.parallel_count,
+        api_key: tocAllForm.api_key || undefined,
+        base_url: tocAllForm.base_url || undefined,
+        model: tocAllForm.model || undefined,
+        max_pages: tocAllForm.max_pages,
+      })
+      toast({
+        title: '批量 TOC 提取任务已提交',
+        description: result.message || `已提交 ${result.total} 个文档的 TOC 提取任务`,
+      })
+      await refreshData()
+      setTocAllDialogOpen(false)
+    } catch (error: any) {
+      toast({
+        title: '批量 TOC 提取失败',
+        description: error.response?.data?.detail || '请重试',
+        variant: 'destructive',
+      })
+    } finally {
+      setExtractingToc(false)
     }
   }
 
@@ -1218,6 +1254,98 @@ export default function Home() {
                       </Button>
                       <Button onClick={handleEmbeddingAll} disabled={embeddingAll}>
                         {embeddingAll ? '提交中...' : '确认提交'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                {/* TOC Extract All Dialog */}
+                <Dialog open={tocAllDialogOpen} onOpenChange={setTocAllDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      disabled={extractingToc || totalDocs === 0}
+                      variant="secondary"
+                      size="sm"
+                      className="gap-1.5"
+                    >
+                      {extractingToc ? (
+                        <>
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          提取中...
+                        </>
+                      ) : (
+                        <>
+                          <ListChecks className="h-4 w-4" />
+                          提取目录
+                        </>
+                      )}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                      <DialogTitle>批量提取目录（TOC）</DialogTitle>
+                      <DialogDescription>
+                        使用 LLM 从 PDF 前 N 页提取目录结构，用于后续层级解析
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="toc-parallel">并行数量</Label>
+                        <Input
+                          id="toc-parallel"
+                          type="number"
+                          min={1}
+                          max={10}
+                          value={tocAllForm.parallel_count}
+                          onChange={(e) => setTocAllForm({ ...tocAllForm, parallel_count: parseInt(e.target.value) || 1 })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="toc-pages">提取页数</Label>
+                        <Input
+                          id="toc-pages"
+                          type="number"
+                          min={1}
+                          max={20}
+                          value={tocAllForm.max_pages}
+                          onChange={(e) => setTocAllForm({ ...tocAllForm, max_pages: parseInt(e.target.value) || 5 })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="toc-api-key">LLM API Key（可选）</Label>
+                        <Input
+                          id="toc-api-key"
+                          type="password"
+                          placeholder="留空使用环境变量"
+                          value={tocAllForm.api_key}
+                          onChange={(e) => setTocAllForm({ ...tocAllForm, api_key: e.target.value })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="toc-base-url">Base URL（可选）</Label>
+                        <Input
+                          id="toc-base-url"
+                          placeholder="留空使用环境变量"
+                          value={tocAllForm.base_url}
+                          onChange={(e) => setTocAllForm({ ...tocAllForm, base_url: e.target.value })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="toc-model">模型名称（可选）</Label>
+                        <Input
+                          id="toc-model"
+                          placeholder="留空使用默认模型"
+                          value={tocAllForm.model}
+                          onChange={(e) => setTocAllForm({ ...tocAllForm, model: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setTocAllDialogOpen(false)} disabled={extractingToc}>
+                        取消
+                      </Button>
+                      <Button onClick={handleExtractTocAll} disabled={extractingToc}>
+                        {extractingToc ? '提交中...' : '确认提交'}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
