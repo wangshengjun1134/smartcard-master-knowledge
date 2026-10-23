@@ -407,3 +407,40 @@ export async function extractTocAll(request: {
   const response = await api.post('/api/docs/extract-toc-all', request)
   return response.data
 }
+
+// ==================== PageIndex API ====================
+
+export interface PageIndexResponse {
+  success: boolean
+  message: string
+  toc_count: number
+}
+
+export async function pageIndex(request: {
+  document_id: string
+  api_key?: string
+  base_url?: string
+  model?: string
+  max_pages?: number
+}): Promise<PageIndexResponse> {
+  const response = await api.post('/api/docs/page-index', request)
+  return response.data
+}
+
+export interface PageIndexAllResponse {
+  success: boolean
+  message: string
+  total: number
+  parallel_count: number
+}
+
+export async function pageIndexAll(request: {
+  parallel_count?: number
+  api_key?: string
+  base_url?: string
+  model?: string
+  max_pages?: number
+}): Promise<PageIndexAllResponse> {
+  const response = await api.post('/api/docs/page-index-all', request)
+  return response.data
+}

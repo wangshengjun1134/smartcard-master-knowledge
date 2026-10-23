@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { listDocuments, uploadDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings, embeddingAllDocuments, getStatusCounts, extractTocAll } from '@/lib/api'
+import { listDocuments, uploadDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings, embeddingAllDocuments, getStatusCounts, pageIndex, pageIndexAll } from '@/lib/api'
 import type { DocumentInfo } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -67,11 +67,13 @@ export default function Home() {
   const [chunkingAll, setChunkingAll] = useState(false)
   const [embeddingAll, setEmbeddingAll] = useState(false)
   const [extractingToc, setExtractingToc] = useState(false)
+  const [pageIndexRunning, setPageIndexRunning] = useState(false)
   const [parseAllDialogOpen, setParseAllDialogOpen] = useState(false)
   const [vlmAllDialogOpen, setVlmAllDialogOpen] = useState(false)
   const [chunkAllDialogOpen, setChunkAllDialogOpen] = useState(false)
   const [embeddingAllDialogOpen, setEmbeddingAllDialogOpen] = useState(false)
   const [tocAllDialogOpen, setTocAllDialogOpen] = useState(false)
+  const [pageIndexPathDialogOpen, setPageIndexPathDialogOpen] = useState(false)
   const [parseAllForm, setParseAllForm] = useState({
     parallel_count: 1,
     do_ocr: true,
@@ -334,7 +336,7 @@ export default function Home() {
   const handleExtractTocAll = async () => {
     setExtractingToc(true)
     try {
-      const result = await extractTocAll({
+      const result = await pageIndexAll({
         parallel_count: tocAllForm.parallel_count,
         api_key: tocAllForm.api_key || undefined,
         base_url: tocAllForm.base_url || undefined,
@@ -342,14 +344,14 @@ export default function Home() {
         max_pages: tocAllForm.max_pages,
       })
       toast({
-        title: '批量 TOC 提取任务已提交',
-        description: result.message || `已提交 ${result.total} 个文档的 TOC 提取任务`,
+        title: '批量 PageIndex 任务已提交',
+        description: result.message || `已提交 ${result.total} 个文档的 PageIndex 任务`,
       })
       await refreshData()
       setTocAllDialogOpen(false)
     } catch (error: any) {
       toast({
-        title: '批量 TOC 提取失败',
+        title: '批量 PageIndex 失败',
         description: error.response?.data?.detail || '请重试',
         variant: 'destructive',
       })
@@ -591,6 +593,44 @@ export default function Home() {
                   {statusCounts['uploaded'] || 0}
                 </span>
               </button>
+
+              {/* Arrow */}
+              <ArrowRight className="h-4 w-4 text-muted-foreground mt-2 flex-shrink-0" />
+
+              {/* 已PageIndex + 失败分支 */}
+              <div className="flex-1 min-w-[100px] flex flex-col items-center">
+                <button
+                  onClick={() => { setPipelineFilter('indexed'); setCurrentPage(1) }}
+                  className={`w-full flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
+                    pipelineFilter === 'indexed'
+                      ? 'border-primary/60 bg-primary/5 ring-1 ring-primary/40'
+                      : 'border-border hover:bg-muted'
+                  }`}
+                >
+                  <span className="text-xs font-semibold">已PageIndex</span>
+                  <span className={`text-xs mt-1 px-2 py-0.5 rounded-full font-bold ${
+                    pipelineFilter === 'indexed' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                  }`}>
+                    {statusCounts['indexed'] || 0}
+                  </span>
+                </button>
+                <button
+                  onClick={() => { setPipelineFilter('index_failed'); setCurrentPage(1) }}
+                  className={`w-full mt-1 flex items-center justify-center gap-1 px-2 py-1 rounded-lg border transition-all text-xs ${
+                    pipelineFilter === 'index_failed'
+                      ? 'border-destructive bg-destructive/10 ring-1 ring-destructive'
+                      : 'border-destructive/30 bg-destructive/5 hover:bg-destructive/10'
+                  }`}
+                >
+                  <AlertCircle className="h-3 w-3 text-destructive" />
+                  <span className="text-xs font-medium text-destructive">索引失败</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                    pipelineFilter === 'index_failed' ? 'bg-destructive/20 text-destructive' : 'bg-destructive/10 text-destructive'
+                  }`}>
+                    {statusCounts['index_failed'] || 0}
+                  </span>
+                </button>
+              </div>
 
               {/* Arrow */}
               <ArrowRight className="h-4 w-4 text-muted-foreground mt-2 flex-shrink-0" />
@@ -1259,7 +1299,7 @@ export default function Home() {
                   </DialogContent>
                 </Dialog>
 
-                {/* TOC Extract All Dialog */}
+                {/* PageIndex Dialog */}
                 <Dialog open={tocAllDialogOpen} onOpenChange={setTocAllDialogOpen}>
                   <DialogTrigger asChild>
                     <Button
@@ -1271,21 +1311,24 @@ export default function Home() {
                       {extractingToc ? (
                         <>
                           <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                          提取中...
+                          处理中...
                         </>
                       ) : (
                         <>
                           <ListChecks className="h-4 w-4" />
-                          提取目录
+                          <span className="flex flex-col items-center leading-tight">
+                            <span>Page</span>
+                            <span>Index</span>
+                          </span>
                         </>
                       )}
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-[500px]">
                     <DialogHeader>
-                      <DialogTitle>批量提取目录（TOC）</DialogTitle>
+                      <DialogTitle>批量 PageIndex</DialogTitle>
                       <DialogDescription>
-                        使用 LLM 从 PDF 前 N 页提取目录结构，用于后续层级解析
+                        使用 LLM 从 PDF 前 N 页提取目录结构，构建层级骨架
                       </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
