@@ -632,40 +632,82 @@ export default function Home() {
                     {statusCounts['parse_failed'] || 0}
                   </span>
                 </button>
-                {/* 分叉：从已上传来的转弯箭头 + 已PageIndex */}
+                {/* 分叉：从已上传来的转弯箭头 + PageIndex 子流程 */}
                 <div className="w-full mt-1 flex flex-col items-center">
                   <ArrowRight className="h-3 w-3 text-muted-foreground rotate-90" />
-                  <button
-                    onClick={() => { setPipelineFilter('indexed'); setCurrentPage(1) }}
-                    className={`w-full flex flex-col items-center px-2 py-1.5 rounded-lg border transition-all ${
-                      pipelineFilter === 'indexed'
-                        ? 'border-primary/60 bg-primary/5 ring-1 ring-primary/40'
-                        : 'border-border hover:bg-muted'
-                    }`}
-                  >
-                    <span className="text-[10px] font-semibold">已PageIndex</span>
-                    <span className={`text-[10px] mt-0.5 px-1.5 py-0.5 rounded-full font-bold ${
-                      pipelineFilter === 'indexed' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
-                    }`}>
-                      {statusCounts['indexed'] || 0}
-                    </span>
-                  </button>
-                  <button
-                    onClick={() => { setPipelineFilter('index_failed'); setCurrentPage(1) }}
-                    className={`w-full mt-0.5 flex items-center justify-center gap-0.5 px-1.5 py-0.5 rounded-lg border transition-all text-[10px] ${
-                      pipelineFilter === 'index_failed'
-                        ? 'border-destructive bg-destructive/10 ring-1 ring-destructive'
-                        : 'border-destructive/30 bg-destructive/5 hover:bg-destructive/10'
-                    }`}
-                  >
-                    <AlertCircle className="h-2.5 w-2.5 text-destructive" />
-                    <span className="text-[10px] font-medium text-destructive">索引失败</span>
-                    <span className={`text-[9px] px-1 py-0 rounded-full font-bold ${
-                      pipelineFilter === 'index_failed' ? 'bg-destructive/20 text-destructive' : 'bg-destructive/10 text-destructive'
-                    }`}>
-                      {statusCounts['index_failed'] || 0}
-                    </span>
-                  </button>
+                  {/* PageIndex 子流程：已PageIndex → PageIndex-VLM已完成 */}
+                  <div className="w-full flex items-start gap-1">
+                    {/* 已PageIndex + 索引失败 */}
+                    <div className="flex-1 flex flex-col items-center">
+                      <button
+                        onClick={() => { setPipelineFilter('indexed'); setCurrentPage(1) }}
+                        className={`w-full flex flex-col items-center px-2 py-1.5 rounded-lg border transition-all ${
+                          pipelineFilter === 'indexed'
+                            ? 'border-primary/60 bg-primary/5 ring-1 ring-primary/40'
+                            : 'border-border hover:bg-muted'
+                        }`}
+                      >
+                        <span className="text-[10px] font-semibold">已PageIndex</span>
+                        <span className={`text-[10px] mt-0.5 px-1.5 py-0.5 rounded-full font-bold ${
+                          pipelineFilter === 'indexed' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                        }`}>
+                          {statusCounts['indexed'] || 0}
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => { setPipelineFilter('index_failed'); setCurrentPage(1) }}
+                        className={`w-full mt-0.5 flex items-center justify-center gap-0.5 px-1 py-0.5 rounded-lg border transition-all text-[10px] ${
+                          pipelineFilter === 'index_failed'
+                            ? 'border-destructive bg-destructive/10 ring-1 ring-destructive'
+                            : 'border-destructive/30 bg-destructive/5 hover:bg-destructive/10'
+                        }`}
+                      >
+                        <AlertCircle className="h-2.5 w-2.5 text-destructive" />
+                        <span className="text-[9px] font-medium text-destructive">索引失败</span>
+                        <span className={`text-[8px] px-1 py-0 rounded-full font-bold ${
+                          pipelineFilter === 'index_failed' ? 'bg-destructive/20 text-destructive' : 'bg-destructive/10 text-destructive'
+                        }`}>
+                          {statusCounts['index_failed'] || 0}
+                        </span>
+                      </button>
+                    </div>
+                    {/* 小箭头 */}
+                    <ArrowRight className="h-3 w-3 text-muted-foreground mt-2 flex-shrink-0" />
+                    {/* PageIndex-VLM已完成 + VLM失败 */}
+                    <div className="flex-1 flex flex-col items-center">
+                      <button
+                        onClick={() => { setPipelineFilter('pi_vlm_completed'); setCurrentPage(1) }}
+                        className={`w-full flex flex-col items-center px-2 py-1.5 rounded-lg border transition-all ${
+                          pipelineFilter === 'pi_vlm_completed'
+                            ? 'border-primary/60 bg-primary/5 ring-1 ring-primary/40'
+                            : 'border-border hover:bg-muted'
+                        }`}
+                      >
+                        <span className="text-[10px] font-semibold leading-tight text-center">PageIndex<br/>VLM已完成</span>
+                        <span className={`text-[10px] mt-0.5 px-1.5 py-0.5 rounded-full font-bold ${
+                          pipelineFilter === 'pi_vlm_completed' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                        }`}>
+                          {statusCounts['pi_vlm_completed'] || 0}
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => { setPipelineFilter('pi_vlm_failed'); setCurrentPage(1) }}
+                        className={`w-full mt-0.5 flex items-center justify-center gap-0.5 px-1 py-0.5 rounded-lg border transition-all text-[10px] ${
+                          pipelineFilter === 'pi_vlm_failed'
+                            ? 'border-destructive bg-destructive/10 ring-1 ring-destructive'
+                            : 'border-destructive/30 bg-destructive/5 hover:bg-destructive/10'
+                        }`}
+                      >
+                        <AlertCircle className="h-2.5 w-2.5 text-destructive" />
+                        <span className="text-[9px] font-medium text-destructive">VLM失败</span>
+                        <span className={`text-[8px] px-1 py-0 rounded-full font-bold ${
+                          pipelineFilter === 'pi_vlm_failed' ? 'bg-destructive/20 text-destructive' : 'bg-destructive/10 text-destructive'
+                        }`}>
+                          {statusCounts['pi_vlm_failed'] || 0}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
