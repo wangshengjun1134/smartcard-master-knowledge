@@ -577,59 +577,58 @@ export default function Home() {
               {/* Arrow */}
               <ArrowRight className="h-4 w-4 text-muted-foreground mt-2 flex-shrink-0" />
 
-              {/* 已上传 */}
-              <button
-                onClick={() => { setPipelineFilter('uploaded'); setCurrentPage(1) }}
-                className={`flex-1 min-w-[100px] flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
-                  pipelineFilter === 'uploaded'
-                    ? 'border-primary/60 bg-primary/5 ring-1 ring-primary/40'
-                    : 'border-border hover:bg-muted'
-                }`}
-              >
-                <span className="text-xs font-semibold">已上传</span>
-                <span className={`text-xs mt-1 px-2 py-0.5 rounded-full font-bold ${
-                  pipelineFilter === 'uploaded' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
-                }`}>
-                  {statusCounts['uploaded'] || 0}
-                </span>
-              </button>
-
-              {/* Arrow */}
-              <ArrowRight className="h-4 w-4 text-muted-foreground mt-2 flex-shrink-0" />
-
-              {/* 已PageIndex + 失败分支 */}
+              {/* 已上传 + PageIndex 分叉 */}
               <div className="flex-1 min-w-[100px] flex flex-col items-center">
                 <button
-                  onClick={() => { setPipelineFilter('indexed'); setCurrentPage(1) }}
+                  onClick={() => { setPipelineFilter('uploaded'); setCurrentPage(1) }}
                   className={`w-full flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
-                    pipelineFilter === 'indexed'
+                    pipelineFilter === 'uploaded'
                       ? 'border-primary/60 bg-primary/5 ring-1 ring-primary/40'
                       : 'border-border hover:bg-muted'
                   }`}
                 >
-                  <span className="text-xs font-semibold">已PageIndex</span>
+                  <span className="text-xs font-semibold">已上传</span>
                   <span className={`text-xs mt-1 px-2 py-0.5 rounded-full font-bold ${
-                    pipelineFilter === 'indexed' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                    pipelineFilter === 'uploaded' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
                   }`}>
-                    {statusCounts['indexed'] || 0}
+                    {statusCounts['uploaded'] || 0}
                   </span>
                 </button>
-                <button
-                  onClick={() => { setPipelineFilter('index_failed'); setCurrentPage(1) }}
-                  className={`w-full mt-1 flex items-center justify-center gap-1 px-2 py-1 rounded-lg border transition-all text-xs ${
-                    pipelineFilter === 'index_failed'
-                      ? 'border-destructive bg-destructive/10 ring-1 ring-destructive'
-                      : 'border-destructive/30 bg-destructive/5 hover:bg-destructive/10'
-                  }`}
-                >
-                  <AlertCircle className="h-3 w-3 text-destructive" />
-                  <span className="text-xs font-medium text-destructive">索引失败</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                    pipelineFilter === 'index_failed' ? 'bg-destructive/20 text-destructive' : 'bg-destructive/10 text-destructive'
-                  }`}>
-                    {statusCounts['index_failed'] || 0}
-                  </span>
-                </button>
+                {/* 分叉：向下箭头 + 已PageIndex */}
+                <div className="w-full mt-1 flex flex-col items-center">
+                  <ArrowRight className="h-3 w-3 text-muted-foreground rotate-90" />
+                  <button
+                    onClick={() => { setPipelineFilter('indexed'); setCurrentPage(1) }}
+                    className={`w-full flex flex-col items-center px-2 py-1.5 rounded-lg border transition-all ${
+                      pipelineFilter === 'indexed'
+                        ? 'border-primary/60 bg-primary/5 ring-1 ring-primary/40'
+                        : 'border-border hover:bg-muted'
+                    }`}
+                  >
+                    <span className="text-[10px] font-semibold">已PageIndex</span>
+                    <span className={`text-[10px] mt-0.5 px-1.5 py-0.5 rounded-full font-bold ${
+                      pipelineFilter === 'indexed' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                    }`}>
+                      {statusCounts['indexed'] || 0}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => { setPipelineFilter('index_failed'); setCurrentPage(1) }}
+                    className={`w-full mt-0.5 flex items-center justify-center gap-0.5 px-1.5 py-0.5 rounded-lg border transition-all text-[10px] ${
+                      pipelineFilter === 'index_failed'
+                        ? 'border-destructive bg-destructive/10 ring-1 ring-destructive'
+                        : 'border-destructive/30 bg-destructive/5 hover:bg-destructive/10'
+                    }`}
+                  >
+                    <AlertCircle className="h-2.5 w-2.5 text-destructive" />
+                    <span className="text-[10px] font-medium text-destructive">索引失败</span>
+                    <span className={`text-[9px] px-1 py-0 rounded-full font-bold ${
+                      pipelineFilter === 'index_failed' ? 'bg-destructive/20 text-destructive' : 'bg-destructive/10 text-destructive'
+                    }`}>
+                      {statusCounts['index_failed'] || 0}
+                    </span>
+                  </button>
+                </div>
               </div>
 
               {/* Arrow */}
