@@ -66,7 +66,7 @@ def extract_text_from_pdf_pages(pdf_path: str, max_pages: int = 5) -> str:
     """
     from mineru.parser import parse
 
-    page_range = f"0-{max_pages - 1}" if max_pages > 1 else "0"
+    page_range = f"1-{max_pages}" if max_pages > 1 else "1"
     result = parse(
         pdf_path,
         tier="basic",
@@ -241,3 +241,49 @@ def extract_toc_with_fallback(
     except Exception as e:
         logger.error(f"TOC extraction failed for {pdf_path}: {e}")
         return None
+
+
+# ==================== CLI 入口 ====================
+
+if __name__ == "__main__":
+    import argparse
+    import os
+
+    parser = argparse.ArgumentParser(description="从 PDF 前 N 页用 LLM 提取 TOC")
+    parser.add_argument("pdf_path", help="PDF 文件路径")
+    parser.add_argument("--pages", type=int, default=5, help="提取前 N 页（默认 5）")
+    parser.add_argument("--api-url", default=None, help="LLM API URL（默认从 OPENAI_BASE_URL 读取）")
+    parser.add_argument("--api-key", default=None, help="LLM API Key（默认从 OPENAI_API_KEY 读取）")
+    parser.add_argument("--model", default=None, help="模型名称（默认从 OPENAI_MODEL 或 qwen-plus）")
+    parser.add_argument("--output", default=None, help="输出 JSON 文件路径（默认打印到终端）")
+    args = parser.parse_args()
+
+    api_url = args.api_url or os.getenv("OPENAI_BASE_URL", "")
+    api_key = args.api_key or os.getenv("OPENAI_API_KEY", "")
+    model = args.model or os.getenv("OPENAI_MODEL", "qwen-plus")
+
+    if not api_url or not api_key:
+        print("❌ 请提供 --api-url 和 --api-key，或设置环境变量 OPENAI_BASE_URL / OPENAI_API_KEY")
+        sys.exit(1)
+
+    print(f"PDF: {args.pdf_path}")
+    print(f"提取前 {args.pages} 页, model={model}")
+    print()
+
+    toc = extract_toc_from_pdf(
+        pdf_path=args.pdf_path,
+        api_url=api_url,
+        api_key=api_key,
+        model=model,
+        max_pages=args.pages,
+    )
+
+    print(f"\n✅ 提取了 {len(toc)} 个 TOC 条目：\n")
+    for entry in toc:
+        indent = "  " * (entry["level"] - 1)
+        print(f"{indent}{entry['number']} {entry['title']} (p.{entry['page']})")
+
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
+            json.dump(toc, f, ensure_ascii=False, indent=2)
+        print(f"\n已保存到 {args.output}")
