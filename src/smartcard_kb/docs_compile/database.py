@@ -53,6 +53,10 @@ def init_database():
             processing_started_at TEXT,
             processing_finished_at TEXT,
             processing_error TEXT,
+            page_index_status TEXT,
+            page_index_started_at TEXT,
+            page_index_finished_at TEXT,
+            page_index_error TEXT,
             item_count INTEGER DEFAULT 0,
             text_count INTEGER DEFAULT 0,
             title_count INTEGER DEFAULT 0,
@@ -77,6 +81,19 @@ def init_database():
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_doc_info_processing_status
         ON doc_info(processing_status)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_doc_info_page_index_status
+        ON doc_info(page_index_status)
+    """)
+
+    # 迁移：为已有数据库添加 page_index_status 相关列
+    cursor.execute("""
+        ALTER TABLE doc_info
+        ADD COLUMN IF NOT EXISTS page_index_status TEXT,
+        ADD COLUMN IF NOT EXISTS page_index_started_at TEXT,
+        ADD COLUMN IF NOT EXISTS page_index_finished_at TEXT,
+        ADD COLUMN IF NOT EXISTS page_index_error TEXT
     """)
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_doc_info_file_hash
@@ -927,6 +944,7 @@ def update_document_info(doc_info: Dict[str, Any]) -> None:
         "revision", "publication_date", "effective_date", "issuer", "language",
         "source_type", "parser", "parser_version",
         "processing_status", "processing_started_at", "processing_finished_at", "processing_error",
+        "page_index_status", "page_index_started_at", "page_index_finished_at", "page_index_error",
         "item_count", "text_count", "title_count", "table_count", "picture_count", "formula_count",
         "metadata",
     ]
