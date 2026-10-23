@@ -594,10 +594,12 @@ export default function Home() {
                 </span>
               </button>
 
-              {/* Arrow */}
-              <ArrowRight className="h-4 w-4 text-muted-foreground mt-2 flex-shrink-0" />
+              {/* 分叉箭头：从已上传出发，向右转弯指向 PageIndex */}
+              <div className="flex flex-col items-center justify-center self-center" style={{ minWidth: '20px' }}>
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+              </div>
 
-              {/* 已解析 + 失败分支 + PageIndex 分叉 */}
+              {/* 已解析 + 失败分支 + PageIndex 分叉（PageIndex 在已解析正下方，箭头从已上传来） */}
               <div className="flex-1 min-w-[100px] flex flex-col items-center">
                 <button
                   onClick={() => { setPipelineFilter('parsed'); setCurrentPage(1) }}
@@ -630,7 +632,7 @@ export default function Home() {
                     {statusCounts['parse_failed'] || 0}
                   </span>
                 </button>
-                {/* 分叉：向下箭头 + 已PageIndex */}
+                {/* 分叉：从已上传来的转弯箭头 + 已PageIndex */}
                 <div className="w-full mt-1 flex flex-col items-center">
                   <ArrowRight className="h-3 w-3 text-muted-foreground rotate-90" />
                   <button
