@@ -16,7 +16,9 @@ from smartcard_kb.logger import logger
 
 # ==================== Prompt ====================
 
-TOC_EXTRACTION_SYSTEM_PROMPT = """你是一个 PDF 文档结构分析专家。你的任务是从文档前几页中找到"Table of Contents"（目录）页面，并提取其中列出的**完整**目录结构。
+TOC_EXTRACTION_SYSTEM_PROMPT = """你是一个 PDF 文档结构分析专家。你的任务是从文档前几页中找到目录区域，并提取其中列出的**完整**目录结构。
+
+目录区域的常见名称包括但不限于：Table of Contents、Contents、目录、摘要目录、List of Figures/Tables 等。它通常位于文档前几页，以列表形式列出所有章节及其对应页码。
 
 输出严格的 JSON 数组，每个元素代表一个目录条目：
 [
@@ -27,23 +29,24 @@ TOC_EXTRACTION_SYSTEM_PROMPT = """你是一个 PDF 文档结构分析专家。�
 ]
 
 关键规则：
-1. **找到目录区域**：在前几页文本中定位 "Table of Contents" 或 "目录" 标题，从其下方开始提取
-2. **提取完整目录**：目录页列出了多少个条目就提取多少个，不要遗漏任何一个（包括 Annex 及其子节）
+1. **找到目录区域**：在前几页文本中定位目录部分（可能叫 Table of Contents、Contents、目录 等），从其下方开始提取
+2. **提取完整目录**：目录列出了多少个条目就提取多少个，不要遗漏任何一个
 3. level: 整数，1=顶级章节，2=子节，3=子子节。根据编号层级推断（如 "3.2.1" → level=3，"Annex A" → level=1，"A.1" → level=2）
 4. number: 章节编号原文（如 "1", "1.1", "3.2.1", "Annex A", "A.1"）
 5. title: 章节标题文字（不含编号前缀）
-6. page: 目录中该条目对应的页码（目录条目右侧通常有页码数字）
+6. page: 目录中该条目对应的页码
 7. 按目录中出现的顺序排列
-8. 只输出 JSON 数组，不要输出任何解释、Markdown 标记或代码围栏"""
+8. 如果文档没有明确的目录区域，从文本中的标题层级推断结构
+9. 只输出 JSON 数组，不要输出任何解释、Markdown 标记或代码围栏"""
 
-TOC_EXTRACTION_USER_TEMPLATE = """以下是 PDF 文档前 {page_count} 页的完整文本（由 OCR/文本提取获得）。
-请找到其中的 "Table of Contents"（目录）区域，提取其中列出的**所有**条目。
+TOC_EXTRACTION_USER_TEMPLATE = """以下是 PDF 文档前 {page_count} 页的完整文本（由文本提取获得）。
+请找到其中的目录区域，提取其中列出的**所有**条目。
 
 注意：
-- 目录通常在文档前几页，标题可能是 "Table of Contents" 或类似文字
-- 目录条目通常包含编号、标题和页码（如 "1.1  Overview  ......  4"）
+- 目录可能叫 Table of Contents、Contents、目录 或其他类似名称
+- 目录条目通常包含编号、标题和页码
 - 必须提取目录中的**每一个**条目，不要截断或遗漏
-- Annex 是顶级章节（level=1），其子节如 A.1, A.2 是 level=2
+- 如果没有明确的目录区域，从标题层级推断文档结构
 
 --- 文本开始 ---
 {text_content}
