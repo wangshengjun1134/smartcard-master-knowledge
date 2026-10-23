@@ -16,9 +16,9 @@ from smartcard_kb.logger import logger
 
 # ==================== Prompt ====================
 
-TOC_EXTRACTION_SYSTEM_PROMPT = """你是一个 PDF 文档结构分析专家。你的任务是从文档的前几页文本中提取目录（Table of Contents）结构。
+TOC_EXTRACTION_SYSTEM_PROMPT = """你是一个 PDF 文档结构分析专家。你的任务是从文档前几页中找到"Table of Contents"（目录）页面，并提取其中列出的**完整**目录结构。
 
-输出严格的 JSON 数组，每个元素代表一个章节条目：
+输出严格的 JSON 数组，每个元素代表一个目录条目：
 [
   {"level": 1, "number": "1", "title": "Introduction", "page": 4},
   {"level": 2, "number": "1.1", "title": "Overview", "page": 4},
@@ -26,36 +26,39 @@ TOC_EXTRACTION_SYSTEM_PROMPT = """你是一个 PDF 文档结构分析专家。�
   {"level": 2, "number": "A.1", "title": "Consumer Devices Use Case", "page": 18}
 ]
 
-规则：
-1. level: 整数，1=顶级章节，2=子节，3=子子节，以此类推
-2. number: 章节编号（如 "1", "1.1", "3.2.1", "Annex A", "A.1"）。没有编号的顶级标题用空字符串
-3. title: 章节标题文字（不含编号前缀）
-4. page: 该章节起始的页码（印刷页码，即文档中页脚/页眉显示的页码）
-5. 按文档中出现的顺序排列
-6. 包含所有章节层级，不要遗漏
-7. 只输出 JSON 数组，不要输出任何解释、Markdown 标记或代码围栏"""
+关键规则：
+1. **找到目录区域**：在前几页文本中定位 "Table of Contents" 或 "目录" 标题，从其下方开始提取
+2. **提取完整目录**：目录页列出了多少个条目就提取多少个，不要遗漏任何一个（包括 Annex 及其子节）
+3. level: 整数，1=顶级章节，2=子节，3=子子节。根据编号层级推断（如 "3.2.1" → level=3，"Annex A" → level=1，"A.1" → level=2）
+4. number: 章节编号原文（如 "1", "1.1", "3.2.1", "Annex A", "A.1"）
+5. title: 章节标题文字（不含编号前缀）
+6. page: 目录中该条目对应的页码（目录条目右侧通常有页码数字）
+7. 按目录中出现的顺序排列
+8. 只输出 JSON 数组，不要输出任何解释、Markdown 标记或代码围栏"""
 
-TOC_EXTRACTION_USER_TEMPLATE = """以下是 PDF 文档前 {page_count} 页的文本内容（由 OCR/文本提取获得，可能有噪声）。
-请从中提取完整的目录结构。
+TOC_EXTRACTION_USER_TEMPLATE = """以下是 PDF 文档前 {page_count} 页的完整文本（由 OCR/文本提取获得）。
+请找到其中的 "Table of Contents"（目录）区域，提取其中列出的**所有**条目。
 
 注意：
-- 文档可能有一个专门的 "Table of Contents" 页面，优先从该页面提取
-- 如果没有目录页，从标题层级推断结构
-- 页码以文档中实际显示的页码为准
+- 目录通常在文档前几页，标题可能是 "Table of Contents" 或类似文字
+- 目录条目通常包含编号、标题和页码（如 "1.1  Overview  ......  4"）
+- 必须提取目录中的**每一个**条目，不要截断或遗漏
 - Annex 是顶级章节（level=1），其子节如 A.1, A.2 是 level=2
 
 --- 文本开始 ---
 {text_content}
 --- 文本结束 ---
 
-请输出 JSON 数组："""
+请输出完整的 JSON 数组："""
 
 
 # ==================== 核心函数 ====================
 
 def extract_text_from_pdf_pages(pdf_path: str, max_pages: int = 5) -> str:
     """
-    用 MinerU 提取 PDF 前 N 页的纯文本。
+    用 PyMuPDF 提取 PDF 前 N 页的纯文本。
+
+    PyMuPDF 直接提取文字层，比 MinerU 的版面分析更适合提取目录等文本内容。
 
     Args:
         pdf_path: PDF 文件路径
@@ -64,38 +67,19 @@ def extract_text_from_pdf_pages(pdf_path: str, max_pages: int = 5) -> str:
     Returns:
         拼接后的文本字符串
     """
-    from mineru.parser import parse
+    import fitz  # PyMuPDF
 
-    page_range = f"1-{max_pages}" if max_pages > 1 else "1"
-    result = parse(
-        pdf_path,
-        tier="basic",
-        ocr_mode="auto",
-        image_analysis=False,
-        page_range=page_range,
-    )
-
+    doc = fitz.open(pdf_path)
     pages_text = []
-    for page in result.pages:
-        page_texts = []
-        for block in page.blocks:
-            if block.type in ("paragraph_title", "text"):
-                text = ""
-                for span in (block.content or []):
-                    if hasattr(span, "content") and isinstance(span.content, str):
-                        text += span.content
-                text = text.strip()
-                if text:
-                    prefix = "[TITLE] " if block.type == "paragraph_title" else ""
-                    page_texts.append(f"{prefix}{text}")
-            elif block.type == "table":
-                for cb in (block.content or []):
-                    if hasattr(cb, "content") and isinstance(cb.content, str) and cb.content.strip():
-                        page_texts.append(f"[TABLE] {cb.content.strip()[:500]}")
-                        break
-        if page_texts:
-            pages_text.append(f"--- Page {page.page_idx + 1} ---\n" + "\n".join(page_texts))
+    total_pages = min(max_pages, len(doc))
 
+    for page_idx in range(total_pages):
+        page = doc[page_idx]
+        text = page.get_text("text").strip()
+        if text:
+            pages_text.append(f"--- Page {page_idx + 1} ---\n{text}")
+
+    doc.close()
     return "\n\n".join(pages_text)
 
 
@@ -106,7 +90,7 @@ def extract_toc_from_pdf(
     model: str,
     max_pages: int = 5,
     temperature: float = 0.1,
-    timeout: float = 120.0,
+    timeout: float = 300.0,
 ) -> List[Dict[str, Any]]:
     """
     从 PDF 前 N 页提取 TOC 结构（调用 LLM）。
@@ -137,7 +121,7 @@ def extract_toc_from_pdf(
     # Step 2: 构造 LLM 请求
     user_content = TOC_EXTRACTION_USER_TEMPLATE.format(
         page_count=max_pages,
-        text_content=text_content[:15000],  # 限制长度避免超 token
+        text_content=text_content,  # 不截断，保留完整 TOC 内容
     )
 
     messages = [
