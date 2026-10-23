@@ -16,43 +16,47 @@ from smartcard_kb.logger import logger
 
 # ==================== Prompt ====================
 
-TOC_EXTRACTION_SYSTEM_PROMPT = """你是一个 PDF 文档结构分析专家。你的任务是从文档前几页中找到目录区域，并提取其中列出的**完整**目录结构。
+TOC_EXTRACTION_SYSTEM_PROMPT = """你是一个 PDF 文档结构分析专家。你的任务是从给定的文本页中找到目录区域，并提取其中列出的目录条目。
 
-目录区域的常见名称包括但不限于：Table of Contents、Contents、目录、摘要目录、List of Figures/Tables 等。它通常位于文档前几页，以列表形式列出所有章节及其对应页码。
+目录区域的常见名称包括但不限于：Table of Contents、Contents、目录、摘要目录等。
 
-输出严格的 JSON 数组，每个元素代表一个目录条目：
-[
-  {"level": 1, "number": "1", "title": "Introduction", "page": 4},
-  {"level": 2, "number": "1.1", "title": "Overview", "page": 4},
-  {"level": 1, "number": "Annex A", "title": "Use Cases (Informative)", "page": 18},
-  {"level": 2, "number": "A.1", "title": "Consumer Devices Use Case", "page": 18}
-]
+输出严格的 JSON 对象，包含两个字段：
+{
+  "entries": [
+    {"level": 1, "number": "1", "title": "Introduction", "page": 4},
+    {"level": 2, "number": "1.1", "title": "Overview", "page": 4}
+  ],
+  "complete": true
+}
 
-关键规则：
-1. **找到目录区域**：在前几页文本中定位目录部分（可能叫 Table of Contents、Contents、目录 等），从其下方开始提取
-2. **提取完整目录**：目录列出了多少个条目就提取多少个，不要遗漏任何一个
-3. level: 整数，1=顶级章节，2=子节，3=子子节。根据编号层级推断（如 "3.2.1" → level=3，"Annex A" → level=1，"A.1" → level=2）
-4. number: 章节编号原文（如 "1", "1.1", "3.2.1", "Annex A", "A.1"）
-5. title: 章节标题文字（不含编号前缀）
-6. page: 目录中该条目对应的页码
-7. 按目录中出现的顺序排列
-8. 如果文档没有明确的目录区域，从文本中的标题层级推断结构
-9. 只输出 JSON 数组，不要输出任何解释、Markdown 标记或代码围栏"""
+字段说明：
+- entries: 目录条目数组，每个条目包含 level/number/title/page
+- complete: 布尔值，表示从当前文本中是否已提取到目录的**末尾**。判断依据：
+  - 如果目录明显被截断（如最后一个条目后还有更多内容未显示），设为 false
+  - 如果目录已完整提取（如最后几个条目是 Annex/附录/文档管理/参考文献等文档末尾章节），设为 true
+  - 如果文本中没有找到目录区域，entries 为空数组，complete 设为 true
 
-TOC_EXTRACTION_USER_TEMPLATE = """以下是 PDF 文档前 {page_count} 页的完整文本（由文本提取获得）。
-请找到其中的目录区域，提取其中列出的**所有**条目。
+条目规则：
+1. level: 整数，1=顶级章节，2=子节，3=子子节。根据编号层级推断
+2. number: 章节编号原文（如 "1", "1.1", "3.2.1", "Annex A", "A.1"）
+3. title: 章节标题文字（不含编号前缀）
+4. page: 目录中该条目对应的页码
+5. 按目录中出现的顺序排列
+6. 只输出 JSON 对象，不要输出任何解释、Markdown 标记或代码围栏"""
+
+TOC_EXTRACTION_USER_TEMPLATE = """以下是 PDF 文档第 {start_page}-{end_page} 页的文本内容。
+请找到其中的目录区域，提取目录条目，并判断目录是否已完整提取。
 
 注意：
 - 目录可能叫 Table of Contents、Contents、目录 或其他类似名称
-- 目录条目通常包含编号、标题和页码
-- 必须提取目录中的**每一个**条目，不要截断或遗漏
-- 如果没有明确的目录区域，从标题层级推断文档结构
+- 如果没有找到目录区域，返回 {{"entries": [], "complete": true}}
+- 如果目录在文本末尾处被截断（还有后续条目未显示），设 complete 为 false
 
 --- 文本开始 ---
 {text_content}
 --- 文本结束 ---
 
-请输出完整的 JSON 数组："""
+请输出 JSON 对象："""
 
 
 # ==================== 核心函数 ====================
@@ -86,45 +90,26 @@ def extract_text_from_pdf_pages(pdf_path: str, max_pages: int = 5) -> str:
     return "\n\n".join(pages_text)
 
 
-def extract_toc_from_pdf(
-    pdf_path: str,
+def _call_llm_for_toc(
     api_url: str,
     api_key: str,
     model: str,
-    max_pages: int = 5,
+    text_content: str,
+    start_page: int,
+    end_page: int,
     temperature: float = 0.1,
     timeout: float = 300.0,
-) -> List[Dict[str, Any]]:
+) -> tuple:
     """
-    从 PDF 前 N 页提取 TOC 结构（调用 LLM）。
-
-    Args:
-        pdf_path: PDF 文件路径
-        api_url: LLM API Base URL（OpenAI 兼容）
-        api_key: API Key
-        model: 模型名称
-        max_pages: 提取的最大页数
-        temperature: LLM temperature
-        timeout: 请求超时（秒）
+    调用 LLM 提取一轮 TOC，返回 (entries, complete)。
 
     Returns:
-        TOC 条目列表，格式同 SGP41_TOC：
-        [{"level": 1, "number": "1", "title": "Introduction", "page": 4}, ...]
+        (entries, complete): entries 为 TOC 条目列表，complete 为是否完整
     """
-    logger.info(f"Extracting TOC from {pdf_path} (first {max_pages} pages)...")
-
-    # Step 1: 提取文本
-    text_content = extract_text_from_pdf_pages(pdf_path, max_pages)
-    if not text_content.strip():
-        logger.warning(f"No text extracted from {pdf_path}")
-        return []
-
-    logger.info(f"Extracted {len(text_content)} chars from {pdf_path}")
-
-    # Step 2: 构造 LLM 请求
     user_content = TOC_EXTRACTION_USER_TEMPLATE.format(
-        page_count=max_pages,
-        text_content=text_content,  # 不截断，保留完整 TOC 内容
+        start_page=start_page,
+        end_page=end_page,
+        text_content=text_content,
     )
 
     messages = [
@@ -132,7 +117,6 @@ def extract_toc_from_pdf(
         {"role": "user", "content": user_content},
     ]
 
-    # OpenAI 兼容协议：Base URL 后需追加 /chat/completions
     url = api_url.strip().rstrip("/")
     if not url.endswith("/chat/completions"):
         url = f"{url}/chat/completions"
@@ -148,8 +132,7 @@ def extract_toc_from_pdf(
         "Content-Type": "application/json",
     }
 
-    # Step 3: 调用 LLM
-    logger.info(f"Calling LLM: {url}, model={model}")
+    logger.info(f"Calling LLM: {url}, model={model}, pages={start_page}-{end_page}")
     with httpx.Client(timeout=timeout) as client:
         response = client.post(url, headers=headers, json=payload)
 
@@ -160,7 +143,6 @@ def extract_toc_from_pdf(
 
     result = response.json()
 
-    # Step 4: 解析响应
     if "choices" in result and len(result["choices"]) > 0:
         content = result["choices"][0]["message"]["content"]
     else:
@@ -169,30 +151,142 @@ def extract_toc_from_pdf(
     # 剥离可能的 Markdown 代码围栏
     content = content.strip()
     if content.startswith("```"):
-        # 去掉 ```json ... ``` 或 ``` ... ```
         content = re.sub(r'^```(?:json)?\s*\n?', '', content)
         content = re.sub(r'\n?```\s*$', '', content)
 
     # 解析 JSON
     try:
-        toc = json.loads(content)
+        data = json.loads(content)
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse LLM output as JSON: {e}\nContent: {content[:500]}")
         raise ValueError(f"LLM output is not valid JSON: {e}")
 
-    # 验证格式
-    if not isinstance(toc, list):
-        raise ValueError(f"LLM output is not a JSON array, got {type(toc)}")
+    # 兼容：如果 LLM 返回的是数组（旧格式），当作 entries 处理，complete=True
+    if isinstance(data, list):
+        entries = data
+        complete = True
+    elif isinstance(data, dict):
+        entries = data.get("entries", [])
+        complete = data.get("complete", True)
+    else:
+        raise ValueError(f"LLM output is neither array nor object: {type(data)}")
 
-    for i, entry in enumerate(toc):
+    # 验证 entries 格式
+    for i, entry in enumerate(entries):
         if not isinstance(entry, dict):
             raise ValueError(f"TOC entry {i} is not a dict: {entry}")
         for key in ("level", "number", "title", "page"):
             if key not in entry:
                 raise ValueError(f"TOC entry {i} missing key '{key}': {entry}")
 
-    logger.info(f"Extracted {len(toc)} TOC entries from {pdf_path}")
-    return toc
+    return entries, complete
+
+
+def extract_toc_from_pdf(
+    pdf_path: str,
+    api_url: str,
+    api_key: str,
+    model: str,
+    max_pages: int = 10,
+    pages_per_round: int = 5,
+    max_rounds: int = 4,
+    temperature: float = 0.1,
+    timeout: float = 300.0,
+) -> List[Dict[str, Any]]:
+    """
+    从 PDF 提取完整 TOC 结构（增量式，调用 LLM）。
+
+    流程：
+    1. 一次性提取前 max_pages 页文本并缓存（按页拆分）
+    2. 第一轮送前 pages_per_round 页给 LLM
+    3. 若 LLM 返回 complete=false，从缓存取下一页范围的文本继续送
+    4. 合并所有轮次的 entries，直到 complete=true 或缓存耗尽
+
+    Args:
+        pdf_path: PDF 文件路径
+        api_url: LLM API Base URL（OpenAI 兼容）
+        api_key: API Key
+        model: 模型名称
+        max_pages: 一次性提取的最大页数（缓存上限）
+        pages_per_round: 每轮送 LLM 的页数
+        max_rounds: 最大轮数
+        temperature: LLM temperature
+        timeout: 请求超时（秒）
+
+    Returns:
+        TOC 条目列表
+    """
+    import fitz  # PyMuPDF
+
+    logger.info(f"Extracting TOC from {pdf_path} (incremental, {pages_per_round} pages/round, cache {max_pages} pages)...")
+
+    # Step 1: 一次性提取前 max_pages 页文本，按页缓存
+    doc = fitz.open(pdf_path)
+    total_pdf_pages = len(doc)
+    cache_pages = min(max_pages, total_pdf_pages)
+
+    page_texts = {}  # page_num (1-based) -> text
+    for page_idx in range(cache_pages):
+        page = doc[page_idx]
+        text = page.get_text("text").strip()
+        if text:
+            page_texts[page_idx + 1] = text
+    doc.close()
+
+    logger.info(f"Cached {len(page_texts)} pages of text from {pdf_path} (PDF has {total_pdf_pages} pages)")
+
+    if not page_texts:
+        logger.warning(f"No text extracted from {pdf_path}")
+        return []
+
+    # Step 2: 增量式送 LLM
+    all_entries = []
+    cached_page_nums = sorted(page_texts.keys())
+    current_idx = 0  # 在 cached_page_nums 中的索引
+
+    for round_num in range(1, max_rounds + 1):
+        # 取当前轮次的页
+        end_idx = min(current_idx + pages_per_round, len(cached_page_nums))
+        round_pages = cached_page_nums[current_idx:end_idx]
+
+        if not round_pages:
+            logger.info("No more cached pages to send")
+            break
+
+        start_page = round_pages[0]
+        end_page = round_pages[-1]
+
+        # 拼接当前轮次的文本
+        text_content = "\n\n".join(
+            f"--- Page {pn} ---\n{page_texts[pn]}" for pn in round_pages
+        )
+
+        logger.info(f"Round {round_num}: sending pages {start_page}-{end_page} ({len(text_content)} chars)")
+
+        # 调用 LLM
+        entries, complete = _call_llm_for_toc(
+            api_url=api_url,
+            api_key=api_key,
+            model=model,
+            text_content=text_content,
+            start_page=start_page,
+            end_page=end_page,
+            temperature=temperature,
+            timeout=timeout,
+        )
+
+        logger.info(f"  Round {round_num}: {len(entries)} entries, complete={complete}")
+        all_entries.extend(entries)
+
+        if complete:
+            logger.info(f"TOC extraction complete after round {round_num}")
+            break
+
+        # 继续下一轮（从缓存取）
+        current_idx = end_idx
+
+    logger.info(f"Total TOC entries extracted: {len(all_entries)} from {pdf_path}")
+    return all_entries
 
 
 # ==================== 便捷函数 ====================
