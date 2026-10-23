@@ -742,6 +742,44 @@ export default function Home() {
                   </span>
                 </button>
               </div>
+            </div>
+
+            {/* PageIndex 流程行 */}
+            <div className="flex items-start gap-2 pb-1">
+              {/* 全部 */}
+              <button
+                onClick={() => { setPipelineFilter(''); setCurrentPage(1) }}
+                className={`flex-1 min-w-[100px] flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
+                  pipelineFilter === ''
+                    ? 'border-primary/60 bg-primary/5 ring-1 ring-primary/40'
+                    : 'border-border hover:bg-muted'
+                }`}
+              >
+                <span className="text-xs font-semibold">全部</span>
+                <span className={`text-xs mt-1 px-2 py-0.5 rounded-full font-bold ${
+                  pipelineFilter === '' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                }`}>{totalDocs}</span>
+              </button>
+
+              {/* Arrow */}
+              <ArrowRight className="h-4 w-4 text-muted-foreground mt-2 flex-shrink-0" />
+
+              {/* 已上传 */}
+              <button
+                onClick={() => { setPipelineFilter('uploaded'); setCurrentPage(1) }}
+                className={`flex-1 min-w-[100px] flex flex-col items-center px-3 py-2 rounded-lg border transition-all ${
+                  pipelineFilter === 'uploaded'
+                    ? 'border-primary/60 bg-primary/5 ring-1 ring-primary/40'
+                    : 'border-border hover:bg-muted'
+                }`}
+              >
+                <span className="text-xs font-semibold">已上传</span>
+                <span className={`text-xs mt-1 px-2 py-0.5 rounded-full font-bold ${
+                  pipelineFilter === 'uploaded' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                }`}>
+                  {statusCounts['uploaded'] || 0}
+                </span>
+              </button>
 
               {/* Arrow */}
               <ArrowRight className="h-4 w-4 text-muted-foreground mt-2 flex-shrink-0" />
