@@ -462,3 +462,20 @@ export async function summaryDocument(request: {
   const response = await api.post('/api/docs/summary', request)
   return response.data
 }
+
+export interface SummaryAllResponse {
+  success: boolean
+  message: string
+  total: number
+  parallel_count: number
+}
+
+export async function summaryAll(request: {
+  parallel_count?: number
+  api_key?: string
+  base_url?: string
+  model?: string
+}): Promise<SummaryAllResponse> {
+  const response = await api.post('/api/docs/summary-all', request)
+  return response.data
+}
