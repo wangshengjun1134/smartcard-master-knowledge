@@ -3,6 +3,7 @@
 import asyncio
 import os
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, List, Tuple
 from fastapi import APIRouter, HTTPException, BackgroundTasks
@@ -1187,7 +1188,7 @@ async def extract_toc(request: ExtractTocRequest):
 
     try:
         # 查询文档信息获取 PDF 路径
-        docs = query_document_info(document_ids=[request.document_id])
+        docs = query_document_info(document_id=request.document_id)
         if not docs:
             raise HTTPException(status_code=404, detail=f"文档 {request.document_id} 不存在")
 
@@ -1393,7 +1394,7 @@ async def page_index(request: PageIndexRequest):
 
     try:
         # 查询文档信息
-        docs = query_document_info(document_ids=[request.document_id])
+        docs = query_document_info(document_id=request.document_id)
         if not docs:
             raise HTTPException(status_code=404, detail=f"文档 {request.document_id} 不存在")
 
@@ -1686,7 +1687,7 @@ async def generate_summary(request: SummaryRequest):
 
     try:
         # Query document info
-        docs = query_document_info(document_ids=[request.document_id])
+        docs = query_document_info(document_id=request.document_id)
         if not docs:
             raise HTTPException(status_code=404, detail=f"文档 {request.document_id} 不存在")
 
