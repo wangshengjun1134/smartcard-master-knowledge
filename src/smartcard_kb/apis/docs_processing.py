@@ -1835,3 +1835,215 @@ async def generate_summary(request: SummaryRequest):
     except Exception as e:
         logger.error(f"Summary failed for {request.document_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Summary 失败: {str(e)}")
+
+
+class SummaryAllRequest(BaseModel):
+    """批量 Summary 请求"""
+    parallel_count: int = 1
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    model: Optional[str] = None
+
+
+class SummaryAllResponse(BaseModel):
+    """批量 Summary 响应"""
+    success: bool
+    message: str
+    total: int
+    parallel_count: int
+
+
+@router.post("/summary-all", response_model=SummaryAllResponse)
+async def summary_all(request: SummaryAllRequest):
+    """
+    批量执行 Summary（对所有已完成 PageIndex 的文档）
+
+    - **parallel_count**: 并行数量（默认 1）
+    - **api_key**: LLM API Key（可选）
+    - **base_url**: LLM API URL（可选）
+    - **model**: 模型名（可选）
+    """
+    import json as json_module
+    from pathlib import Path as PathLib
+
+    try:
+        # Query documents with page_index_status = 'indexed'
+        from smartcard_kb.docs_compile.database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor.execute(
+            "SELECT * FROM doc_info WHERE page_index_status = 'indexed' ORDER BY created_at DESC"
+        )
+        docs = [dict(row) for row in cursor.fetchall()]
+        cursor.close()
+        conn.close()
+
+        if not docs:
+            return SummaryAllResponse(
+                success=True,
+                message="没有已完成 PageIndex 的文档",
+                total=0,
+                parallel_count=request.parallel_count,
+            )
+
+        api_key = request.api_key or settings.openai_api_key
+        base_url = request.base_url or settings.openai_base_url
+        model = request.model or settings.openai_model
+
+        if not api_key or not base_url:
+            raise HTTPException(status_code=400, detail="未配置 LLM API")
+
+        semaphore = asyncio.Semaphore(request.parallel_count)
+        success_count = 0
+        fail_count = 0
+
+        async def summarize_one(doc):
+            nonlocal success_count, fail_count
+            async with semaphore:
+                doc_id = doc["id"]
+                pdf_path = doc.get("file_path", "")
+                if not pdf_path or not PathLib(pdf_path).exists():
+                    logger.warning(f"Skip summary for {doc_id}: PDF not found")
+                    fail_count += 1
+                    return
+
+                skeleton_path = Path("output") / "toc" / doc_id / "skeleton.json"
+                if not skeleton_path.exists():
+                    logger.warning(f"Skip summary for {doc_id}: skeleton.json not found")
+                    fail_count += 1
+                    return
+
+                try:
+                    t0 = time.time()
+
+                    # Read skeleton
+                    with open(skeleton_path, "r", encoding="utf-8") as f:
+                        skeleton = json_module.load(f)
+
+                    # Extract text per chapter using PyMuPDF
+                    import fitz
+                    pdf_doc = fitz.open(pdf_path)
+                    total_pages = len(pdf_doc)
+
+                    def flatten_nodes(nodes, result=None):
+                        if result is None:
+                            result = []
+                        for node in nodes:
+                            result.append(node)
+                            if node.get("children"):
+                                flatten_nodes(node["children"], result)
+                        return result
+
+                    all_nodes = flatten_nodes(skeleton)
+                    summaries = []
+
+                    for i, node in enumerate(all_nodes):
+                        start_page = node.get("page", 1)
+                        if i + 1 < len(all_nodes):
+                            end_page = all_nodes[i + 1].get("page", total_pages) - 1
+                        else:
+                            end_page = total_pages
+
+                        start_page = max(1, min(start_page, total_pages))
+                        end_page = max(start_page, min(end_page, total_pages))
+
+                        text_parts = []
+                        for p in range(start_page - 1, end_page):
+                            page_text = pdf_doc[p].get_text("text").strip()
+                            if page_text:
+                                text_parts.append(page_text)
+
+                        chapter_text = "\n".join(text_parts)
+                        if not chapter_text:
+                            summaries.append({
+                                "number": node.get("number", ""),
+                                "title": node.get("title", ""),
+                                "level": node.get("level", 1),
+                                "page": start_page,
+                                "summary": "",
+                                "error": "无文本内容",
+                            })
+                            continue
+
+                        if len(chapter_text) > 8000:
+                            chapter_text = chapter_text[:8000] + "\n[... 文本已截断 ...]"
+
+                        try:
+                            import httpx
+                            url = base_url.rstrip("/")
+                            if not url.endswith("/chat/completions"):
+                                url = f"{url}/chat/completions"
+
+                            llm_payload = {
+                                "model": model,
+                                "messages": [
+                                    {"role": "system", "content": SUMMARY_SYSTEM_PROMPT},
+                                    {"role": "user", "content": f"请为以下章节生成摘要：\n\n章节标题：{node.get('number', '')} {node.get('title', '')}\n\n章节内容：\n{chapter_text}"},
+                                ],
+                                "temperature": 0.3,
+                            }
+
+                            headers = {
+                                "Authorization": f"Bearer {api_key}",
+                                "Content-Type": "application/json",
+                            }
+
+                            with httpx.Client(timeout=120.0) as client:
+                                resp = client.post(url, headers=headers, json=llm_payload)
+
+                            if resp.status_code >= 400:
+                                raise RuntimeError(f"LLM API error {resp.status_code}: {resp.text[:200]}")
+
+                            result = resp.json()
+                            summary_text = result["choices"][0]["message"]["content"].strip()
+
+                            summaries.append({
+                                "number": node.get("number", ""),
+                                "title": node.get("title", ""),
+                                "level": node.get("level", 1),
+                                "page": start_page,
+                                "summary": summary_text,
+                            })
+                        except Exception as e:
+                            logger.error(f"Summary failed for node '{node.get('title', '')}' in {doc_id}: {e}")
+                            summaries.append({
+                                "number": node.get("number", ""),
+                                "title": node.get("title", ""),
+                                "level": node.get("level", 1),
+                                "page": start_page,
+                                "summary": "",
+                                "error": str(e),
+                            })
+
+                    pdf_doc.close()
+
+                    # Save summaries
+                    output_dir = Path("output") / "toc" / doc_id
+                    output_dir.mkdir(parents=True, exist_ok=True)
+                    summary_path = output_dir / "summaries.json"
+                    with open(summary_path, "w", encoding="utf-8") as f:
+                        json_module.dump(summaries, f, ensure_ascii=False, indent=2)
+
+                    elapsed = time.time() - t0
+                    success_chapters = sum(1 for s in summaries if s.get("summary"))
+                    logger.info(f"Summary for {doc_id}: {success_chapters}/{len(summaries)} chapters in {elapsed:.1f}s")
+                    success_count += 1
+                except Exception as e:
+                    logger.error(f"Summary failed for {doc_id}: {e}")
+                    fail_count += 1
+
+        tasks = [summarize_one(doc) for doc in docs]
+        await asyncio.gather(*tasks)
+
+        return SummaryAllResponse(
+            success=True,
+            message=f"完成: {success_count} 成功, {fail_count} 失败",
+            total=len(docs),
+            parallel_count=request.parallel_count,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Batch Summary failed: {e}")
+        raise HTTPException(status_code=500, detail=f"批量 Summary 失败: {str(e)}")
