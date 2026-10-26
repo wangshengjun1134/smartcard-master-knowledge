@@ -1415,7 +1415,8 @@ async def page_index(request: PageIndexRequest):
             )
 
         # 更新状态为 indexing
-        update_document_info(request.document_id, {
+        update_document_info({
+            "id": request.document_id,
             "page_index_status": "indexing",
             "page_index_started_at": datetime.now().isoformat(),
             "page_index_error": None,
@@ -1443,7 +1444,8 @@ async def page_index(request: PageIndexRequest):
         )
 
         if not toc:
-            update_document_info(request.document_id, {
+            update_document_info({
+                "id": request.document_id,
                 "page_index_status": "index_failed",
                 "page_index_finished_at": datetime.now().isoformat(),
                 "page_index_error": "TOC extraction returned empty result",
@@ -1470,7 +1472,8 @@ async def page_index(request: PageIndexRequest):
             json_module.dump(skeleton, f, ensure_ascii=False, indent=2)
 
         # 更新状态为 indexed
-        update_document_info(request.document_id, {
+        update_document_info({
+            "id": request.document_id,
             "page_index_status": "indexed",
             "page_index_finished_at": datetime.now().isoformat(),
             "page_index_error": None,
@@ -1488,7 +1491,8 @@ async def page_index(request: PageIndexRequest):
         raise
     except Exception as e:
         logger.error(f"PageIndex failed for {request.document_id}: {e}")
-        update_document_info(request.document_id, {
+        update_document_info({
+            "id": request.document_id,
             "page_index_status": "index_failed",
             "page_index_finished_at": datetime.now().isoformat(),
             "page_index_error": str(e),
@@ -1575,7 +1579,8 @@ async def page_index_all(request: PageIndexAllRequest):
                 try:
                     t0 = time.time()
 
-                    update_document_info(doc_id, {
+                    update_document_info({
+                        "id": doc_id,
                         "page_index_status": "indexing",
                         "page_index_started_at": datetime.now().isoformat(),
                     })
@@ -1591,7 +1596,8 @@ async def page_index_all(request: PageIndexAllRequest):
                     )
 
                     if not toc:
-                        update_document_info(doc_id, {
+                        update_document_info({
+                        "id": doc_id,
                             "page_index_status": "index_failed",
                             "page_index_finished_at": datetime.now().isoformat(),
                             "page_index_error": "TOC extraction returned empty",
@@ -1609,7 +1615,8 @@ async def page_index_all(request: PageIndexAllRequest):
                     with open(output_dir / "skeleton.json", "w", encoding="utf-8") as f:
                         json_module.dump(skeleton, f, ensure_ascii=False, indent=2)
 
-                    update_document_info(doc_id, {
+                    update_document_info({
+                        "id": doc_id,
                         "page_index_status": "indexed",
                         "page_index_finished_at": datetime.now().isoformat(),
                     })
@@ -1619,7 +1626,8 @@ async def page_index_all(request: PageIndexAllRequest):
                     success_count += 1
                 except Exception as e:
                     logger.error(f"PageIndex failed for {doc_id}: {e}")
-                    update_document_info(doc_id, {
+                    update_document_info({
+                        "id": doc_id,
                         "page_index_status": "index_failed",
                         "page_index_finished_at": datetime.now().isoformat(),
                         "page_index_error": str(e),
