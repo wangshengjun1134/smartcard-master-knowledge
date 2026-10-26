@@ -1640,3 +1640,198 @@ async def page_index_all(request: PageIndexAllRequest):
     except Exception as e:
         logger.error(f"Batch PageIndex failed: {e}")
         raise HTTPException(status_code=500, detail=f"批量 PageIndex 失败: {str(e)}")
+
+
+# ==================== Summary (章节摘要生成) ====================
+
+
+class SummaryRequest(BaseModel):
+    """单文档 Summary 请求"""
+    document_id: str
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    model: Optional[str] = None
+
+
+class SummaryResponse(BaseModel):
+    """单文档 Summary 响应"""
+    success: bool
+    message: str
+    summary_count: int = 0
+
+
+SUMMARY_SYSTEM_PROMPT = """你是一个技术文档章节摘要生成专家。你的任务是为给定的章节文本生成简洁、信息密度高的摘要。
+
+摘要要求：
+1. 保留关键技术术语、参数、数值、单位
+2. 保留重要的结构化信息（表格、列表、流程）
+3. 去除冗余描述和非语义信息
+4. 摘要长度控制在原文的 20%-30%
+5. 使用与原文相同的语言
+6. 直接输出摘要文本，不要添加"摘要："前缀或任何解释"""
+
+
+@router.post("/summary", response_model=SummaryResponse)
+async def generate_summary(request: SummaryRequest):
+    """
+    对单个文档执行 Summary（基于 PageIndex 骨架，为每个章节生成摘要）
+
+    - **document_id**: 文档 ID
+    - **api_key**: LLM API Key（可选）
+    - **base_url**: LLM API URL（可选）
+    - **model**: 模型名（可选）
+    """
+    import json as json_module
+    from pathlib import Path as PathLib
+
+    try:
+        # Query document info
+        docs = query_document_info(document_ids=[request.document_id])
+        if not docs:
+            raise HTTPException(status_code=404, detail=f"文档 {request.document_id} 不存在")
+
+        doc = docs[0]
+        pdf_path = doc.get("file_path", "")
+        if not pdf_path or not PathLib(pdf_path).exists():
+            raise HTTPException(status_code=404, detail=f"PDF 文件不存在: {pdf_path}")
+
+        # Read skeleton
+        output_dir = Path("output") / "toc" / request.document_id
+        skeleton_path = output_dir / "skeleton.json"
+        if not skeleton_path.exists():
+            raise HTTPException(status_code=400, detail="请先执行 PageIndex 生成骨架")
+
+        with open(skeleton_path, "r", encoding="utf-8") as f:
+            skeleton = json_module.load(f)
+
+        # LLM config
+        api_key = request.api_key or settings.openai_api_key
+        base_url = request.base_url or settings.openai_base_url
+        model = request.model or settings.openai_model
+
+        if not api_key or not base_url:
+            raise HTTPException(status_code=400, detail="未配置 LLM API")
+
+        # Extract text per chapter using PyMuPDF
+        import fitz
+        pdf_doc = fitz.open(pdf_path)
+        total_pages = len(pdf_doc)
+
+        # Flatten skeleton to get leaf nodes with page ranges
+        def flatten_nodes(nodes, result=None):
+            if result is None:
+                result = []
+            for node in nodes:
+                result.append(node)
+                if node.get("children"):
+                    flatten_nodes(node["children"], result)
+            return result
+
+        all_nodes = flatten_nodes(skeleton)
+
+        # Calculate page ranges for each node
+        summaries = []
+        for i, node in enumerate(all_nodes):
+            start_page = node.get("page", 1)
+            # End page is the next node's start page - 1, or last page
+            if i + 1 < len(all_nodes):
+                end_page = all_nodes[i + 1].get("page", total_pages) - 1
+            else:
+                end_page = total_pages
+
+            # Clamp to valid range
+            start_page = max(1, min(start_page, total_pages))
+            end_page = max(start_page, min(end_page, total_pages))
+
+            # Extract text from pages (0-indexed in PyMuPDF)
+            text_parts = []
+            for p in range(start_page - 1, end_page):
+                page_text = pdf_doc[p].get_text("text").strip()
+                if page_text:
+                    text_parts.append(page_text)
+
+            chapter_text = "\n".join(text_parts)
+            if not chapter_text:
+                summaries.append({
+                    "number": node.get("number", ""),
+                    "title": node.get("title", ""),
+                    "level": node.get("level", 1),
+                    "page": start_page,
+                    "summary": "",
+                    "error": "无文本内容",
+                })
+                continue
+
+            # Truncate if too long (keep first 8000 chars)
+            if len(chapter_text) > 8000:
+                chapter_text = chapter_text[:8000] + "\n[... 文本已截断 ...]"
+
+            # Call LLM for summary
+            try:
+                import httpx
+                url = base_url.rstrip("/")
+                if not url.endswith("/chat/completions"):
+                    url = f"{url}/chat/completions"
+
+                llm_payload = {
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": SUMMARY_SYSTEM_PROMPT},
+                        {"role": "user", "content": f"请为以下章节生成摘要：\n\n章节标题：{node.get('number', '')} {node.get('title', '')}\n\n章节内容：\n{chapter_text}"},
+                    ],
+                    "temperature": 0.3,
+                }
+
+                headers = {
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                }
+
+                with httpx.Client(timeout=120.0) as client:
+                    resp = client.post(url, headers=headers, json=llm_payload)
+
+                if resp.status_code >= 400:
+                    raise RuntimeError(f"LLM API error {resp.status_code}: {resp.text[:200]}")
+
+                result = resp.json()
+                summary_text = result["choices"][0]["message"]["content"].strip()
+
+                summaries.append({
+                    "number": node.get("number", ""),
+                    "title": node.get("title", ""),
+                    "level": node.get("level", 1),
+                    "page": start_page,
+                    "summary": summary_text,
+                })
+            except Exception as e:
+                logger.error(f"Summary failed for node '{node.get('title', '')}': {e}")
+                summaries.append({
+                    "number": node.get("number", ""),
+                    "title": node.get("title", ""),
+                    "level": node.get("level", 1),
+                    "page": start_page,
+                    "summary": "",
+                    "error": str(e),
+                })
+
+        pdf_doc.close()
+
+        # Save summaries
+        summary_path = output_dir / "summaries.json"
+        with open(summary_path, "w", encoding="utf-8") as f:
+            json_module.dump(summaries, f, ensure_ascii=False, indent=2)
+
+        success_count = sum(1 for s in summaries if s.get("summary"))
+        logger.info(f"Summary complete for {request.document_id}: {success_count}/{len(summaries)} chapters summarized")
+
+        return SummaryResponse(
+            success=True,
+            message=f"Summary 完成：{success_count}/{len(summaries)} 个章节已生成摘要",
+            summary_count=success_count,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Summary failed for {request.document_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Summary 失败: {str(e)}")
