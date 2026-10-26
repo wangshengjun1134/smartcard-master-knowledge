@@ -845,7 +845,7 @@ export default function Home() {
                       : 'border-border hover:bg-muted'
                   }`}
                 >
-                  <span className="text-xs font-semibold leading-tight text-center">PageIndex<br/>VLM已完成</span>
+                  <span className="text-xs font-semibold">Summary已完成</span>
                   <span className={`text-xs mt-1 px-2 py-0.5 rounded-full font-bold ${
                     pipelineFilter === 'pi_vlm_completed' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
                   }`}>
