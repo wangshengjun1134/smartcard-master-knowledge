@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { listDocuments, uploadDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings, embeddingAllDocuments, getStatusCounts, pageIndex, pageIndexAll } from '@/lib/api'
+import { listDocuments, uploadDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings, embeddingAllDocuments, getStatusCounts, pageIndex, pageIndexAll, summaryDocument } from '@/lib/api'
 import type { DocumentInfo } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,6 +25,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
@@ -427,6 +428,54 @@ export default function Home() {
     } catch (error: any) {
       toast({
         title: 'Embedding 失败',
+        description: error.response?.data?.detail || '请重试',
+        variant: 'destructive',
+      })
+    } finally {
+      setProcessingDoc(null)
+      setProcessingType(null)
+    }
+  }
+
+  const handlePageIndex = async (doc: DocumentInfo) => {
+    setProcessingDoc(doc.id)
+    setProcessingType('pageindex')
+    try {
+      const result = await pageIndex({
+        document_id: doc.id,
+      })
+      toast({
+        title: 'PageIndex 任务已提交',
+        description: result.message || '正在后台处理，请稍后刷新查看',
+      })
+      await refreshData()
+    } catch (error: any) {
+      toast({
+        title: 'PageIndex 失败',
+        description: error.response?.data?.detail || '请重试',
+        variant: 'destructive',
+      })
+    } finally {
+      setProcessingDoc(null)
+      setProcessingType(null)
+    }
+  }
+
+  const handleSummary = async (doc: DocumentInfo) => {
+    setProcessingDoc(doc.id)
+    setProcessingType('summary')
+    try {
+      const result = await summaryDocument({
+        document_id: doc.id,
+      })
+      toast({
+        title: 'Summary 任务已提交',
+        description: result.message || '正在后台处理，请稍后刷新查看',
+      })
+      await refreshData()
+    } catch (error: any) {
+      toast({
+        title: 'Summary 失败',
         description: error.response?.data?.detail || '请重试',
         variant: 'destructive',
       })
@@ -1561,6 +1610,15 @@ export default function Home() {
                                 <DropdownMenuItem onClick={() => handleEmbedding(doc)} disabled={processingDoc === doc.id}>
                                   <Database className="h-4 w-4 mr-2" />
                                   {processingDoc === doc.id && processingType === 'embedding' ? '嵌入中...' : '嵌入'}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handlePageIndex(doc)} disabled={processingDoc === doc.id}>
+                                  <ListChecks className="h-4 w-4 mr-2" />
+                                  {processingDoc === doc.id && processingType === 'pageindex' ? 'PageIndex中...' : 'PageIndex'}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleSummary(doc)} disabled={processingDoc === doc.id}>
+                                  <FileText className="h-4 w-4 mr-2" />
+                                  {processingDoc === doc.id && processingType === 'summary' ? 'Summary中...' : 'Summary'}
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>

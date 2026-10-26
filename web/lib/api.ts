@@ -444,3 +444,21 @@ export async function pageIndexAll(request: {
   const response = await api.post('/api/docs/page-index-all', request)
   return response.data
 }
+
+// ==================== Summary API ====================
+
+export interface SummaryResponse {
+  success: boolean
+  message: string
+  summary_count: number
+}
+
+export async function summaryDocument(request: {
+  document_id: string
+  api_key?: string
+  base_url?: string
+  model?: string
+}): Promise<SummaryResponse> {
+  const response = await api.post('/api/docs/summary', request)
+  return response.data
+}
