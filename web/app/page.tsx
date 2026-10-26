@@ -743,6 +743,19 @@ export default function Home() {
                 </button>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Pipeline 状态过滤 */}
+        <Card className="mb-4">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold">状态过滤</span>
+                <span className="text-xs text-muted-foreground">（点击节点进行筛选）</span>
+              </div>
+            </div>
+            
 
             {/* PageIndex 流程行 */}
             <div className="flex items-start gap-2 pb-1">
@@ -856,7 +869,16 @@ export default function Home() {
                   </span>
                 </button>
               </div>
+
+
+              {/* 占位：与第一行 已解析、VLM已完成 等宽 */}
+              <div className="flex-1 min-w-[100px]" />
+              <div className="flex-1 min-w-[100px]" />
             </div>
+
+
+
+            
           </CardContent>
         </Card>
 
