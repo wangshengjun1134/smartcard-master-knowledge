@@ -1490,6 +1490,38 @@ async def page_index(request: PageIndexRequest):
 
         # 检测页码偏移并分配 blocks 到骨架节点
         if blocks and skeleton:
+            # 收集骨架节点标题，用于检测 text block 中的标题
+            import re as _re
+
+            def _flatten_titles(nodes, titles=None):
+                if titles is None:
+                    titles = set()
+                for node in nodes:
+                    t = node.get("title", "").strip().lower()
+                    if t:
+                        # 统一破折号/连字符，压缩空白
+                        t = _re.sub(r'[\u2013\u2014\u2012\u2015\ufe58\ufe63\uff0d]', '-', t)
+                        t = _re.sub(r'\s+', ' ', t)
+                        titles.add(t)
+                    _flatten_titles(node.get("children", []), titles)
+                return titles
+
+            skeleton_titles = _flatten_titles(skeleton)
+
+            # 标记标题 block：text block 的文本匹配骨架节点标题 → type 改为 paragraph_title
+            title_count = 0
+            for block in blocks:
+                text = block.get("text", "").strip().lower()
+                if not text:
+                    continue
+                text_norm = _re.sub(r'[\u2013\u2014\u2012\u2015\ufe58\ufe63\uff0d]', '-', text)
+                text_norm = _re.sub(r'\s+', ' ', text_norm)
+                if text_norm in skeleton_titles:
+                    block["type"] = "paragraph_title"
+                    title_count += 1
+
+            logger.info(f"Detected {title_count} title blocks from {len(blocks)} text blocks")
+
             page_offset = detect_page_offset(toc, blocks)
             logger.info(f"Detected page offset: {page_offset}")
             skeleton = assign_blocks_to_skeleton(skeleton, blocks, page_offset)
