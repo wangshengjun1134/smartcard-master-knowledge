@@ -5,6 +5,7 @@ from .docs_items import router as docs_items_router
 from .docs_processing import router as docs_processing_router
 from .search import router as search_router
 from .rag_search import router as rag_search_router
+from .docs_directory import router as docs_directory_router
 
 __all__ = [
     "docs_info_router",
@@ -12,4 +13,5 @@ __all__ = [
     "docs_processing_router",
     "search_router",
     "rag_search_router",
+    "docs_directory_router",
 ]

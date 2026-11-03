@@ -13,6 +13,7 @@ from smartcard_kb.apis import (
     docs_processing_router,
     search_router,
     rag_search_router,
+    docs_directory_router,
 )
 
 # 设置 Docling 模型路径（使用相对路径，支持 Linux 和 Windows）
@@ -42,6 +43,7 @@ app.include_router(docs_items_router)
 app.include_router(docs_processing_router)
 app.include_router(search_router)
 app.include_router(rag_search_router)
+app.include_router(docs_directory_router)
 
 
 @app.on_event("startup")
