@@ -405,11 +405,19 @@ async def upload_document(
     if existing:
         return existing[0]
 
-    # 保存文件
+    # 保存文件到 MinIO（主存储）+ specs/ 本地缓存
+    from smartcard_kb.storage import upload_file
     specs_dir = Path("specs")
     specs_dir.mkdir(parents=True, exist_ok=True)
-    file_path = specs_dir / file.filename
-    file_path.write_bytes(file_content)
+    local_path = specs_dir / file.filename
+    local_path.write_bytes(file_content)
+
+    # 上传到 MinIO，object_key 用文件名
+    object_key = file.filename
+    upload_file(str(local_path), object_key)
+
+    # file_path 存 MinIO object_key
+    file_path = object_key
 
     # 生成文档 ID
     doc_id = str(uuid.uuid4())

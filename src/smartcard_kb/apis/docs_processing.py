@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from smartcard_kb.logger import logger
 from smartcard_kb.docs_compile.pdf_parser import PDFParser
 from smartcard_kb.docs_compile.vlm_service import VLMService
+from smartcard_kb.storage import resolve_file
 from smartcard_kb.docs_compile.embedding_service import EmbeddingService
 from smartcard_kb.docs_compile.chunker import Chunker
 from smartcard_kb.docs_compile.database import update_document_info, get_document_stats, query_documents_by_status, query_document_info
@@ -1194,7 +1195,10 @@ async def extract_toc(request: ExtractTocRequest):
 
         doc = docs[0]
         pdf_path = doc.get("file_path", "")
-        if not pdf_path or not Path(pdf_path).exists():
+        if not pdf_path:
+            raise HTTPException(status_code=404, detail=f"PDF 文件路径为空")
+        pdf_path = resolve_file(pdf_path)
+        if not Path(pdf_path).exists():
             raise HTTPException(status_code=404, detail=f"PDF 文件不存在: {pdf_path}")
 
         # LLM 参数
@@ -1312,7 +1316,11 @@ async def extract_toc_all(request: ExtractTocAllRequest):
             async with semaphore:
                 doc_id = doc["id"]
                 pdf_path = doc.get("file_path", "")
-                if not pdf_path or not Path(pdf_path).exists():
+                if not pdf_path:
+                    logger.error(f"Error: file_path not found for document {document_id}")
+                    continue
+                pdf_path = resolve_file(pdf_path)
+                if not Path(pdf_path).exists():
                     logger.warning(f"Skip {doc_id}: PDF not found")
                     fail_count += 1
                     return
@@ -1400,7 +1408,10 @@ async def page_index(request: PageIndexRequest):
 
         doc = docs[0]
         pdf_path = doc.get("file_path", "")
-        if not pdf_path or not PathLib(pdf_path).exists():
+        if not pdf_path:
+            raise HTTPException(status_code=404, detail="PDF 文件路径为空")
+        pdf_path = resolve_file(pdf_path)
+        if not PathLib(pdf_path).exists():
             raise HTTPException(status_code=404, detail=f"PDF 文件不存在: {pdf_path}")
 
         # LLM 参数
@@ -1642,7 +1653,12 @@ async def page_index_all(request: PageIndexAllRequest):
             async with semaphore:
                 doc_id = doc["id"]
                 pdf_path = doc.get("file_path", "")
-                if not pdf_path or not PathLib(pdf_path).exists():
+                if not pdf_path:
+                    logger.warning(f"Skip {doc_id}: file_path empty")
+                    fail_count += 1
+                    return
+                pdf_path = resolve_file(pdf_path)
+                if not PathLib(pdf_path).exists():
                     logger.warning(f"Skip {doc_id}: PDF not found")
                     fail_count += 1
                     return
@@ -1772,7 +1788,10 @@ async def generate_summary(request: SummaryRequest):
 
         doc = docs[0]
         pdf_path = doc.get("file_path", "")
-        if not pdf_path or not PathLib(pdf_path).exists():
+        if not pdf_path:
+            raise HTTPException(status_code=404, detail="PDF 文件路径为空")
+        pdf_path = resolve_file(pdf_path)
+        if not PathLib(pdf_path).exists():
             raise HTTPException(status_code=404, detail=f"PDF 文件不存在: {pdf_path}")
 
         # Read skeleton
@@ -1982,7 +2001,12 @@ async def summary_all(request: SummaryAllRequest):
             async with semaphore:
                 doc_id = doc["id"]
                 pdf_path = doc.get("file_path", "")
-                if not pdf_path or not PathLib(pdf_path).exists():
+                if not pdf_path:
+                    logger.warning(f"Skip {doc_id}: file_path empty")
+                    fail_count += 1
+                    return
+                pdf_path = resolve_file(pdf_path)
+                if not PathLib(pdf_path).exists():
                     logger.warning(f"Skip summary for {doc_id}: PDF not found")
                     fail_count += 1
                     return
