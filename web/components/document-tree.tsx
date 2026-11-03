@@ -1,16 +1,14 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { ChevronRight, ChevronDown, FileText, Folder } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { getDocumentTree } from '@/lib/api'
-import type { TreeNode } from '@/types'
-import Link from 'next/link'
+import { ChevronRight, ChevronDown, Folder } from 'lucide-react'
+import { getDirectoryTree } from '@/lib/api'
+import type { DirectoryTreeNode } from '@/lib/api'
 
 export function DocumentTree() {
-  const [treeNodes, setTreeNodes] = useState<TreeNode[]>([])
+  const [treeNodes, setTreeNodes] = useState<DirectoryTreeNode[]>([])
   const [loading, setLoading] = useState(true)
-  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set())
+  const [expandedDirs, setExpandedDirs] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     loadTree()
@@ -18,21 +16,16 @@ export function DocumentTree() {
 
   const loadTree = async () => {
     try {
-      const result = await getDocumentTree()
-      // API 现在返回单个树节点，需要提取 children
-      if (result.tree && (result.tree as any).children) {
-        setTreeNodes((result.tree as any).children)
-      } else if (Array.isArray(result.tree)) {
-        setTreeNodes(result.tree)
-      }
+      const result = await getDirectoryTree()
+      setTreeNodes(result)
     } catch (error) {
-      console.error('Failed to load document tree:', error)
+      console.error('Failed to load directory tree:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const toggleDir = (dirId: string) => {
+  const toggleDir = (dirId: number) => {
     setExpandedDirs(prev => {
       const next = new Set(prev)
       if (next.has(dirId)) {
@@ -44,25 +37,23 @@ export function DocumentTree() {
     })
   }
 
-  // 统计文件总数
-  const countFiles = (nodes: TreeNode[]): number => {
+  const countNodes = (nodes: DirectoryTreeNode[]): number => {
     let count = 0
     for (const node of nodes) {
-      if (node.type === 'file') {
-        count++
-      } else if (node.children) {
-        count += countFiles(node.children)
+      count++
+      if (node.children) {
+        count += countNodes(node.children)
       }
     }
     return count
   }
 
-  const totalFiles = countFiles(treeNodes)
+  const totalDirs = countNodes(treeNodes)
 
   return (
     <div className="space-y-1">
       <div className="px-2 py-1.5 text-xs text-muted-foreground">
-        {totalFiles} 个文件
+        {totalDirs} 个目录
       </div>
       {loading ? (
         <div className="px-2 py-4 text-sm text-muted-foreground text-center">
@@ -87,88 +78,50 @@ function TreeNodeItem({
   expandedDirs,
   onToggle,
 }: {
-  node: TreeNode
-  expandedDirs: Set<string>
-  onToggle: (dirId: string) => void
+  node: DirectoryTreeNode
+  expandedDirs: Set<number>
+  onToggle: (dirId: number) => void
 }) {
   const isExpanded = expandedDirs.has(node.id)
+  const hasChildren = node.children && node.children.length > 0
 
-  if (node.type === 'directory' && node.children) {
-    return (
-      <div>
-        <button
-          onClick={() => onToggle(node.id)}
-          className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
-        >
-          {isExpanded ? (
+  return (
+    <div>
+      <button
+        onClick={() => hasChildren && onToggle(node.id)}
+        className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded-md transition-colors ${
+          hasChildren ? 'hover:bg-accent hover:text-accent-foreground cursor-pointer' : 'cursor-default'
+        }`}
+      >
+        {hasChildren ? (
+          isExpanded ? (
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
           ) : (
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          )}
-          <Folder className="h-4 w-4 text-blue-500" />
-          <span className="font-medium truncate">{node.label}</span>
-          {node.count !== undefined && (
-            <span className="ml-auto text-xs text-muted-foreground shrink-0">
-              {node.count}
-            </span>
-          )}
-        </button>
-        {isExpanded && (
-          <div className="ml-4 mt-0.5 space-y-0.5">
-            {node.children.map((child) => (
-              <TreeNodeItem
-                key={child.id}
-                node={child}
-                expandedDirs={expandedDirs}
-                onToggle={onToggle}
-              />
-            ))}
-          </div>
+          )
+        ) : (
+          <span className="w-4" />
         )}
-      </div>
-    )
-  }
-
-  if (node.type === 'file') {
-    const hasDoc = !!node.document
-    const status = node.document?.processing_status
-
-    return (
-      <Link
-        href={hasDoc ? `/docs/${node.document!.id}` : '#'}
-        className={cn(
-          'flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded-md transition-colors',
-          hasDoc
-            ? 'hover:bg-accent hover:text-accent-foreground cursor-pointer'
-            : 'text-muted-foreground cursor-default'
-        )}
-        onClick={(e) => {
-          if (!hasDoc) {
-            e.preventDefault()
-          }
-        }}
-      >
-        <FileText className={cn(
-          "h-4 w-4 shrink-0",
-          hasDoc ? "text-muted-foreground" : "text-muted-foreground/50"
-        )} />
-        <span className="truncate">{node.label}</span>
-        {hasDoc && status && (
-          <span className={cn(
-            "ml-auto text-xs shrink-0",
-            status === 'completed' ? "text-green-500" :
-            status === 'processing' ? "text-blue-500" :
-            status === 'failed' ? "text-red-500" :
-            "text-yellow-500"
-          )}>
-            {status === 'completed' ? '✓' :
-             status === 'processing' ? '⋯' :
-             status === 'failed' ? '✗' : '○'}
+        <Folder className="h-4 w-4 text-blue-500" />
+        <span className="font-medium truncate">{node.name}</span>
+        {hasChildren && (
+          <span className="ml-auto text-xs text-muted-foreground shrink-0">
+            {node.children.length}
           </span>
         )}
-      </Link>
-    )
-  }
-
-  return null
+      </button>
+      {isExpanded && hasChildren && (
+        <div className="ml-4 mt-0.5 space-y-0.5">
+          {node.children.map((child) => (
+            <TreeNodeItem
+              key={child.id}
+              node={child}
+              expandedDirs={expandedDirs}
+              onToggle={onToggle}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }

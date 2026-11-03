@@ -44,6 +44,22 @@ export async function getDocumentTree(): Promise<{
   return response.data
 }
 
+export interface DirectoryTreeNode {
+  id: number
+  parent_id: number
+  name: string
+  path: string
+  level: number
+  sort_order: number
+  description: string
+  children: DirectoryTreeNode[]
+}
+
+export async function getDirectoryTree(): Promise<DirectoryTreeNode[]> {
+  const response = await api.get('/api/directory/tree')
+  return response.data
+}
+
 export async function getDocument(documentId: string): Promise<DocumentInfo> {
   const response = await api.get(`/api/docs/${documentId}`)
   return response.data
