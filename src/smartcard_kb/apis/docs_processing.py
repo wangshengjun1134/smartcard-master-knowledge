@@ -1466,6 +1466,45 @@ async def page_index(request: PageIndexRequest):
         # Step 3: 构建层级骨架
         skeleton = build_skeleton_tree(toc)
 
+        # Step 4: 提取文本 blocks 并分配到骨架节点（填充 contexts）
+        import fitz  # PyMuPDF
+        pdf_doc = fitz.open(pdf_path)
+        total_pages = len(pdf_doc)
+
+        # 提取每页文本 blocks
+        blocks = []
+        for page_idx in range(total_pages):
+            page = pdf_doc[page_idx]
+            text_blocks = page.get_text("blocks")
+            for tb in text_blocks:
+                text = tb[4].strip() if len(tb) > 4 else ""
+                if text:
+                    blocks.append({
+                        "type": "text",
+                        "text": text,
+                        "page_idx": page_idx,
+                    })
+        pdf_doc.close()
+
+        logger.info(f"Extracted {len(blocks)} text blocks from {pdf_path}")
+
+        # 检测页码偏移并分配 blocks 到骨架节点
+        if blocks and skeleton:
+            page_offset = detect_page_offset(toc, blocks)
+            logger.info(f"Detected page offset: {page_offset}")
+            skeleton = assign_blocks_to_skeleton(skeleton, blocks, page_offset)
+
+            # 统计 contexts 填充情况
+            def count_contexts(nodes):
+                total = 0
+                for node in nodes:
+                    total += len(node.get("contexts", []))
+                    total += count_contexts(node.get("children", []))
+                return total
+
+            ctx_count = count_contexts(skeleton)
+            logger.info(f"Assigned {ctx_count} contexts to skeleton nodes")
+
         # 保存骨架
         skeleton_path = output_dir / "skeleton.json"
         with open(skeleton_path, "w", encoding="utf-8") as f:
