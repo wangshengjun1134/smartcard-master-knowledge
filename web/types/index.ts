@@ -19,6 +19,7 @@ export interface DocumentInfo {
   parser?: string
   parser_version?: string
   processing_status?: 'uploaded' | 'parsing' | 'parsed' | 'vlm_processing' | 'vlm_completed' | 'chunking' | 'chunked' | 'embedding' | 'embedded' | 'parse_failed' | 'vlm_failed' | 'chunk_failed' | 'embedding_failed' | 'completed' | 'failed' | 'pending' | 'processing'
+  page_index_status?: 'indexing' | 'indexed' | 'index_failed'
   processing_started_at?: string
   processing_finished_at?: string
   processing_error?: string

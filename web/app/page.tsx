@@ -509,6 +509,17 @@ export default function Home() {
     return <Badge variant={config.variant}>{config.label}</Badge>
   }
 
+  const getPageIndexBadge = (status?: string) => {
+    const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
+      indexing: { label: '索引中', variant: 'default' },
+      indexed: { label: '已索引', variant: 'outline' },
+      index_failed: { label: '索引失败', variant: 'destructive' },
+    }
+    if (!status) return <Badge variant="secondary">-</Badge>
+    const config = statusMap[status] || { label: status, variant: 'outline' as const }
+    return <Badge variant={config.variant}>{config.label}</Badge>
+  }
+
   // 生成分页页码
   const getPageNumbers = () => {
     const pages: number[] = []
@@ -1562,6 +1573,7 @@ export default function Home() {
                         <TableHead className="hidden sm:table-cell h-8 px-2 py-1">系列 ID</TableHead>
                         <TableHead className="hidden sm:table-cell h-8 px-2 py-1">修订版本</TableHead>
                         <TableHead className="h-8 px-2 py-1">状态</TableHead>
+                        <TableHead className="h-8 px-2 py-1">PageIndex</TableHead>
                         <TableHead className="h-8 px-2 py-1">操作</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1581,6 +1593,7 @@ export default function Home() {
                             {doc.revision || '-'}
                           </TableCell>
                           <TableCell className="px-2 py-1">{getStatusBadge(doc.processing_status)}</TableCell>
+                          <TableCell className="px-2 py-1">{getPageIndexBadge(doc.page_index_status)}</TableCell>
                           <TableCell className="px-2 py-1">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
