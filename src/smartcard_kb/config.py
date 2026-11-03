@@ -55,6 +55,16 @@ class Settings(BaseSettings):
     # Docling 模型路径
     docling_models_path: str = str(MODELS_DIR / "docling-models")
 
+    # MinIO 对象存储配置
+    minio_endpoint: str = "localhost:9000"
+    minio_access_key: str = "admin"
+    minio_secret_key: str = "admin123"
+    minio_bucket: str = "specs"
+    minio_secure: bool = False
+
+    # 本地缓存目录（MinIO 文件首次读取时缓存到此目录）
+    specs_cache_dir: str = str(PROJECT_ROOT / "specs")
+
     class Config:
         env_file = ".env"
 

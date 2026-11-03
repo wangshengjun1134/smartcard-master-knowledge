@@ -55,6 +55,9 @@ dependencies = [
 
     # 连接 PostgreSQL 的驱动
     "psycopg2-binary>=2.9.9",
+
+    # 对象存储
+    "minio>=7.2.0",
 ]
 
 [project.optional-dependencies]
