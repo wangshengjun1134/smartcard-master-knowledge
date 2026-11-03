@@ -98,7 +98,7 @@ def _call_llm_for_toc(
     start_page: int,
     end_page: int,
     temperature: float = 0.1,
-    timeout: float = 300.0,
+    timeout: float = 600.0,
 ) -> tuple:
     """
     调用 LLM 提取一轮 TOC，返回 (entries, complete)。
@@ -191,7 +191,7 @@ def extract_toc_from_pdf(
     pages_per_round: int = 5,
     max_rounds: int = 4,
     temperature: float = 0.1,
-    timeout: float = 300.0,
+    timeout: float = 600.0,
 ) -> List[Dict[str, Any]]:
     """
     从 PDF 提取完整 TOC 结构（增量式，调用 LLM）。
