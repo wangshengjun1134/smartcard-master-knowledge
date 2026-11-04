@@ -355,14 +355,62 @@ def update_document(document_id: str, doc: DocumentInfoUpdate):
 
 @router.delete("/{document_id}", response_model=ApiResponse)
 def delete_document(document_id: str):
-    """删除文档及其关联的所有 item"""
+    """删除文档及其关联的所有数据（DB + MinIO + 本地缓存）"""
     existing = query_document_info(document_id=document_id)
     if not existing:
         raise HTTPException(status_code=404, detail="文档不存在")
 
-    deleted = delete_document_info(document_id)
-    if deleted == 0:
-        raise HTTPException(status_code=500, detail="删除失败")
+    doc = existing[0]
+    file_path = doc.get("file_path", "")
+
+    # 1. 删除 DB 关联表
+    from smartcard_kb.docs_compile.database import delete_chunks_by_document
+    delete_chunks_by_document(document_id)
+    delete_document_info(document_id)
+
+    # 2. 删除 MinIO 文件
+    try:
+        from smartcard_kb.storage import get_minio_client
+        from smartcard_kb.config import settings
+
+        client = get_minio_client()
+
+        # 删除文档文件（specs 桶）
+        if file_path:
+            try:
+                client.remove_object(settings.minio_bucket, file_path)
+            except Exception as e:
+                logger.warning(f"MinIO 文档删除失败: {file_path}: {e}")
+
+            # 删除图片文件（specs-pictures 桶，前缀匹配）
+            try:
+                image_prefix = f"{file_path}/"
+                objects = list(client.list_objects(settings.minio_pictures_bucket, prefix=image_prefix, recursive=True))
+                for obj in objects:
+                    client.remove_object(settings.minio_pictures_bucket, obj.object_name)
+                if objects:
+                    logger.info(f"Deleted {len(objects)} images from MinIO for {document_id}")
+            except Exception as e:
+                logger.warning(f"MinIO 图片删除失败: {e}")
+    except Exception as e:
+        logger.warning(f"MinIO 清理失败: {e}")
+
+    # 3. 删除本地缓存和输出
+    import shutil
+    # 本地 specs 缓存
+    local_spec = Path("specs") / file_path if file_path else None
+    if local_spec and local_spec.exists():
+        local_spec.unlink()
+
+    # output/toc/{document_id}/
+    toc_dir = Path("output") / "toc" / document_id
+    if toc_dir.exists():
+        shutil.rmtree(toc_dir)
+
+    # output/pictures/{document_id}/
+    pic_dir = Path("output") / "pictures" / document_id
+    if pic_dir.exists():
+        shutil.rmtree(pic_dir)
 
     return ApiResponse(success=True, message=f"已删除文档 {document_id}")
 
