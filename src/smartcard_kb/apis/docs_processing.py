@@ -1079,10 +1079,13 @@ async def get_document_file(document_id: str, image_path: Optional[str] = None):
 
     # If image_path is provided, serve that specific image
     if image_path:
-        resolved_path = Path(image_path)
-        if not resolved_path.is_absolute():
-            project_root = Path(__file__).resolve().parent.parent.parent.parent
-            resolved_path = project_root / resolved_path
+        # 从 MinIO specs-pictures 桶解析到本地缓存路径
+        from smartcard_kb.storage import resolve_image
+        try:
+            resolved_path_str = resolve_image(image_path)
+            resolved_path = Path(resolved_path_str)
+        except Exception as e:
+            raise HTTPException(status_code=404, detail=f"图片解析失败: {image_path}: {e}")
 
         if not resolved_path.exists():
             raise HTTPException(status_code=404, detail=f"图片不存在: {resolved_path}")
