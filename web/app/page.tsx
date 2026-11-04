@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { listDocuments, uploadDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings, embeddingAllDocuments, getStatusCounts, pageIndex, pageIndexAll, summaryDocument, getDirectoryTree } from '@/lib/api'
+import { listDocuments, uploadDocument, deleteDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings, embeddingAllDocuments, getStatusCounts, pageIndex, pageIndexAll, summaryDocument, getDirectoryTree } from '@/lib/api'
 import type { DocumentInfo } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -37,7 +37,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { formatFileSize, formatDate } from '@/lib/utils'
-import { Upload, FileText, Search, Moon, Sun, Plus, ChevronLeft, ChevronRight, MoreHorizontal, Eye, FileUp, Image, Layers, Database, Play, Sparkles, RotateCcw, AlertCircle, CheckCircle, ArrowRight, ListChecks, Download, Folder, ChevronDown, ChevronRight as ChevronRightIcon } from 'lucide-react'
+import { Upload, FileText, Search, Moon, Sun, Plus, ChevronLeft, ChevronRight, MoreHorizontal, Eye, FileUp, Image, Layers, Database, Play, Sparkles, RotateCcw, AlertCircle, CheckCircle, ArrowRight, ListChecks, Download, Folder, ChevronDown, ChevronRight as ChevronRightIcon, Trash2 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { DocumentTree } from '@/components/document-tree'
 
@@ -494,6 +494,24 @@ export default function Home() {
     } finally {
       setProcessingDoc(null)
       setProcessingType(null)
+    }
+  }
+
+  const handleDelete = async (doc: DocumentInfo) => {
+    if (!confirm(`确定删除文档「${doc.file_name}」？此操作不可恢复。`)) return
+    try {
+      await deleteDocument(doc.id)
+      toast({
+        title: '删除成功',
+        description: `${doc.file_name} 已删除`,
+      })
+      await refreshData()
+    } catch (error: any) {
+      toast({
+        title: '删除失败',
+        description: error?.response?.data?.detail || '请重试',
+        variant: 'destructive',
+      })
     }
   }
 
@@ -1651,10 +1669,6 @@ export default function Home() {
                                     查看
                                   </Link>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => window.open(`/api/docs/${doc.id}/download`, '_blank')}>
-                                  <Download className="h-4 w-4 mr-2" />
-                                  下载
-                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleParse(doc)} disabled={processingDoc === doc.id}>
                                   <FileUp className="h-4 w-4 mr-2" />
                                   {processingDoc === doc.id && processingType === 'parse' ? '解析中...' : '解析'}
@@ -1679,6 +1693,15 @@ export default function Home() {
                                 <DropdownMenuItem onClick={() => handleSummary(doc)} disabled={processingDoc === doc.id}>
                                   <FileText className="h-4 w-4 mr-2" />
                                   {processingDoc === doc.id && processingType === 'summary' ? 'Summary中...' : 'Summary'}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => window.open(`/api/docs/${doc.id}/download`, '_blank')}>
+                                  <Download className="h-4 w-4 mr-2" />
+                                  下载
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDelete(doc)} className="text-destructive focus:text-destructive">
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  删除
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
