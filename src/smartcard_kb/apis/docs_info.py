@@ -404,7 +404,11 @@ async def upload_document(
     # 检查是否已存在相同文件
     existing = query_document_info(file_hash=file_hash)
     if existing:
-        return existing[0]
+        old_doc = existing[0]
+        raise HTTPException(
+            status_code=409,
+            detail=f"文件已存在：{old_doc.get('file_name', '未知文档')}（ID: {old_doc['id']}）",
+        )
 
     # 保存文件到 MinIO（主存储）+ specs/ 本地缓存
     from smartcard_kb.storage import upload_file
