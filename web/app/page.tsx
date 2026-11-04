@@ -37,7 +37,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { formatFileSize, formatDate } from '@/lib/utils'
-import { Upload, FileText, Search, Moon, Sun, Plus, ChevronLeft, ChevronRight, MoreHorizontal, Eye, FileUp, Image, Layers, Database, Play, Sparkles, RotateCcw, AlertCircle, CheckCircle, ArrowRight, ListChecks, Download } from 'lucide-react'
+import { Upload, FileText, Search, Moon, Sun, Plus, ChevronLeft, ChevronRight, MoreHorizontal, Eye, FileUp, Image, Layers, Database, Play, Sparkles, RotateCcw, AlertCircle, CheckCircle, ArrowRight, ListChecks, Download, Folder, ChevronDown, ChevronRight as ChevronRightIcon } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { DocumentTree } from '@/components/document-tree'
 
@@ -55,8 +55,18 @@ export default function Home() {
     title: '',
     issuer: '',
     language: 'en',
+    directory_id: 0,
   })
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [directoryTree, setDirectoryTree] = useState<any[]>([])
+  const [expandedDirs, setExpandedDirs] = useState<Set<number>>(new Set())
+
+  // 上传对话框打开时加载目录树
+  useEffect(() => {
+    if (uploadDialogOpen) {
+      getDirectoryTree().then(setDirectoryTree).catch(() => {})
+    }
+  }, [uploadDialogOpen])
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalDocs, setTotalDocs] = useState(0)
@@ -175,6 +185,7 @@ export default function Home() {
       formData.append('title', uploadForm.title)
       formData.append('issuer', uploadForm.issuer)
       formData.append('language', uploadForm.language)
+      formData.append('directory_id', String(uploadForm.directory_id))
 
       await uploadDocument(formData)
       toast({
@@ -1033,6 +1044,37 @@ export default function Home() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="grid gap-2">
+                    <Label>所属目录</Label>
+                    <div className="border rounded-md p-2 max-h-[200px] overflow-y-auto">
+                      <button
+                        type="button"
+                        onClick={() => setUploadForm({ ...uploadForm, directory_id: 0 })}
+                        className={`flex items-center gap-2 w-full px-2 py-1 text-sm rounded-md transition-colors ${
+                          uploadForm.directory_id === 0 ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-accent'
+                        }`}
+                      >
+                        <Folder className="h-4 w-4 text-blue-500" />
+                        根目录
+                      </button>
+                      {directoryTree.map((node) => (
+                        <DirTreeNode
+                          key={node.id}
+                          node={node}
+                          selectedId={uploadForm.directory_id}
+                          expandedDirs={expandedDirs}
+                          onSelect={(id) => setUploadForm({ ...uploadForm, directory_id: id })}
+                          onToggle={(id) => {
+                            setExpandedDirs(prev => {
+                              const next = new Set(prev)
+                              next.has(id) ? next.delete(id) : next.add(id)
+                              return next
+                            })
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setUploadDialogOpen(false)} disabled={uploading}>
@@ -1696,6 +1738,63 @@ export default function Home() {
         </div>
         </div>
       </main>
+    </div>
+  )
+}
+
+function DirTreeNode({
+  node,
+  selectedId,
+  expandedDirs,
+  onSelect,
+  onToggle,
+  depth = 0,
+}: {
+  node: any
+  selectedId: number
+  expandedDirs: Set<number>
+  onSelect: (id: number) => void
+  onToggle: (id: number) => void
+  depth?: number
+}) {
+  const isExpanded = expandedDirs.has(node.id)
+  const isSelected = selectedId === node.id
+  const hasChildren = node.children && node.children.length > 0
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => onSelect(node.id)}
+        className={`flex items-center gap-1 w-full px-2 py-1 text-sm rounded-md transition-colors ${
+          isSelected ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-accent'
+        }`}
+        style={{ paddingLeft: `${depth * 16 + 8}px` }}
+      >
+        {hasChildren ? (
+          <span
+            onClick={(e) => { e.stopPropagation(); onToggle(node.id) }}
+            className="cursor-pointer"
+          >
+            {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRightIcon className="h-3 w-3" />}
+          </span>
+        ) : (
+          <span className="w-3" />
+        )}
+        <Folder className="h-4 w-4 text-blue-500 flex-shrink-0" />
+        <span className="truncate">{node.name}</span>
+      </button>
+      {isExpanded && hasChildren && node.children.map((child: any) => (
+        <DirTreeNode
+          key={child.id}
+          node={child}
+          selectedId={selectedId}
+          expandedDirs={expandedDirs}
+          onSelect={onSelect}
+          onToggle={onToggle}
+          depth={depth + 1}
+        />
+      ))}
     </div>
   )
 }
