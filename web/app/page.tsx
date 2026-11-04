@@ -37,7 +37,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { formatFileSize, formatDate } from '@/lib/utils'
-import { Upload, FileText, Search, Moon, Sun, Plus, ChevronLeft, ChevronRight, MoreHorizontal, Eye, FileUp, Image, Layers, Database, Play, Sparkles, RotateCcw, AlertCircle, CheckCircle, ArrowRight, ListChecks } from 'lucide-react'
+import { Upload, FileText, Search, Moon, Sun, Plus, ChevronLeft, ChevronRight, MoreHorizontal, Eye, FileUp, Image, Layers, Database, Play, Sparkles, RotateCcw, AlertCircle, CheckCircle, ArrowRight, ListChecks, Download } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { DocumentTree } from '@/components/document-tree'
 
@@ -1607,6 +1607,10 @@ export default function Home() {
                                     <Eye className="h-4 w-4 mr-2" />
                                     查看
                                   </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => window.open(`/api/docs/${doc.id}/download`, '_blank')}>
+                                  <Download className="h-4 w-4 mr-2" />
+                                  下载
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleParse(doc)} disabled={processingDoc === doc.id}>
                                   <FileUp className="h-4 w-4 mr-2" />

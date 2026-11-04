@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query, UploadFile, File, Form
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel, Field
 
 from smartcard_kb.docs_compile.database import (
@@ -505,6 +505,32 @@ def list_document_chunks(
 class PageCountResponse(BaseModel):
     """页码统计响应"""
     total_pages: int
+
+
+@router.get("/{document_id}/download")
+async def download_document(document_id: str):
+    """下载文档原始文件（从 MinIO 缓存或本地）"""
+    from smartcard_kb.storage import resolve_file
+
+    docs = query_document_info(document_id=document_id)
+    if not docs:
+        raise HTTPException(status_code=404, detail=f"文档 {document_id} 不存在")
+
+    doc = docs[0]
+    file_path = doc.get("file_path", "")
+    if not file_path:
+        raise HTTPException(status_code=404, detail="文件路径为空")
+
+    local_path = resolve_file(file_path)
+    if not Path(local_path).exists():
+        raise HTTPException(status_code=404, detail=f"文件不存在: {local_path}")
+
+    filename = doc.get("file_name") or Path(local_path).name
+    return FileResponse(
+        path=local_path,
+        filename=filename,
+        media_type="application/octet-stream",
+    )
 
 
 @router.get("/{document_id}/pages")
