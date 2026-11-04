@@ -197,11 +197,12 @@ export default function Home() {
       setUploadDialogOpen(false)
       setUploadForm({ document_code: '', title: '', issuer: '', language: 'en' })
       setSelectedFile(null)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to upload document:', error)
+      const detail = error?.response?.data?.detail || '请重试'
       toast({
         title: '上传失败',
-        description: '请重试',
+        description: detail,
         variant: 'destructive',
       })
     } finally {
