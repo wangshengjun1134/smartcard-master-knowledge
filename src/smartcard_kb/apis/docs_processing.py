@@ -1317,8 +1317,8 @@ async def extract_toc_all(request: ExtractTocAllRequest):
                 doc_id = doc["id"]
                 pdf_path = doc.get("file_path", "")
                 if not pdf_path:
-                    logger.error(f"Error: file_path not found for document {document_id}")
-                    continue
+                    logger.error(f"Error: file_path not found for document {doc_id}")
+                    return
                 pdf_path = resolve_file(pdf_path)
                 if not Path(pdf_path).exists():
                     logger.warning(f"Skip {doc_id}: PDF not found")
