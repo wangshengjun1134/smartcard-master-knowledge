@@ -460,13 +460,21 @@ async def upload_document(
 
     # 保存文件到 MinIO（主存储）+ specs/ 本地缓存
     from smartcard_kb.storage import upload_file
-    specs_dir = Path("specs")
-    specs_dir.mkdir(parents=True, exist_ok=True)
-    local_path = specs_dir / file.filename
+    from smartcard_kb.docs_compile.database import get_directory_name_path
+
+    # 构建 MinIO object_key：目录名称路径 + 文件名
+    dir_path = get_directory_name_path(directory_id or 0)
+    if dir_path:
+        object_key = f"{dir_path}/{file.filename}"
+    else:
+        object_key = file.filename
+
+    # 本地缓存也按目录结构保存
+    local_path = Path("specs") / object_key
+    local_path.parent.mkdir(parents=True, exist_ok=True)
     local_path.write_bytes(file_content)
 
-    # 上传到 MinIO，object_key 用文件名
-    object_key = file.filename
+    # 上传到 MinIO
     upload_file(str(local_path), object_key)
 
     # file_path 存 MinIO object_key

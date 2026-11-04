@@ -1313,3 +1313,38 @@ def query_directory_by_id(directory_id: int) -> Optional[Dict[str, Any]]:
     cursor.close()
     conn.close()
     return dict(row) if row else None
+
+
+def get_directory_name_path(directory_id: int) -> str:
+    """
+    根据目录 ID 构建名称路径（如 '03-management-provisioning/gsma/SGP.11'）
+
+    从当前目录向上遍历父链，收集每层目录名称，拼接为 / 分隔的路径。
+
+    :param directory_id: 目录 ID（0 表示根目录）
+    :return: 名称路径字符串，根目录返回空字符串
+    """
+    if not directory_id or directory_id == 0:
+        return ""
+
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    names = []
+    current_id = directory_id
+    while current_id and current_id != 0:
+        cursor.execute(
+            "SELECT name, parent_id FROM doc_directory WHERE id = %s AND is_deleted = FALSE",
+            (current_id,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            break
+        names.append(row["name"])
+        current_id = row["parent_id"]
+
+    cursor.close()
+    conn.close()
+
+    names.reverse()
+    return "/".join(names)
