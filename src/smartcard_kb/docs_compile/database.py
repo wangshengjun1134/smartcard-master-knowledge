@@ -312,6 +312,19 @@ def init_database():
         ON doc_directory(path);
     """)
 
+    # doc_info 增加 directory_id 列（关联 doc_directory）
+    cursor.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'doc_info' AND column_name = 'directory_id'
+            ) THEN
+                ALTER TABLE doc_info ADD COLUMN directory_id BIGINT DEFAULT 0;
+            END IF;
+        END $$;
+    """)
+
     conn.commit()
     cursor.close()
     conn.close()

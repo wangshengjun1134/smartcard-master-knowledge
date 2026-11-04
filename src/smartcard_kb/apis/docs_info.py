@@ -375,6 +375,7 @@ async def upload_document(
     series_id: Optional[str] = Form(None),
     issuer: Optional[str] = Form(None),
     language: Optional[str] = Form("en"),
+    directory_id: Optional[int] = Form(0),
 ):
     """
     上传 PDF/DOCX 文件并保存文档信息
@@ -442,6 +443,7 @@ async def upload_document(
         "parser": "docling",
         "processing_status": "uploaded",
         "processing_started_at": datetime.now().isoformat(),
+        "directory_id": directory_id or 0,
     }
 
     insert_document_info(doc_data)
