@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query, UploadFile, File, Form
 from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel, Field
 
+from smartcard_kb.logger import logger
 from smartcard_kb.docs_compile.database import (
     insert_document_info,
     query_document_info,
