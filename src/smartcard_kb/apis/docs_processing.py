@@ -181,6 +181,9 @@ async def _async_parse(
 ):
     """异步解析 PDF"""
     try:
+        # 从 MinIO 解析到本地缓存路径
+        pdf_path = resolve_file(pdf_path)
+
         update_document_info({
             "id": document_id,
             "processing_status": "parsing",
@@ -257,6 +260,9 @@ async def _async_parse_all(
                 t0 = time.time()
 
                 try:
+                    # 从 MinIO 解析到本地缓存路径
+                    pdf_path = resolve_file(pdf_path)
+
                     update_document_info({
                         "id": document_id,
                         "processing_status": "parsing",
@@ -465,6 +471,9 @@ async def _async_chunk(
 ):
     """异步分块"""
     try:
+        # 从 MinIO 解析到本地缓存路径
+        pdf_path = resolve_file(pdf_path)
+
         update_document_info({
             "id": document_id,
             "processing_status": "chunking",
@@ -535,6 +544,9 @@ async def _async_chunk_all(
                 t0 = time.time()
 
                 try:
+                    # 从 MinIO 解析到本地缓存路径
+                    pdf_path = resolve_file(pdf_path)
+
                     update_document_info({
                         "id": document_id,
                         "processing_status": "chunking",
