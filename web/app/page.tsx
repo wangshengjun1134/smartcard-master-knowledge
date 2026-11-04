@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { listDocuments, uploadDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings, embeddingAllDocuments, getStatusCounts, pageIndex, pageIndexAll, summaryDocument } from '@/lib/api'
+import { listDocuments, uploadDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings, embeddingAllDocuments, getStatusCounts, pageIndex, pageIndexAll, summaryDocument, getDirectoryTree } from '@/lib/api'
 import type { DocumentInfo } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
