@@ -181,6 +181,8 @@ async def _async_parse(
 ):
     """异步解析 PDF"""
     try:
+        # 保存原始 object_key 用于图片上传路径
+        doc_file_path = pdf_path
         # 从 MinIO 解析到本地缓存路径
         pdf_path = resolve_file(pdf_path)
 
@@ -198,6 +200,7 @@ async def _async_parse(
             document_id=document_id,
             page_range=page_range,
             output_dir=output_dir,
+            doc_file_path=doc_file_path,
         )
 
         # 更新统计信息
@@ -260,6 +263,8 @@ async def _async_parse_all(
                 t0 = time.time()
 
                 try:
+                    # 保存原始 object_key 用于图片上传路径
+                    doc_file_path = pdf_path
                     # 从 MinIO 解析到本地缓存路径
                     pdf_path = resolve_file(pdf_path)
 
@@ -277,6 +282,7 @@ async def _async_parse_all(
                         document_id=document_id,
                         page_range=None,
                         output_dir=output_dir,
+                        doc_file_path=doc_file_path,
                     )
 
                     # 更新统计信息

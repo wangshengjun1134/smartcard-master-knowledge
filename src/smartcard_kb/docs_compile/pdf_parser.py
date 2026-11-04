@@ -60,15 +60,17 @@ class PDFParser:
         pdf_path: str,
         document_id: str,
         page_range: Optional[tuple] = None,
-        output_dir: str = "output/pictures"
+        output_dir: str = "output/pictures",
+        doc_file_path: str = "",
     ) -> Dict[str, List[Dict[str, Any]]]:
         """
         解析 PDF 文件并将所有 item 保存到数据库
 
-        :param pdf_path: PDF 文件路径
+        :param pdf_path: PDF 本地文件路径
         :param document_id: 文档 ID
         :param page_range: 页码范围 (start, end)，1-based
         :param output_dir: 图片保存目录
+        :param doc_file_path: 文档的 MinIO object_key，用于构建图片 object_key
         :return: 包含 items 的字典
         """
         # 确保输出目录存在（每个文档使用独立子目录）
@@ -89,7 +91,7 @@ class PDFParser:
         t1 = time.time()
 
         # 提取 items（使用文档独立子目录）
-        items = self._extract_all_items(result.document, document_id, str(document_output_dir))
+        items = self._extract_all_items(result.document, document_id, str(document_output_dir), doc_file_path)
         insert_document_items(items)
         t2 = time.time()
 
@@ -101,7 +103,8 @@ class PDFParser:
         self,
         doc,
         document_id: str,
-        output_dir: str
+        output_dir: str,
+        doc_file_path: str = "",
     ) -> List[Dict[str, Any]]:
         """
         从 Docling 文档对象中提取所有 item（不区分类型）
@@ -109,8 +112,11 @@ class PDFParser:
         :param doc: Docling 转换后的文档对象
         :param document_id: 文档 ID
         :param output_dir: 图片保存目录
+        :param doc_file_path: 文档的 MinIO object_key，用于构建图片 object_key
         :return: item 列表
         """
+        from smartcard_kb.storage import upload_image
+
         items = []
         order_index = 0
         picture_count = 0
@@ -144,6 +150,16 @@ class PDFParser:
                         picture_count += 1
                         image_path = str(Path(output_dir) / f"picture_{picture_count:04d}.png")
                         image.save(image_path)
+
+                        # 上传到 MinIO specs-pictures 桶
+                        if doc_file_path:
+                            image_object_key = f"{doc_file_path}/picture_{picture_count:04d}.png"
+                            upload_image(image_path, image_object_key)
+                            # metadata 存 MinIO object_key
+                            metadata["image_path"] = image_object_key
+                        else:
+                            # 向后兼容：没有 doc_file_path 时存本地路径
+                            metadata["image_path"] = image_path
                 except Exception:
                     pass
 
@@ -154,8 +170,8 @@ class PDFParser:
                 except Exception:
                     pass
 
-                # 保存图片路径到 metadata 字段
-                if image_path:
+                # 如果没有图片路径但有 doc_file_path，仍然记录
+                if image_path and "image_path" not in metadata:
                     metadata["image_path"] = image_path
 
             elif item.label == DocItemLabel.TABLE:

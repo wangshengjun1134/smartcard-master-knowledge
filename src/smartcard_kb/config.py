@@ -60,6 +60,7 @@ class Settings(BaseSettings):
     minio_access_key: str = "admin"
     minio_secret_key: str = "admin123"
     minio_bucket: str = "specs"
+    minio_pictures_bucket: str = "specs-pictures"
     minio_secure: bool = False
 
     # 本地缓存目录（MinIO 文件首次读取时缓存到此目录）

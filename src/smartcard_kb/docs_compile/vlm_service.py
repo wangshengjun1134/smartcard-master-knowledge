@@ -90,13 +90,16 @@ class VLMService:
                 failed_items.append(item_id)
                 continue
 
-            # Use full path (database already includes document_id subdirectory)
-            image_path = Path(image_path_str)
-            if not image_path.is_absolute():
-                # If relative path, resolve based on project root
-                project_root = Path(__file__).resolve().parent.parent.parent.parent
-                image_path = project_root / image_path
+            # Resolve image path: MinIO object_key → local cached path
+            from smartcard_kb.storage import resolve_image
+            try:
+                image_path_str = resolve_image(image_path_str)
+            except Exception as e:
+                logger.warning(f"Warning: Failed to resolve image {image_path_str}: {e}, skipping")
+                failed_items.append(item_id)
+                continue
 
+            image_path = Path(image_path_str)
             if not image_path.exists():
                 logger.warning(f"Warning: Image not found {image_path}, skipping")
                 failed_items.append(item_id)
