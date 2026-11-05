@@ -2184,6 +2184,16 @@ async def summary_all(request: SummaryAllRequest):
                     with open(summary_path, "w", encoding="utf-8") as f:
                         json_module.dump(summaries, f, ensure_ascii=False, indent=2)
 
+                    # 写入 doc_page_index 表（UPSERT summary_data）
+                    from smartcard_kb.docs_compile.database import upsert_page_index
+                    success_chapters = sum(1 for s in summaries if s.get("summary"))
+                    upsert_page_index(doc_id, {
+                        "status": "summarized",
+                        "summary_data": json_module.dumps(summaries, ensure_ascii=False),
+                        "summary_count": success_chapters,
+                        "finished_at": datetime.now().isoformat(),
+                    })
+
                     elapsed = time.time() - t0
                     success_chapters = sum(1 for s in summaries if s.get("summary"))
                     logger.info(f"Summary for {doc_id}: {success_chapters}/{len(summaries)} chapters in {elapsed:.1f}s")
