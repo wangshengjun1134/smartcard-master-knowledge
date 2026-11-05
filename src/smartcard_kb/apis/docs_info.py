@@ -534,6 +534,33 @@ def get_document_statistics(document_id: str):
     }
 
 
+@router.get("/{document_id}/page-index-data")
+def get_page_index_data(document_id: str):
+    """获取文档的 PageIndex 数据（skeleton + summary）"""
+    from smartcard_kb.docs_compile.database import query_page_index
+    result = query_page_index(document_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="该文档尚未执行 PageIndex")
+
+    # 解析 JSONB 字段
+    import json
+    skeleton_data = result.get("skeleton_data")
+    summary_data = result.get("summary_data")
+    if isinstance(skeleton_data, str):
+        skeleton_data = json.loads(skeleton_data)
+    if isinstance(summary_data, str):
+        summary_data = json.loads(summary_data)
+
+    return {
+        "status": result.get("status"),
+        "skeleton": skeleton_data,
+        "summary": summary_data,
+        "toc_entry_count": result.get("toc_entry_count", 0),
+        "summary_count": result.get("summary_count", 0),
+        "llm_model": result.get("llm_model"),
+    }
+
+
 @router.get("/{document_id}/chunks", response_model=PaginatedChunksResponse)
 def list_document_chunks(
     document_id: str,
