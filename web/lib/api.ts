@@ -172,6 +172,20 @@ export async function getDocumentPageCount(documentId: string): Promise<number> 
   return response.data.total_pages
 }
 
+export interface PageIndexData {
+  status: string
+  skeleton: any[]
+  summary: any[]
+  toc_entry_count: number
+  summary_count: number
+  llm_model: string
+}
+
+export async function getPageIndexData(documentId: string): Promise<PageIndexData> {
+  const response = await api.get(`/api/docs/${documentId}/page-index-data`)
+  return response.data
+}
+
 // ==================== 文档处理流程 API ====================
 
 export async function parseDocument(request: {
