@@ -541,9 +541,11 @@ export default function Home() {
 
   const getPageIndexBadge = (status?: string) => {
     const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-      indexing: { label: '索引中', variant: 'default' },
-      indexed: { label: '已索引', variant: 'outline' },
-      index_failed: { label: '索引失败', variant: 'destructive' },
+      indexing: { label: 'PageIndex中', variant: 'default' },
+      indexed: { label: 'PageIndexed', variant: 'outline' },
+      index_failed: { label: 'PageIndex失败', variant: 'destructive' },
+      pi_vlm_completed: { label: 'Summarized', variant: 'outline' },
+      pi_vlm_failed: { label: 'Summary失败', variant: 'destructive' },
     }
     if (!status) return <Badge variant="secondary">-</Badge>
     const config = statusMap[status] || { label: status, variant: 'outline' as const }
@@ -659,7 +661,7 @@ export default function Home() {
                       : 'border-border hover:bg-muted'
                   }`}
                 >
-                  <span className="text-xs font-semibold">Summary已完成</span>
+                  <span className="text-xs font-semibold">Summarized</span>
                   <span className={`text-xs mt-1 px-2 py-0.5 rounded-full font-bold ${
                     pipelineFilter === 'pi_vlm_completed' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
                   }`}>
@@ -675,7 +677,7 @@ export default function Home() {
                   }`}
                 >
                   <AlertCircle className="h-3 w-3 text-destructive" />
-                  <span className="text-xs font-medium text-destructive">VLM失败</span>
+                  <span className="text-xs font-medium text-destructive">Summary失败</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
                     pipelineFilter === 'pi_vlm_failed' ? 'bg-destructive/20 text-destructive' : 'bg-destructive/10 text-destructive'
                   }`}>
@@ -687,7 +689,7 @@ export default function Home() {
               {/* ← Arrow */}
               <ArrowRight className="h-4 w-4 text-muted-foreground mt-2 flex-shrink-0 rotate-180" />
 
-              {/* 已PageIndex */}
+              {/* PageIndexed */}
               <div className="flex-1 min-w-[100px] flex flex-col items-center">
                 <button
                   onClick={() => { setPipelineFilter('indexed'); setCurrentPage(1) }}
@@ -697,7 +699,7 @@ export default function Home() {
                       : 'border-border hover:bg-muted'
                   }`}
                 >
-                  <span className="text-xs font-semibold">已PageIndex</span>
+                  <span className="text-xs font-semibold">PageIndexed</span>
                   <span className={`text-xs mt-1 px-2 py-0.5 rounded-full font-bold ${
                     pipelineFilter === 'indexed' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
                   }`}>
@@ -713,7 +715,7 @@ export default function Home() {
                   }`}
                 >
                   <AlertCircle className="h-3 w-3 text-destructive" />
-                  <span className="text-xs font-medium text-destructive">索引失败</span>
+                  <span className="text-xs font-medium text-destructive">PageIndex失败</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
                     pipelineFilter === 'index_failed' ? 'bg-destructive/20 text-destructive' : 'bg-destructive/10 text-destructive'
                   }`}>
