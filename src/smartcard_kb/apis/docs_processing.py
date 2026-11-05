@@ -1858,109 +1858,184 @@ async def generate_summary(request: SummaryRequest):
         if not api_key or not base_url:
             raise HTTPException(status_code=400, detail="未配置 LLM API")
 
-        # Extract text per chapter using PyMuPDF
-        import fitz
-        pdf_doc = fitz.open(pdf_path)
-        total_pages = len(pdf_doc)
+        # 自底向上层级摘要：叶子节点用 contexts 文本，父节点用自身文本 + 子节点摘要
+        import httpx
 
-        # Flatten skeleton to get leaf nodes with page ranges
-        def flatten_nodes(nodes, result=None):
-            if result is None:
-                result = []
-            for node in nodes:
-                result.append(node)
-                if node.get("children"):
-                    flatten_nodes(node["children"], result)
-            return result
+        def _get_contexts_text(node):
+            """从节点的 contexts 提取文本"""
+            contexts = node.get("contexts", [])
+            if not contexts:
+                return ""
+            return "\n".join(c.get("context", "") for c in contexts if c.get("context"))
 
-        all_nodes = flatten_nodes(skeleton)
+        def _call_llm_summary(text, title, is_hierarchical=False):
+            """调用 LLM 生成摘要"""
+            url = base_url.rstrip("/")
+            if not url.endswith("/chat/completions"):
+                url = f"{url}/chat/completions"
 
-        # Calculate page ranges for each node
-        summaries = []
-        for i, node in enumerate(all_nodes):
-            start_page = node.get("page", 1)
-            # End page is the next node's start page - 1, or last page
-            if i + 1 < len(all_nodes):
-                end_page = all_nodes[i + 1].get("page", total_pages) - 1
+            if is_hierarchical:
+                prompt = f"""请基于以下信息为章节生成简洁的摘要：
+
+章节标题：{title}
+
+本章自身内容：
+{text if text else '（无直接内容）'}
+
+子章节摘要：
+{title}
+
+请综合以上信息，生成一个简洁、信息密度高的摘要。保留关键技术术语和重要结论。"""
             else:
-                end_page = total_pages
+                prompt = f"请为以下章节生成摘要：\n\n章节标题：{title}\n\n章节内容：\n{text}"
 
-            # Clamp to valid range
-            start_page = max(1, min(start_page, total_pages))
-            end_page = max(start_page, min(end_page, total_pages))
+            # 截断过长文本
+            if len(prompt) > 12000:
+                prompt = prompt[:12000] + "\n[... 文本已截断 ...]"
 
-            # Extract text from pages (0-indexed in PyMuPDF)
-            text_parts = []
-            for p in range(start_page - 1, end_page):
-                page_text = pdf_doc[p].get_text("text").strip()
-                if page_text:
-                    text_parts.append(page_text)
+            llm_payload = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": SUMMARY_SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.3,
+            }
 
-            chapter_text = "\n".join(text_parts)
-            if not chapter_text:
-                summaries.append({
-                    "number": node.get("number", ""),
-                    "title": node.get("title", ""),
-                    "level": node.get("level", 1),
-                    "page": start_page,
-                    "summary": "",
-                    "error": "无文本内容",
-                })
-                continue
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
 
-            # Truncate if too long (keep first 8000 chars)
-            if len(chapter_text) > 8000:
-                chapter_text = chapter_text[:8000] + "\n[... 文本已截断 ...]"
+            with httpx.Client(timeout=120.0) as client:
+                resp = client.post(url, headers=headers, json=llm_payload)
 
-            # Call LLM for summary
-            try:
-                import httpx
-                url = base_url.rstrip("/")
-                if not url.endswith("/chat/completions"):
-                    url = f"{url}/chat/completions"
+            if resp.status_code >= 400:
+                raise RuntimeError(f"LLM API error {resp.status_code}: {resp.text[:200]}")
 
-                llm_payload = {
-                    "model": model,
-                    "messages": [
-                        {"role": "system", "content": SUMMARY_SYSTEM_PROMPT},
-                        {"role": "user", "content": f"请为以下章节生成摘要：\n\n章节标题：{node.get('number', '')} {node.get('title', '')}\n\n章节内容：\n{chapter_text}"},
-                    ],
-                    "temperature": 0.3,
-                }
+            result = resp.json()
+            return result["choices"][0]["message"]["content"].strip()
 
-                headers = {
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                }
+        def _summarize_node(node, all_summaries):
+            """递归处理单个节点，返回摘要文本"""
+            children = node.get("children", [])
+            number = node.get("number", "")
+            title = node.get("title", "")
+            full_title = f"{number} {title}".strip()
 
-                with httpx.Client(timeout=120.0) as client:
-                    resp = client.post(url, headers=headers, json=llm_payload)
+            if not children:
+                # 叶子节点：用 contexts 文本
+                text = _get_contexts_text(node)
+                if not text:
+                    return ""
+                try:
+                    return _call_llm_summary(text, full_title)
+                except Exception as e:
+                    logger.error(f"Summary failed for leaf '{full_title}': {e}")
+                    return ""
+            else:
+                # 父节点：先递归处理子节点
+                children_summaries = []
+                for child in children:
+                    child_summary = _summarize_node(child, all_summaries)
+                    if child_summary:
+                        child_title = f"{child.get('number', '')} {child.get('title', '')}".strip()
+                        children_summaries.append(f"- {child_title}: {child_summary}")
 
-                if resp.status_code >= 400:
-                    raise RuntimeError(f"LLM API error {resp.status_code}: {resp.text[:200]}")
+                # 父节点自身文本
+                own_text = _get_contexts_text(node)
 
-                result = resp.json()
-                summary_text = result["choices"][0]["message"]["content"].strip()
+                # 用自身文本 + 子节点摘要生成父节点摘要
+                combined = own_text
+                if children_summaries:
+                    combined += "\n\n子章节摘要：\n" + "\n".join(children_summaries)
 
-                summaries.append({
-                    "number": node.get("number", ""),
-                    "title": node.get("title", ""),
-                    "level": node.get("level", 1),
-                    "page": start_page,
-                    "summary": summary_text,
-                })
-            except Exception as e:
-                logger.error(f"Summary failed for node '{node.get('title', '')}': {e}")
-                summaries.append({
-                    "number": node.get("number", ""),
-                    "title": node.get("title", ""),
-                    "level": node.get("level", 1),
-                    "page": start_page,
-                    "summary": "",
-                    "error": str(e),
-                })
+                if not combined.strip():
+                    return ""
 
-        pdf_doc.close()
+                try:
+                    return _call_llm_summary(combined, full_title, is_hierarchical=True)
+                except Exception as e:
+                    logger.error(f"Summary failed for parent '{full_title}': {e}")
+                    return ""
+
+        # 自底向上处理骨架树
+        summaries = []
+
+        def _collect_summaries(nodes):
+            """递归收集所有节点的摘要"""
+            for node in nodes:
+                children = node.get("children", [])
+                number = node.get("number", "")
+                title = node.get("title", "")
+                page = node.get("page", 0)
+
+                if children:
+                    # 先处理子节点
+                    _collect_summaries(children)
+
+                # 处理当前节点
+                full_title = f"{number} {title}".strip()
+                if not children:
+                    # 叶子节点
+                    text = _get_contexts_text(node)
+                    if text:
+                        try:
+                            summary_text = _call_llm_summary(text, full_title)
+                            summaries.append({
+                                "number": number,
+                                "title": title,
+                                "level": node.get("level", 1),
+                                "page": page,
+                                "summary": summary_text,
+                            })
+                        except Exception as e:
+                            logger.error(f"Summary failed for '{full_title}': {e}")
+                            summaries.append({
+                                "number": number, "title": title,
+                                "level": node.get("level", 1), "page": page,
+                                "summary": "", "error": str(e),
+                            })
+                    else:
+                        summaries.append({
+                            "number": number, "title": title,
+                            "level": node.get("level", 1), "page": page,
+                            "summary": "", "error": "无文本内容",
+                        })
+                else:
+                    # 父节点：用自身文本 + 子节点摘要
+                    children_summaries = []
+                    for child in children:
+                        # 从已生成的 summaries 中找子节点的摘要
+                        child_num = child.get("number", "")
+                        for s in summaries:
+                            if s.get("number") == child_num and s.get("summary"):
+                                child_title = f"{child.get('number', '')} {child.get('title', '')}".strip()
+                                children_summaries.append(f"- {child_title}: {s['summary']}")
+                                break
+
+                    own_text = _get_contexts_text(node)
+                    combined = own_text
+                    if children_summaries:
+                        combined += "\n\n子章节摘要：\n" + "\n".join(children_summaries)
+
+                    if combined.strip():
+                        try:
+                            summary_text = _call_llm_summary(combined, full_title, is_hierarchical=True)
+                            summaries.append({
+                                "number": number, "title": title,
+                                "level": node.get("level", 1), "page": page,
+                                "summary": summary_text,
+                            })
+                        except Exception as e:
+                            logger.error(f"Summary failed for '{full_title}': {e}")
+                            summaries.append({
+                                "number": number, "title": title,
+                                "level": node.get("level", 1), "page": page,
+                                "summary": "", "error": str(e),
+                            })
+
+        _collect_summaries(skeleton)
 
         # Save summaries
         summary_path = output_dir / "summaries.json"
