@@ -1736,6 +1736,19 @@ async def page_index_all(request: PageIndexAllRequest):
                     with open(output_dir / "skeleton.json", "w", encoding="utf-8") as f:
                         json_module.dump(skeleton, f, ensure_ascii=False, indent=2)
 
+                    # 写入 doc_page_index 表
+                    from smartcard_kb.docs_compile.database import upsert_page_index
+                    upsert_page_index(doc_id, {
+                        "status": "page_indexed",
+                        "toc_data": json_module.dumps(toc, ensure_ascii=False),
+                        "skeleton_data": json_module.dumps(skeleton, ensure_ascii=False),
+                        "llm_model": model,
+                        "llm_base_url": base_url,
+                        "toc_entry_count": len(toc),
+                        "started_at": datetime.now().isoformat(),
+                        "finished_at": datetime.now().isoformat(),
+                    })
+
                     update_document_info({
                         "id": doc_id,
                         "page_index_status": "indexed",
