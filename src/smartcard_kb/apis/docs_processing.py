@@ -1574,6 +1574,19 @@ async def page_index(request: PageIndexRequest):
         with open(skeleton_path, "w", encoding="utf-8") as f:
             json_module.dump(skeleton, f, ensure_ascii=False, indent=2)
 
+        # 写入 doc_page_index 表
+        from smartcard_kb.docs_compile.database import upsert_page_index
+        upsert_page_index(request.document_id, {
+            "status": "page_indexed",
+            "toc_data": json_module.dumps(toc, ensure_ascii=False),
+            "skeleton_data": json_module.dumps(skeleton, ensure_ascii=False),
+            "llm_model": model,
+            "llm_base_url": base_url,
+            "toc_entry_count": len(toc),
+            "started_at": datetime.now().isoformat(),
+            "finished_at": datetime.now().isoformat(),
+        })
+
         # 更新状态为 indexed
         update_document_info({
             "id": request.document_id,
@@ -1940,6 +1953,15 @@ async def generate_summary(request: SummaryRequest):
         summary_path = output_dir / "summaries.json"
         with open(summary_path, "w", encoding="utf-8") as f:
             json_module.dump(summaries, f, ensure_ascii=False, indent=2)
+
+        # 写入 doc_page_index 表（UPSERT summary_data）
+        from smartcard_kb.docs_compile.database import upsert_page_index
+        upsert_page_index(request.document_id, {
+            "status": "summarized",
+            "summary_data": json_module.dumps(summaries, ensure_ascii=False),
+            "summary_count": success_count,
+            "finished_at": datetime.now().isoformat(),
+        })
 
         success_count = sum(1 for s in summaries if s.get("summary"))
         logger.info(f"Summary complete for {request.document_id}: {success_count}/{len(summaries)} chapters summarized")
