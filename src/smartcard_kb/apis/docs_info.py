@@ -487,6 +487,10 @@ async def upload_document(
     # 确定文件格式
     file_format = "docx" if file.filename.lower().endswith('.docx') else "pdf"
 
+    # document_code 默认为文件名去掉后缀
+    if not document_code:
+        document_code = Path(file.filename).stem
+
     # 创建文档信息
     doc_data = {
         "id": doc_id,
@@ -503,6 +507,7 @@ async def upload_document(
         "source_type": "upload",
         "parser": "docling",
         "processing_status": "uploaded",
+        "page_index_status": "uploaded",
         "processing_started_at": datetime.now().isoformat(),
         "directory_id": directory_id or 0,
     }
