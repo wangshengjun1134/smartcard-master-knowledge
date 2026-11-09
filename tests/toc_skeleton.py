@@ -306,6 +306,20 @@ def assign_blocks_to_skeleton(skeleton_nodes: list, blocks: list, page_offset: i
         if text:
             _add_context(current_node, label, text, page)
             _update_page_range(current_node, page)
+        elif label in ("picture", "image", "table", "drawing", "link"):
+            # 非文本 block：保留 metadata，添加到当前节点
+            seq = len(current_node["contexts"]) + 1
+            ctx = {
+                "seq": seq,
+                "label": label,
+                "context": "",
+                "start_index": page,
+                "end_index": page,
+            }
+            if "metadata" in block:
+                ctx["metadata"] = block["metadata"]
+            current_node["contexts"].append(ctx)
+            _update_page_range(current_node, page)
 
     # 后处理：冒泡页码范围（从子节点到父节点）
     _finalize_page_ranges(skeleton_nodes)
@@ -345,8 +359,14 @@ def _extract_block_content(block: dict) -> tuple:
     block_type = block.get("type", "")
     if block_type == "image":
         return "image", block.get("img_path", "")
+    elif block_type == "picture":
+        return "picture", ""
     elif block_type == "table":
         return "table", block.get("text", "")
+    elif block_type == "drawing":
+        return "drawing", ""
+    elif block_type == "link":
+        return "link", ""
     else:
         return "text", block.get("text", "")
 
