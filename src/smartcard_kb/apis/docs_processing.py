@@ -1507,9 +1507,12 @@ async def page_index(request: PageIndexRequest):
         pdf_doc = fitz.open(pdf_path)
         total_pages = len(pdf_doc)
 
-        # 提取每页文本 blocks + 图片 blocks
+        # 提取每页文本 blocks + 图片 blocks + 表格 + 矢量图 + 链接
         blocks = []
-        image_blocks = []  # 单独收集图片 blocks，用于后续分配到骨架节点
+        image_blocks = []
+        table_blocks = []
+        drawing_blocks = []
+        link_blocks = []
         img_counter = 0
         for page_idx in range(total_pages):
             page = pdf_doc[page_idx]
@@ -1536,7 +1539,6 @@ async def page_index(request: PageIndexRequest):
                     img_local_dir.mkdir(parents=True, exist_ok=True)
                     img_local_path = img_local_dir / img_filename
                     pix.save(str(img_local_path))
-                    # 上传到 MinIO specs-pictures 桶
                     img_object_key = f"{doc_file_path}/{img_filename}"
                     upload_image(str(img_local_path), img_object_key)
                     image_blocks.append({
@@ -1546,9 +1548,54 @@ async def page_index(request: PageIndexRequest):
                     })
                 except Exception as e:
                     logger.warning(f"Failed to extract image xref={xref} on page {page_idx}: {e}")
+            # 表格 blocks
+            try:
+                tabs = page.find_tables()
+                for tab in tabs:
+                    table_data = tab.extract()
+                    if table_data:
+                        table_blocks.append({
+                            "type": "table",
+                            "page_idx": page_idx,
+                            "data": table_data,
+                            "bbox": list(tab.bbox),
+                        })
+            except Exception as e:
+                logger.debug(f"No table support or no tables on page {page_idx}: {e}")
+            # 矢量图 blocks（drawings）
+            try:
+                drawings = page.get_drawings()
+                for dr in drawings:
+                    drawing_blocks.append({
+                        "type": "drawing",
+                        "page_idx": page_idx,
+                        "items_count": len(dr.get("items", [])),
+                        "color": str(dr.get("color")) if dr.get("color") else None,
+                        "fill": str(dr.get("fill")) if dr.get("fill") else None,
+                        "rect": list(dr.get("rect", [])) if dr.get("rect") else None,
+                    })
+            except Exception as e:
+                logger.debug(f"No drawings on page {page_idx}: {e}")
+            # 链接 blocks
+            try:
+                links = page.get_links()
+                for lnk in links:
+                    link_blocks.append({
+                        "type": "link",
+                        "page_idx": page_idx,
+                        "from": list(lnk.get("from", [])) if lnk.get("from") else None,
+                        "uri": lnk.get("uri", ""),
+                        "page": lnk.get("page"),
+                        "kind": lnk.get("kind"),
+                    })
+            except Exception as e:
+                logger.debug(f"No links on page {page_idx}: {e}")
         pdf_doc.close()
 
-        logger.info(f"Extracted {len(blocks)} text blocks and {len(image_blocks)} image blocks from {pdf_path}")
+        logger.info(
+            f"Extracted from {pdf_path}: {len(blocks)} text, {len(image_blocks)} images, "
+            f"{len(table_blocks)} tables, {len(drawing_blocks)} drawings, {len(link_blocks)} links"
+        )
 
         # 检测页码偏移并分配 blocks 到骨架节点
         if blocks and skeleton:
@@ -1629,6 +1676,51 @@ async def page_index(request: PageIndexRequest):
 
                 _assign_images_to_nodes(skeleton, image_blocks)
                 logger.info(f"Assigned {len(image_blocks)} image blocks to skeleton nodes")
+
+            # 通用分配函数：按页码把 extra blocks 分配到骨架节点
+            def _assign_extra_blocks(nodes, extra_blocks, label, meta_keys):
+                """将额外类型的 blocks 按页码分配到骨架节点"""
+                def _get_range(n):
+                    pages = set()
+                    for c in n.get("contexts", []):
+                        p = c.get("page_idx")
+                        if p is not None:
+                            pages.add(p)
+                    return (min(pages), max(pages)) if pages else (None, None)
+
+                def _do_assign(ns, blks):
+                    for n in ns:
+                        s, e = _get_range(n)
+                        if s is not None:
+                            for b in blks:
+                                if s <= b["page_idx"] <= e:
+                                    meta = {k: b.get(k) for k in meta_keys if b.get(k) is not None}
+                                    n["contexts"].append({
+                                        "seq": len(n["contexts"]) + 1,
+                                        "label": label,
+                                        "context": "",
+                                        "start_index": None,
+                                        "end_index": None,
+                                        "metadata": meta,
+                                    })
+                        _do_assign(n.get("children", []), blks)
+
+                _do_assign(nodes, extra_blocks)
+
+            # 分配表格
+            if table_blocks:
+                _assign_extra_blocks(skeleton, table_blocks, "table", ["data", "bbox"])
+                logger.info(f"Assigned {len(table_blocks)} table blocks to skeleton nodes")
+
+            # 分配矢量图
+            if drawing_blocks:
+                _assign_extra_blocks(skeleton, drawing_blocks, "drawing", ["items_count", "color", "fill", "rect"])
+                logger.info(f"Assigned {len(drawing_blocks)} drawing blocks to skeleton nodes")
+
+            # 分配链接
+            if link_blocks:
+                _assign_extra_blocks(skeleton, link_blocks, "link", ["from", "uri", "page", "kind"])
+                logger.info(f"Assigned {len(link_blocks)} link blocks to skeleton nodes")
 
         # 保存骨架
         skeleton_path = output_dir / "skeleton.json"
@@ -1795,14 +1887,18 @@ async def page_index_all(request: PageIndexAllRequest):
 
                     skeleton = build_skeleton_tree(toc)
 
-                    # 用 PyMuPDF 提取图片并分配到骨架节点
+                    # 用 PyMuPDF 提取图片 + 表格 + 矢量图 + 链接
                     import fitz as _fitz
                     from smartcard_kb.storage import upload_image as _upload_img
                     _pdf = _fitz.open(pdf_path)
                     _img_blocks = []
+                    _table_blocks = []
+                    _drawing_blocks = []
+                    _link_blocks = []
                     _img_ctr = 0
                     for _pi in range(len(_pdf)):
                         _pg = _pdf[_pi]
+                        # 图片
                         for _img_info in _pg.get_images(full=True):
                             _xref = _img_info[0]
                             try:
@@ -1820,8 +1916,66 @@ async def page_index_all(request: PageIndexAllRequest):
                                 _img_blocks.append({"page_idx": _pi, "image_path": _img_key})
                             except Exception as e:
                                 logger.warning(f"Failed to extract image xref={_xref} page {_pi} for {doc_id}: {e}")
+                        # 表格
+                        try:
+                            for _tab in _pg.find_tables():
+                                _td = _tab.extract()
+                                if _td:
+                                    _table_blocks.append({"page_idx": _pi, "data": _td, "bbox": list(_tab.bbox)})
+                        except Exception:
+                            pass
+                        # 矢量图
+                        try:
+                            for _dr in _pg.get_drawings():
+                                _drawing_blocks.append({
+                                    "page_idx": _pi,
+                                    "items_count": len(_dr.get("items", [])),
+                                    "color": str(_dr.get("color")) if _dr.get("color") else None,
+                                    "fill": str(_dr.get("fill")) if _dr.get("fill") else None,
+                                    "rect": list(_dr.get("rect", [])) if _dr.get("rect") else None,
+                                })
+                        except Exception:
+                            pass
+                        # 链接
+                        try:
+                            for _lnk in _pg.get_links():
+                                _link_blocks.append({
+                                    "page_idx": _pi,
+                                    "from": list(_lnk.get("from", [])) if _lnk.get("from") else None,
+                                    "uri": _lnk.get("uri", ""),
+                                    "page": _lnk.get("page"),
+                                    "kind": _lnk.get("kind"),
+                                })
+                        except Exception:
+                            pass
                     _pdf.close()
 
+                    # 通用分配函数
+                    def _assign_extra(_nodes, _blks, _label, _meta_keys):
+                        def _get_r(_n):
+                            _ps = set()
+                            for _c in _n.get("contexts", []):
+                                _p = _c.get("page_idx")
+                                if _p is not None:
+                                    _ps.add(_p)
+                            return (min(_ps), max(_ps)) if _ps else (None, None)
+                        def _do(_ns, _bs):
+                            for _n in _ns:
+                                _s, _e = _get_r(_n)
+                                if _s is not None:
+                                    for _b in _bs:
+                                        if _s <= _b["page_idx"] <= _e:
+                                            _meta = {k: _b.get(k) for k in _meta_keys if _b.get(k) is not None}
+                                            _n["contexts"].append({
+                                                "seq": len(_n["contexts"]) + 1,
+                                                "label": _label, "context": "",
+                                                "start_index": None, "end_index": None,
+                                                "metadata": _meta,
+                                            })
+                                _do(_n.get("children", []), _bs)
+                        _do(_nodes, _blks)
+
+                    # 分配图片
                     if _img_blocks:
                         def _get_range(_n):
                             _ps = set()
@@ -1830,7 +1984,6 @@ async def page_index_all(request: PageIndexAllRequest):
                                 if _p is not None:
                                     _ps.add(_p)
                             return (min(_ps), max(_ps)) if _ps else (None, None)
-
                         def _do_assign(_nodes, _imgs):
                             for _n in _nodes:
                                 _s, _e = _get_range(_n)
@@ -1839,16 +1992,24 @@ async def page_index_all(request: PageIndexAllRequest):
                                         if _s <= _im["page_idx"] <= _e:
                                             _n["contexts"].append({
                                                 "seq": len(_n["contexts"]) + 1,
-                                                "label": "picture",
-                                                "context": "",
-                                                "start_index": None,
-                                                "end_index": None,
+                                                "label": "picture", "context": "",
+                                                "start_index": None, "end_index": None,
                                                 "metadata": {"image_path": _im["image_path"]},
                                             })
                                 _do_assign(_n.get("children", []), _imgs)
-
                         _do_assign(skeleton, _img_blocks)
                         logger.info(f"Assigned {len(_img_blocks)} images to skeleton for {doc_id}")
+
+                    # 分配表格、矢量图、链接
+                    if _table_blocks:
+                        _assign_extra(skeleton, _table_blocks, "table", ["data", "bbox"])
+                        logger.info(f"Assigned {len(_table_blocks)} tables for {doc_id}")
+                    if _drawing_blocks:
+                        _assign_extra(skeleton, _drawing_blocks, "drawing", ["items_count", "color", "fill", "rect"])
+                        logger.info(f"Assigned {len(_drawing_blocks)} drawings for {doc_id}")
+                    if _link_blocks:
+                        _assign_extra(skeleton, _link_blocks, "link", ["from", "uri", "page", "kind"])
+                        logger.info(f"Assigned {len(_link_blocks)} links for {doc_id}")
 
                     with open(output_dir / "skeleton.json", "w", encoding="utf-8") as f:
                         json_module.dump(skeleton, f, ensure_ascii=False, indent=2)
