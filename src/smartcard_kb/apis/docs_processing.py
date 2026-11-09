@@ -6,6 +6,9 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, List, Tuple
+
+import psycopg2
+import psycopg2.extras
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel, Field
