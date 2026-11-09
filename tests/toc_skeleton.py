@@ -233,8 +233,15 @@ def assign_blocks_to_skeleton(skeleton_nodes: list, blocks: list, page_offset: i
         sk["_expected_end"] = end
 
     def _find_node_by_page(page: int, start_idx: int = 0) -> tuple:
-        """根据页码找到对应的骨架节点，返回 (node, index)"""
+        """根据页码找到对应的骨架节点，返回 (node, index)
+        先向前搜索（从 start_idx 开始），找不到再向后搜索（从 0 到 start_idx）"""
+        # 向前搜索
         for j in range(start_idx, len(flat_skeleton)):
+            sk = flat_skeleton[j]
+            if sk["_expected_start"] <= page <= sk["_expected_end"]:
+                return sk, j
+        # 向后搜索（兜底：前言区 blocks 等）
+        for j in range(0, start_idx):
             sk = flat_skeleton[j]
             if sk["_expected_start"] <= page <= sk["_expected_end"]:
                 return sk, j
@@ -292,11 +299,20 @@ def assign_blocks_to_skeleton(skeleton_nodes: list, blocks: list, page_offset: i
             if node_by_page:
                 current_node = node_by_page
                 skeleton_idx = idx
+            elif is_non_text_block(block):
+                # 非文本 block 在前言区：分配到页码最近的骨架节点
+                nearest, nearest_idx = _find_nearest_node_by_page(page, flat_skeleton)
+                if nearest:
+                    current_node = nearest
+                    skeleton_idx = nearest_idx
+                else:
+                    continue
             else:
-                continue  # 前言区内容，跳过
+                continue  # 前言区文本内容，跳过
 
-        # 页码范围兜底：如果 block 页码超出当前节点的期望范围，按页码重新查找
-        if page > current_node.get("_expected_end", 9999):
+        # 页码范围兜底：仅对文本 block 生效，非文本 block 直接追加到当前节点
+        is_non_text = block.get("type") in ("picture", "image", "table", "drawing", "link")
+        if not is_non_text and page > current_node.get("_expected_end", 9999):
             node_by_page, idx = _find_node_by_page(page, skeleton_idx + 1)
             if node_by_page:
                 current_node = node_by_page
@@ -331,6 +347,26 @@ def assign_blocks_to_skeleton(skeleton_nodes: list, blocks: list, page_offset: i
 
 
 # ==================== 内部辅助函数 ====================
+
+
+def is_non_text_block(block: dict) -> bool:
+    """判断是否为非文本 block"""
+    return block.get("type") in ("picture", "image", "table", "drawing", "link")
+
+
+def _find_nearest_node_by_page(page: int, flat_skeleton: list) -> tuple:
+    """按页码找最近的骨架节点（最小化页码距离）"""
+    best_node = None
+    best_idx = -1
+    best_dist = float("inf")
+    for j, sk in enumerate(flat_skeleton):
+        dist = abs(sk["page"] - page)
+        if dist < best_dist:
+            best_dist = dist
+            best_node = sk
+            best_idx = j
+    return best_node, best_idx
+
 
 def _add_context(node: dict, label: str, text: str, page: int):
     """添加 context 到节点，seq 在当前节点的 contexts 内从 1 递增"""
