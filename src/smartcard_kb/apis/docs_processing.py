@@ -1569,6 +1569,56 @@ async def page_index(request: PageIndexRequest):
             ctx_count = count_contexts(skeleton)
             logger.info(f"Assigned {ctx_count} contexts to skeleton nodes")
 
+            # 将图片 items 分配到骨架节点（从 doc_items 查询 label='picture' 的记录）
+            from smartcard_kb.docs_compile.database import get_connection
+            conn = get_connection()
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute(
+                "SELECT page_id, metadata FROM doc_items WHERE document_id = %s AND label = 'picture'",
+                (request.document_id,),
+            )
+            image_items = [dict(r) for r in cursor.fetchall()]
+            cursor.close()
+            conn.close()
+
+            if image_items:
+                # 计算每个骨架节点的页码范围
+                def _get_node_page_range(node):
+                    """从节点的 contexts 推断页码范围"""
+                    pages = set()
+                    for ctx in node.get("contexts", []):
+                        p = ctx.get("page_idx")
+                        if p is not None:
+                            pages.add(p)
+                    if not pages:
+                        return None, None
+                    return min(pages), max(pages)
+
+                def _assign_images_to_nodes(nodes, items):
+                    for node in nodes:
+                        start, end = _get_node_page_range(node)
+                        if start is not None:
+                            for item in items:
+                                try:
+                                    page_num = int(item.get("page_id", "0")) - 1  # 1-based → 0-based
+                                except (ValueError, TypeError):
+                                    continue
+                                if start <= page_num <= end:
+                                    meta = item.get("metadata") or {}
+                                    image_path = meta.get("image_path", "")
+                                    node["contexts"].append({
+                                        "seq": len(node["contexts"]) + 1,
+                                        "label": "picture",
+                                        "context": "",
+                                        "start_index": None,
+                                        "end_index": None,
+                                        "metadata": {"image_path": image_path},
+                                    })
+                        _assign_images_to_nodes(node.get("children", []), items)
+
+                _assign_images_to_nodes(skeleton, image_items)
+                logger.info(f"Assigned {len(image_items)} image items to skeleton nodes")
+
         # 保存骨架
         skeleton_path = output_dir / "skeleton.json"
         with open(skeleton_path, "w", encoding="utf-8") as f:
@@ -1733,6 +1783,54 @@ async def page_index_all(request: PageIndexAllRequest):
                         json_module.dump(toc, f, ensure_ascii=False, indent=2)
 
                     skeleton = build_skeleton_tree(toc)
+
+                    # 将图片 items 分配到骨架节点
+                    from smartcard_kb.docs_compile.database import get_connection as _get_conn
+                    _conn = _get_conn()
+                    _cur = _conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                    _cur.execute(
+                        "SELECT page_id, metadata FROM doc_items WHERE document_id = %s AND label = 'picture'",
+                        (doc_id,),
+                    )
+                    _img_items = [dict(r) for r in _cur.fetchall()]
+                    _cur.close()
+                    _conn.close()
+
+                    if _img_items:
+                        def _get_node_page_range(_node):
+                            _pages = set()
+                            for _ctx in _node.get("contexts", []):
+                                _p = _ctx.get("page_idx")
+                                if _p is not None:
+                                    _pages.add(_p)
+                            if not _pages:
+                                return None, None
+                            return min(_pages), max(_pages)
+
+                        def _assign_imgs(_nodes, _items):
+                            for _node in _nodes:
+                                _start, _end = _get_node_page_range(_node)
+                                if _start is not None:
+                                    for _item in _items:
+                                        try:
+                                            _pn = int(_item.get("page_id", "0")) - 1
+                                        except (ValueError, TypeError):
+                                            continue
+                                        if _start <= _pn <= _end:
+                                            _meta = _item.get("metadata") or {}
+                                            _node["contexts"].append({
+                                                "seq": len(_node["contexts"]) + 1,
+                                                "label": "picture",
+                                                "context": "",
+                                                "start_index": None,
+                                                "end_index": None,
+                                                "metadata": {"image_path": _meta.get("image_path", "")},
+                                            })
+                                _assign_imgs(_node.get("children", []), _items)
+
+                        _assign_imgs(skeleton, _img_items)
+                        logger.info(f"Assigned {len(_img_items)} images to skeleton for {doc_id}")
+
                     with open(output_dir / "skeleton.json", "w", encoding="utf-8") as f:
                         json_module.dump(skeleton, f, ensure_ascii=False, indent=2)
 
