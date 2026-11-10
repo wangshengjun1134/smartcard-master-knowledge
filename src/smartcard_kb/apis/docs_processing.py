@@ -6,9 +6,6 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, List, Tuple
-
-import psycopg2
-import psycopg2.extras
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel, Field
@@ -1501,114 +1498,30 @@ async def page_index(request: PageIndexRequest):
         # Step 3: 构建层级骨架
         skeleton = build_skeleton_tree(toc)
 
-        # Step 4: 提取文本 blocks + 图片 blocks，分配到骨架节点（填充 contexts）
+        # Step 4: 提取文本 blocks 并分配到骨架节点（填充 contexts）
         import fitz  # PyMuPDF
-        from smartcard_kb.storage import upload_image
         pdf_doc = fitz.open(pdf_path)
         total_pages = len(pdf_doc)
 
-        # 提取每页所有 blocks（文本+图片+表格+矢量图+链接），统一按 y 排序
-        all_blocks = []
-        img_counter = 0
+        # 提取每页文本 blocks
+        blocks = []
         for page_idx in range(total_pages):
             page = pdf_doc[page_idx]
-            # 文本 blocks（y = bbox[1]）
-            for tb in page.get_text("blocks"):
+            text_blocks = page.get_text("blocks")
+            for tb in text_blocks:
                 text = tb[4].strip() if len(tb) > 4 else ""
                 if text:
-                    all_blocks.append({
+                    blocks.append({
                         "type": "text",
                         "text": text,
                         "page_idx": page_idx,
-                        "y": tb[1],
                     })
-            # 图片 blocks（用 get_image_info 获取 bbox）
-            for ii in page.get_image_info():
-                xref = ii.get("xref", 0)
-                bbox = ii.get("bbox", (0, 0, 0, 0))
-                try:
-                    pix = fitz.Pixmap(pdf_doc, xref)
-                    if pix.alpha:
-                        pix = fitz.Pixmap(fitz.csRGB, pix)
-                    img_counter += 1
-                    img_filename = f"picture_{img_counter:04d}.png"
-                    img_local_dir = Path("output") / "pictures" / request.document_id
-                    img_local_dir.mkdir(parents=True, exist_ok=True)
-                    img_local_path = img_local_dir / img_filename
-                    pix.save(str(img_local_path))
-                    img_object_key = f"{doc_file_path}/{img_filename}"
-                    upload_image(str(img_local_path), img_object_key)
-                    all_blocks.append({
-                        "type": "picture",
-                        "page_idx": page_idx,
-                        "y": bbox[1],
-                        "metadata": {"image_path": img_object_key},
-                    })
-                except Exception as e:
-                    logger.warning(f"Failed to extract image xref={xref} on page {page_idx}: {e}")
-            # 表格 blocks
-            try:
-                for tab in page.find_tables():
-                    table_data = tab.extract()
-                    if table_data:
-                        all_blocks.append({
-                            "type": "table",
-                            "page_idx": page_idx,
-                            "y": tab.bbox[1],
-                            "metadata": {"data": table_data, "bbox": list(tab.bbox)},
-                        })
-            except Exception:
-                pass
-            # 矢量图 blocks
-            try:
-                for dr in page.get_drawings():
-                    rect = dr.get("rect")
-                    all_blocks.append({
-                        "type": "drawing",
-                        "page_idx": page_idx,
-                        "y": rect[1] if rect else 0,
-                        "metadata": {
-                            "items_count": len(dr.get("items", [])),
-                            "color": str(dr.get("color")) if dr.get("color") else None,
-                            "fill": str(dr.get("fill")) if dr.get("fill") else None,
-                            "rect": list(rect) if rect else None,
-                        },
-                    })
-            except Exception:
-                pass
-            # 链接 blocks
-            try:
-                for lnk in page.get_links():
-                    from_rect = lnk.get("from")
-                    all_blocks.append({
-                        "type": "link",
-                        "page_idx": page_idx,
-                        "y": from_rect[1] if from_rect else 0,
-                        "metadata": {
-                            "uri": lnk.get("uri", ""),
-                            "page": lnk.get("page"),
-                            "kind": lnk.get("kind"),
-                            "from": list(from_rect) if from_rect else None,
-                        },
-                    })
-            except Exception:
-                pass
         pdf_doc.close()
 
-        # 按 (page_idx, y) 排序 — 同一页内按从上到下的阅读顺序
-        all_blocks.sort(key=lambda b: (b["page_idx"], b.get("y", 0)))
+        logger.info(f"Extracted {len(blocks)} text blocks from {pdf_path}")
 
-        logger.info(
-            f"Extracted {len(all_blocks)} total blocks from {pdf_path} "
-            f"(text={sum(1 for b in all_blocks if b['type']=='text')}, "
-            f"picture={sum(1 for b in all_blocks if b['type']=='picture')}, "
-            f"table={sum(1 for b in all_blocks if b['type']=='table')}, "
-            f"drawing={sum(1 for b in all_blocks if b['type']=='drawing')}, "
-            f"link={sum(1 for b in all_blocks if b['type']=='link')})"
-        )
-
-        # 检测页码偏移并统一分配所有 blocks 到骨架节点
-        if all_blocks and skeleton:
+        # 检测页码偏移并分配 blocks 到骨架节点
+        if blocks and skeleton:
             # 收集骨架节点标题，用于检测 text block 中的标题
             import re as _re
 
@@ -1629,9 +1542,7 @@ async def page_index(request: PageIndexRequest):
 
             # 标记标题 block：text block 的文本匹配骨架节点标题 → type 改为 paragraph_title
             title_count = 0
-            for block in all_blocks:
-                if block.get("type") != "text":
-                    continue
+            for block in blocks:
                 text = block.get("text", "").strip().lower()
                 if not text:
                     continue
@@ -1641,11 +1552,11 @@ async def page_index(request: PageIndexRequest):
                     block["type"] = "paragraph_title"
                     title_count += 1
 
-            logger.info(f"Detected {title_count} title blocks from {len(all_blocks)} total blocks")
+            logger.info(f"Detected {title_count} title blocks from {len(blocks)} text blocks")
 
-            page_offset = detect_page_offset(toc, all_blocks)
+            page_offset = detect_page_offset(toc, blocks)
             logger.info(f"Detected page offset: {page_offset}")
-            skeleton = assign_blocks_to_skeleton(skeleton, all_blocks, page_offset)
+            skeleton = assign_blocks_to_skeleton(skeleton, blocks, page_offset)
 
             # 统计 contexts 填充情况
             def count_contexts(nodes):
@@ -1656,7 +1567,7 @@ async def page_index(request: PageIndexRequest):
                 return total
 
             ctx_count = count_contexts(skeleton)
-            logger.info(f"Assigned {ctx_count} contexts to skeleton nodes (unified sequence)")
+            logger.info(f"Assigned {ctx_count} contexts to skeleton nodes")
 
         # 保存骨架
         skeleton_path = output_dir / "skeleton.json"
@@ -1822,98 +1733,6 @@ async def page_index_all(request: PageIndexAllRequest):
                         json_module.dump(toc, f, ensure_ascii=False, indent=2)
 
                     skeleton = build_skeleton_tree(toc)
-
-                    # 用 PyMuPDF 提取所有 blocks（文本+图片+表格+矢量图+链接），统一按 y 排序
-                    import fitz as _fitz
-                    from smartcard_kb.storage import upload_image as _upload_img
-                    _pdf = _fitz.open(pdf_path)
-                    _all_blocks = []
-                    _img_ctr = 0
-                    for _pi in range(len(_pdf)):
-                        _pg = _pdf[_pi]
-                        # 文本 blocks
-                        for _tb in _pg.get_text("blocks"):
-                            _txt = _tb[4].strip() if len(_tb) > 4 else ""
-                            if _txt:
-                                _all_blocks.append({"type": "text", "text": _txt, "page_idx": _pi, "y": _tb[1]})
-                        # 图片 blocks
-                        for _ii in _pg.get_image_info():
-                            _xref = _ii.get("xref", 0)
-                            _bbox = _ii.get("bbox", (0, 0, 0, 0))
-                            try:
-                                _pix = _fitz.Pixmap(_pdf, _xref)
-                                if _pix.alpha:
-                                    _pix = _fitz.Pixmap(_fitz.csRGB, _pix)
-                                _img_ctr += 1
-                                _img_fn = f"picture_{_img_ctr:04d}.png"
-                                _img_dir = Path("output") / "pictures" / doc_id
-                                _img_dir.mkdir(parents=True, exist_ok=True)
-                                _img_local = _img_dir / _img_fn
-                                _pix.save(str(_img_local))
-                                _img_key = f"{doc_file_path}/{_img_fn}"
-                                _upload_img(str(_img_local), _img_key)
-                                _all_blocks.append({"type": "picture", "page_idx": _pi, "y": _bbox[1], "metadata": {"image_path": _img_key}})
-                            except Exception as e:
-                                logger.warning(f"Failed to extract image xref={_xref} page {_pi} for {doc_id}: {e}")
-                        # 表格 blocks
-                        try:
-                            for _tab in _pg.find_tables():
-                                _td = _tab.extract()
-                                if _td:
-                                    _all_blocks.append({"type": "table", "page_idx": _pi, "y": _tab.bbox[1], "metadata": {"data": _td, "bbox": list(_tab.bbox)}})
-                        except Exception:
-                            pass
-                        # 矢量图 blocks
-                        try:
-                            for _dr in _pg.get_drawings():
-                                _rect = _dr.get("rect")
-                                _all_blocks.append({"type": "drawing", "page_idx": _pi, "y": _rect[1] if _rect else 0, "metadata": {"items_count": len(_dr.get("items", [])), "color": str(_dr.get("color")) if _dr.get("color") else None, "fill": str(_dr.get("fill")) if _dr.get("fill") else None, "rect": list(_rect) if _rect else None}})
-                        except Exception:
-                            pass
-                        # 链接 blocks
-                        try:
-                            for _lnk in _pg.get_links():
-                                _fr = _lnk.get("from")
-                                _all_blocks.append({"type": "link", "page_idx": _pi, "y": _fr[1] if _fr else 0, "metadata": {"uri": _lnk.get("uri", ""), "page": _lnk.get("page"), "kind": _lnk.get("kind"), "from": list(_fr) if _fr else None}})
-                        except Exception:
-                            pass
-                    _pdf.close()
-
-                    # 按 (page_idx, y) 排序
-                    _all_blocks.sort(key=lambda b: (b["page_idx"], b.get("y", 0)))
-
-                    # 标题检测（仅对 text blocks）
-                    import re as _re2
-                    def _flatten_titles2(nodes, titles=None):
-                        if titles is None:
-                            titles = set()
-                        for node in nodes:
-                            t = node.get("title", "").strip().lower()
-                            if t:
-                                t = _re2.sub(r'[\u2013\u2014\u2012\u2015\ufe58\ufe63\uff0d]', '-', t)
-                                t = _re2.sub(r'\s+', ' ', t)
-                                titles.add(t)
-                            _flatten_titles2(node.get("children", []), titles)
-                        return titles
-                    _sk_titles = _flatten_titles2(skeleton)
-                    _title_count = 0
-                    for _b in _all_blocks:
-                        if _b.get("type") != "text":
-                            continue
-                        _txt = _b.get("text", "").strip().lower()
-                        if not _txt:
-                            continue
-                        _tn = _re2.sub(r'[\u2013\u2014\u2012\u2015\ufe58\ufe63\uff0d]', '-', _txt)
-                        _tn = _re2.sub(r'\s+', ' ', _tn)
-                        if _tn in _sk_titles:
-                            _b["type"] = "paragraph_title"
-                            _title_count += 1
-
-                    # 统一分配到骨架节点
-                    _page_offset = detect_page_offset(toc, _all_blocks)
-                    skeleton = assign_blocks_to_skeleton(skeleton, _all_blocks, _page_offset)
-                    logger.info(f"PageIndex for {doc_id}: {len(toc)} entries, {_title_count} titles, {len(_all_blocks)} blocks (unified) in {time.time()-t0:.1f}s")
-
                     with open(output_dir / "skeleton.json", "w", encoding="utf-8") as f:
                         json_module.dump(skeleton, f, ensure_ascii=False, indent=2)
 
