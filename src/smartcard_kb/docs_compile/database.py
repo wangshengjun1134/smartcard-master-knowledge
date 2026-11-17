@@ -263,6 +263,46 @@ def init_database():
         END $$;
     """)
 
+    # 创建 doc_tocs 表 — 存储文档目录结构
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS doc_tocs (
+            id BIGSERIAL PRIMARY KEY,
+            document_id TEXT NOT NULL REFERENCES doc_info(id) ON DELETE CASCADE,
+            
+            -- 目录信息
+            title TEXT NOT NULL,           -- 章节标题（含编号，如 "1.2.3 xxx"）
+            level INTEGER NOT NULL,        -- 层级：1=一级, 2=二级...
+            
+            -- 位置范围
+            start_page INTEGER,            -- 起始页码
+            end_page INTEGER,              -- 结束页码
+            start_item_index INTEGER,      -- 对应 doc_items 的起始 order_index
+            end_item_index INTEGER,        -- 对应 doc_items 的结束 order_index
+            
+            -- 摘要（暂不处理，由后续独立接口触发更新）
+            summary TEXT,
+            
+            -- 树结构
+            parent_id BIGINT,              -- 父节点 ID
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # doc_tocs 表索引
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_doc_tocs_document_id
+        ON doc_tocs(document_id)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_doc_tocs_level
+        ON doc_tocs(level)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_doc_tocs_parent_id
+        ON doc_tocs(parent_id)
+    """)
+
     # 删除旧的 embedding bytea 字段（如果存在）
     cursor.execute("""
         DO $$
@@ -1439,3 +1479,137 @@ def query_page_index(document_id: str) -> Optional[Dict[str, Any]]:
     cursor.close()
     conn.close()
     return dict(row) if row else None
+
+
+# ==================== doc_tocs CRUD ====================
+
+def insert_doc_tocs(document_id: str, tocs: List[Dict[str, Any]]) -> int:
+    """
+    批量插入 doc_tocs 记录。
+
+    :param document_id: 文档 ID
+    :param tocs: 目录条目列表，每个条目包含 title, level, start_page, end_page,
+                 start_item_index, end_item_index, parent_id 等字段
+    :return: 插入的记录数
+    """
+    if not tocs:
+        return 0
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # 先删除该文档的旧记录
+    cursor.execute("DELETE FROM doc_tocs WHERE document_id = %s", (document_id,))
+
+    # 批量插入
+    insert_sql = """
+        INSERT INTO doc_tocs (document_id, title, level, start_page, end_page,
+                              start_item_index, end_item_index, summary, parent_id)
+        VALUES %s
+    """
+
+    values = []
+    for toc in tocs:
+        values.append((
+            document_id,
+            toc.get("title"),
+            toc.get("level"),
+            toc.get("start_page"),
+            toc.get("end_page"),
+            toc.get("start_item_index"),
+            toc.get("end_item_index"),
+            toc.get("summary"),
+            toc.get("parent_id"),
+        ))
+
+    execute_values(cursor, insert_sql, values)
+    inserted = len(values)
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return inserted
+
+
+def query_doc_tocs(document_id: str) -> List[Dict[str, Any]]:
+    """
+    查询指定文档的目录结构。
+
+    :param document_id: 文档 ID
+    :return: 目录条目列表，按 id 排序
+    """
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    cursor.execute(
+        """
+        SELECT id, document_id, title, level, start_page, end_page,
+               start_item_index, end_item_index, summary, parent_id,
+               created_at, updated_at
+        FROM doc_tocs
+        WHERE document_id = %s
+        ORDER BY id
+        """,
+        (document_id,),
+    )
+    rows = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return [dict(row) for row in rows]
+
+
+def query_doc_tocs_tree(document_id: str) -> List[Dict[str, Any]]:
+    """
+    查询指定文档的目录结构，返回树形结构。
+
+    :param document_id: 文档 ID
+    :return: 树形目录列表，每个节点包含 children 字段
+    """
+    flat_tocs = query_doc_tocs(document_id)
+    if not flat_tocs:
+        return []
+
+    # 构建 id -> node 映射
+    node_map = {toc["id"]: {**toc, "children": []} for toc in flat_tocs}
+
+    # 构建树
+    roots = []
+    for node in node_map.values():
+        parent_id = node.get("parent_id")
+        if parent_id and parent_id in node_map:
+            node_map[parent_id]["children"].append(node)
+        else:
+            roots.append(node)
+
+    return roots
+
+
+def update_doc_toc_summary(toc_id: int, summary: str) -> bool:
+    """
+    更新单个目录条目的摘要。
+
+    :param toc_id: 目录条目 ID
+    :param summary: 摘要内容
+    :return: 是否更新成功
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        UPDATE doc_tocs
+        SET summary = %s, updated_at = CURRENT_TIMESTAMP
+        WHERE id = %s
+        """,
+        (summary, toc_id),
+    )
+    updated = cursor.rowcount > 0
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return updated
