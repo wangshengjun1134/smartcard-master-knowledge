@@ -2326,6 +2326,8 @@ async def doc_toc(request: DocTocRequest):
     - **max_items**: 最多送入 LLM 的标题数（默认 500）
     """
     import sys
+    import psycopg2
+    import psycopg2.extras
     from pathlib import Path as PathLib
 
     try:
@@ -2501,6 +2503,8 @@ async def doc_toc_all(request: DocTocAllRequest):
     - **max_items**: 最多送入 LLM 的标题数（默认 500）
     """
     import sys
+    import psycopg2
+    import psycopg2.extras
     from pathlib import Path as PathLib
 
     try:
