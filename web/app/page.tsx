@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { listDocuments, uploadDocument, deleteDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings, embeddingAllDocuments, getStatusCounts, pageIndex, pageIndexAll, summaryDocument, getDirectoryTree } from '@/lib/api'
+import { listDocuments, uploadDocument, deleteDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings, embeddingAllDocuments, getStatusCounts, pageIndex, pageIndexAll, summaryDocument, docToc, getDirectoryTree } from '@/lib/api'
 import type { DocumentInfo } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -37,7 +37,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { formatFileSize, formatDate } from '@/lib/utils'
-import { Upload, FileText, Search, Moon, Sun, Plus, ChevronLeft, ChevronRight, MoreHorizontal, Eye, FileUp, Image, Layers, Database, Play, Sparkles, RotateCcw, AlertCircle, CheckCircle, ArrowRight, ListChecks, Download, Folder, ChevronDown, ChevronRight as ChevronRightIcon, Trash2 } from 'lucide-react'
+import { Upload, FileText, Search, Moon, Sun, Plus, ChevronLeft, ChevronRight, MoreHorizontal, Eye, FileUp, Image, Layers, Database, Play, Sparkles, RotateCcw, AlertCircle, CheckCircle, ArrowRight, ListChecks, Download, Folder, ChevronDown, ChevronRight as ChevronRightIcon, Trash2, ListTree } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { DocumentTree } from '@/components/document-tree'
 
@@ -195,7 +195,7 @@ export default function Home() {
       setCurrentPage(1)
       await refreshData()
       setUploadDialogOpen(false)
-      setUploadForm({ document_code: '', title: '', issuer: '', language: 'en' })
+      setUploadForm({ document_code: '', title: '', issuer: '', language: 'en', directory_id: 0 })
       setSelectedFile(null)
     } catch (error: any) {
       console.error('Failed to upload document:', error)
@@ -488,6 +488,30 @@ export default function Home() {
     } catch (error: any) {
       toast({
         title: 'Summary 失败',
+        description: error.response?.data?.detail || '请重试',
+        variant: 'destructive',
+      })
+    } finally {
+      setProcessingDoc(null)
+      setProcessingType(null)
+    }
+  }
+
+  const handleDocToc = async (doc: DocumentInfo) => {
+    setProcessingDoc(doc.id)
+    setProcessingType('doctoc')
+    try {
+      const result = await docToc({
+        document_id: doc.id,
+      })
+      toast({
+        title: '生成目录 任务已提交',
+        description: result.message || '正在后台处理，请稍后刷新查看',
+      })
+      await refreshData()
+    } catch (error: any) {
+      toast({
+        title: '生成目录 失败',
         description: error.response?.data?.detail || '请重试',
         variant: 'destructive',
       })
@@ -1616,6 +1640,10 @@ export default function Home() {
                                 <DropdownMenuItem onClick={() => handleSummary(doc)} disabled={processingDoc === doc.id}>
                                   <FileText className="h-4 w-4 mr-2" />
                                   {processingDoc === doc.id && processingType === 'summary' ? 'Summary中...' : 'Summary'}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDocToc(doc)} disabled={processingDoc === doc.id}>
+                                  <ListTree className="h-4 w-4 mr-2" />
+                                  {processingDoc === doc.id && processingType === 'doctoc' ? '生成目录中...' : '生成目录'}
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={() => window.open(`/api/docs/${doc.id}/download`, '_blank')}>
