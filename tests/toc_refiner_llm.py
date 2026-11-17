@@ -198,6 +198,22 @@ def _call_llm_for_refined_toc(
         "Content-Type": "application/json",
     }
 
+    # 📤 打印请求内容
+    logger.info("=" * 80)
+    logger.info("📤 LLM Request for TOC Refiner")
+    logger.info("=" * 80)
+    logger.info(f"URL: {url}")
+    logger.info(f"Model: {model.strip()}")
+    logger.info(f"Temperature: {temperature}")
+    logger.info(f"Timeout: {timeout}s")
+    logger.info("-" * 80)
+    logger.info("System Prompt:")
+    logger.info(TOC_REFINER_SYSTEM_PROMPT[:500] + "..." if len(TOC_REFINER_SYSTEM_PROMPT) > 500 else TOC_REFINER_SYSTEM_PROMPT)
+    logger.info("-" * 80)
+    logger.info("User Content:")
+    logger.info(user_content[:2000] + "..." if len(user_content) > 2000 else user_content)
+    logger.info("=" * 80)
+
     logger.info(f"Calling LLM for refined TOC: {url}, model={model}")
     with httpx.Client(timeout=timeout) as client:
         response = client.post(url, headers=headers, json=payload)
@@ -208,6 +224,25 @@ def _call_llm_for_refined_toc(
         raise RuntimeError(f"LLM API error {response.status_code}: {body}")
 
     result = response.json()
+
+    # 📥 打印响应内容
+    logger.info("=" * 80)
+    logger.info("📥 LLM Response for TOC Refiner")
+    logger.info("=" * 80)
+    if "choices" in result and len(result["choices"]) > 0:
+        choice = result["choices"][0]
+        logger.info(f"Response ID: {result.get('id', 'N/A')}")
+        logger.info(f"Model: {result.get('model', 'N/A')}")
+        if "usage" in result:
+            usage = result["usage"]
+            logger.info(f"Token Usage: prompt={usage.get('prompt_tokens', 0)}, completion={usage.get('completion_tokens', 0)}, total={usage.get('total_tokens', 0)}")
+        logger.info("-" * 80)
+        logger.info("Response Content:")
+        content = choice["message"]["content"]
+        logger.info(content[:3000] + "..." if len(content) > 3000 else content)
+    else:
+        logger.info(f"Unexpected response format: {result}")
+    logger.info("=" * 80)
 
     if "choices" in result and len(result["choices"]) > 0:
         content = result["choices"][0]["message"]["content"]
