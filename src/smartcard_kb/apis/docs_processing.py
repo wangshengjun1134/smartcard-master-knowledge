@@ -2292,3 +2292,368 @@ async def summary_all(request: SummaryAllRequest):
     except Exception as e:
         logger.error(f"Batch Summary failed: {e}")
         raise HTTPException(status_code=500, detail=f"批量 Summary 失败: {str(e)}")
+
+
+# ==================== Doc TOC 端点 ====================
+
+class DocTocRequest(BaseModel):
+    """Doc TOC 请求 — 基于 doc_items + PDF 目录 + LLM 推理生成准确目录树"""
+    document_id: str
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    model: Optional[str] = None
+    max_pages: int = 10  # 从 PDF 提取前 N 页用于目录文本
+    max_items: int = 500  # 最多送入 LLM 的标题数
+
+
+class DocTocResponse(BaseModel):
+    """Doc TOC 响应"""
+    success: bool
+    message: str
+    toc_count: int = 0
+
+
+@router.post("/doc-toc", response_model=DocTocResponse)
+async def doc_toc(request: DocTocRequest):
+    """
+    对单个文档执行 Doc TOC（基于 doc_items + PDF 目录 + LLM 推理）
+
+    - **document_id**: 文档 ID
+    - **api_key**: LLM API Key（可选）
+    - **base_url**: LLM API URL（可选）
+    - **model**: LLM 模型名（可选）
+    - **max_pages**: 从 PDF 提取前 N 页用于目录文本（默认 10）
+    - **max_items**: 最多送入 LLM 的标题数（默认 500）
+    """
+    import sys
+    from pathlib import Path as PathLib
+
+    try:
+        # 查询文档信息
+        docs = query_document_info(document_id=request.document_id)
+        if not docs:
+            raise HTTPException(status_code=404, detail=f"文档 {request.document_id} 不存在")
+
+        doc = docs[0]
+        pdf_path = doc.get("file_path", "")
+        if not pdf_path:
+            raise HTTPException(status_code=404, detail="PDF 文件路径为空")
+        pdf_path = resolve_file(pdf_path)
+        if not PathLib(pdf_path).exists():
+            raise HTTPException(status_code=404, detail=f"PDF 文件不存在: {pdf_path}")
+
+        # LLM 参数
+        api_key = request.api_key or settings.openai_api_key
+        base_url = request.base_url or settings.openai_base_url
+        model = request.model or settings.openai_model
+
+        if not api_key or not base_url:
+            raise HTTPException(
+                status_code=400,
+                detail="未配置 LLM API。请提供 api_key 和 base_url，或在环境变量中设置"
+            )
+
+        logger.info(f"Doc TOC for document {request.document_id} from {pdf_path}")
+
+        # 查询 doc_items 中的 section_header
+        from smartcard_kb.docs_compile.database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor.execute(
+            """
+            SELECT order_index, text, page_id, metadata
+            FROM doc_items
+            WHERE document_id = %s AND label = 'section_header'
+            ORDER BY order_index
+            """,
+            (request.document_id,),
+        )
+        doc_items = [dict(row) for row in cursor.fetchall()]
+        cursor.close()
+        conn.close()
+
+        if not doc_items:
+            return DocTocResponse(
+                success=False,
+                message="该文档没有 section_header 类型的 doc_items，请先执行解析",
+                toc_count=0,
+            )
+
+        logger.info(f"Found {len(doc_items)} section_headers for {request.document_id}")
+
+        # 添加 tests 目录到 path
+        project_root = PathLib(__file__).parent.parent.parent.parent
+        tests_dir = str(project_root / "tests")
+        if tests_dir not in sys.path:
+            sys.path.insert(0, tests_dir)
+
+        from toc_refiner_llm import refine_toc_with_llm
+        from smartcard_kb.docs_compile.database import insert_doc_tocs
+
+        # 调用 LLM 推理生成目录树
+        entries = await asyncio.to_thread(
+            refine_toc_with_llm,
+            pdf_path=pdf_path,
+            doc_items=doc_items,
+            api_url=base_url,
+            api_key=api_key,
+            model=model,
+            max_pages=request.max_pages,
+            max_items=request.max_items,
+        )
+
+        if not entries:
+            return DocTocResponse(
+                success=False,
+                message="LLM 未返回任何目录条目",
+                toc_count=0,
+            )
+
+        # 构建 doc_tocs 记录（计算 start/end_page, start/end_item_index, parent_id）
+        tocs = []
+        for i, entry in enumerate(entries):
+            item_index = entry.get("item_index", 0)
+            page = entry.get("page", 1)
+
+            # 找下一个同级或更高级标题的 item_index 作为 end
+            next_item_index = None
+            for j in range(i + 1, len(entries)):
+                next_entry = entries[j]
+                if next_entry.get("level", 1) <= entry.get("level", 1):
+                    next_item_index = next_entry.get("item_index", 0) - 1
+                    break
+
+            # end_page: 下一个同级标题的起始页
+            next_page = None
+            for j in range(i + 1, len(entries)):
+                next_entry = entries[j]
+                if next_entry.get("level", 1) <= entry.get("level", 1):
+                    next_page = next_entry.get("page", 1) - 1  # 前一页
+                    break
+
+            tocs.append({
+                "title": entry.get("title", ""),
+                "level": entry.get("level", 1),
+                "start_page": page,
+                "end_page": next_page,  # 可能为 None，表示到文档末尾
+                "start_item_index": item_index,
+                "end_item_index": next_item_index,  # 可能为 None
+                "parent_id": None,  # 后续构建父子关系
+            })
+
+        # 构建 parent_id 关系
+        stack = []  # (level, id) 栈，用于追踪父节点
+        for i, toc in enumerate(tocs):
+            level = toc["level"]
+            # 弹出栈中 level >= 当前 level 的节点
+            while stack and stack[-1][0] >= level:
+                stack.pop()
+            # 栈顶就是父节点
+            if stack:
+                toc["parent_id"] = stack[-1][1]
+            # 将当前节点压入栈（id 暂时用索引，后续插入后更新）
+            stack.append((level, i))
+
+        # 插入数据库
+        inserted = insert_doc_tocs(request.document_id, tocs)
+
+        return DocTocResponse(
+            success=True,
+            message=f"成功生成 {inserted} 条目录记录",
+            toc_count=inserted,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Doc TOC failed for {request.document_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Doc TOC 失败: {str(e)}")
+
+
+class DocTocAllRequest(BaseModel):
+    """批量 Doc TOC 请求"""
+    parallel_count: int = 1
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    model: Optional[str] = None
+    max_pages: int = 10
+    max_items: int = 500
+
+
+class DocTocAllResponse(BaseModel):
+    """批量 Doc TOC 响应"""
+    success: bool
+    message: str
+    total: int
+    parallel_count: int
+
+
+@router.post("/doc-toc-all", response_model=DocTocAllResponse)
+async def doc_toc_all(request: DocTocAllRequest):
+    """
+    批量执行 Doc TOC
+
+    - **parallel_count**: 并行数量（默认 1）
+    - **api_key**: LLM API Key（可选）
+    - **base_url**: LLM API URL（可选）
+    - **model**: LLM 模型名（可选）
+    - **max_pages**: 从 PDF 提取前 N 页（默认 10）
+    - **max_items**: 最多送入 LLM 的标题数（默认 500）
+    """
+    import sys
+    from pathlib import Path as PathLib
+
+    try:
+        # 查询已解析的文档（有 section_header）
+        docs = query_documents_by_status(status="parsed")
+        if not docs:
+            return DocTocAllResponse(
+                success=True,
+                message="没有已解析的文档",
+                total=0,
+                parallel_count=request.parallel_count,
+            )
+
+        logger.info(f"Batch Doc TOC: {len(docs)} documents, parallel={request.parallel_count}")
+
+        sem = asyncio.Semaphore(request.parallel_count)
+        success_count = 0
+        fail_count = 0
+
+        async def toc_one(doc):
+            nonlocal success_count, fail_count
+            async with sem:
+                doc_id = doc["id"]
+                t0 = time.time()
+                try:
+                    pdf_path = doc.get("file_path", "")
+                    if not pdf_path:
+                        logger.warning(f"Doc TOC skip {doc_id}: no file_path")
+                        fail_count += 1
+                        return
+                    pdf_path = resolve_file(pdf_path)
+                    if not PathLib(pdf_path).exists():
+                        logger.warning(f"Doc TOC skip {doc_id}: file not found")
+                        fail_count += 1
+                        return
+
+                    # 查询 doc_items
+                    from smartcard_kb.docs_compile.database import get_connection
+                    conn = get_connection()
+                    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                    cursor.execute(
+                        """
+                        SELECT order_index, text, page_id, metadata
+                        FROM doc_items
+                        WHERE document_id = %s AND label = 'section_header'
+                        ORDER BY order_index
+                        """,
+                        (doc_id,),
+                    )
+                    doc_items = [dict(row) for row in cursor.fetchall()]
+                    cursor.close()
+                    conn.close()
+
+                    if not doc_items:
+                        logger.warning(f"Doc TOC skip {doc_id}: no section_headers")
+                        fail_count += 1
+                        return
+
+                    # 添加 tests 目录到 path
+                    project_root = PathLib(__file__).parent.parent.parent.parent
+                    tests_dir = str(project_root / "tests")
+                    if tests_dir not in sys.path:
+                        sys.path.insert(0, tests_dir)
+
+                    from toc_refiner_llm import refine_toc_with_llm
+                    from smartcard_kb.docs_compile.database import insert_doc_tocs
+
+                    api_key = request.api_key or settings.openai_api_key
+                    base_url = request.base_url or settings.openai_base_url
+                    model = request.model or settings.openai_model
+
+                    if not api_key or not base_url:
+                        logger.error(f"Doc TOC skip {doc_id}: no LLM config")
+                        fail_count += 1
+                        return
+
+                    # 调用 LLM 推理
+                    entries = await asyncio.to_thread(
+                        refine_toc_with_llm,
+                        pdf_path=pdf_path,
+                        doc_items=doc_items,
+                        api_url=base_url,
+                        api_key=api_key,
+                        model=model,
+                        max_pages=request.max_pages,
+                        max_items=request.max_items,
+                    )
+
+                    if not entries:
+                        logger.warning(f"Doc TOC skip {doc_id}: LLM returned empty")
+                        fail_count += 1
+                        return
+
+                    # 构建 doc_tocs 记录
+                    tocs = []
+                    for i, entry in enumerate(entries):
+                        item_index = entry.get("item_index", 0)
+                        page = entry.get("page", 1)
+
+                        next_item_index = None
+                        for j in range(i + 1, len(entries)):
+                            if entries[j].get("level", 1) <= entry.get("level", 1):
+                                next_item_index = entries[j].get("item_index", 0) - 1
+                                break
+
+                        next_page = None
+                        for j in range(i + 1, len(entries)):
+                            if entries[j].get("level", 1) <= entry.get("level", 1):
+                                next_page = entries[j].get("page", 1) - 1
+                                break
+
+                        tocs.append({
+                            "title": entry.get("title", ""),
+                            "level": entry.get("level", 1),
+                            "start_page": page,
+                            "end_page": next_page,
+                            "start_item_index": item_index,
+                            "end_item_index": next_item_index,
+                            "parent_id": None,
+                        })
+
+                    # 构建 parent_id
+                    stack = []
+                    for i, toc in enumerate(tocs):
+                        level = toc["level"]
+                        while stack and stack[-1][0] >= level:
+                            stack.pop()
+                        if stack:
+                            toc["parent_id"] = stack[-1][1]
+                        stack.append((level, i))
+
+                    # 插入数据库
+                    inserted = insert_doc_tocs(doc_id, tocs)
+
+                    elapsed = time.time() - t0
+                    logger.info(f"Doc TOC {doc_id}: {inserted} entries in {elapsed:.1f}s")
+                    success_count += 1
+                except Exception as e:
+                    logger.error(f"Doc TOC failed for {doc_id}: {e}")
+                    fail_count += 1
+
+        tasks = [toc_one(doc) for doc in docs]
+        await asyncio.gather(*tasks)
+
+        return DocTocAllResponse(
+            success=True,
+            message=f"完成: {success_count} 成功, {fail_count} 失败",
+            total=len(docs),
+            parallel_count=request.parallel_count,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Batch Doc TOC failed: {e}")
+        raise HTTPException(status_code=500, detail=f"批量 Doc TOC 失败: {str(e)}")
