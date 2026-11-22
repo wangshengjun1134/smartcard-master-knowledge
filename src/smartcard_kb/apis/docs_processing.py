@@ -1518,12 +1518,12 @@ async def doc_toc_all(request: DocTocAllRequest):
     from pathlib import Path as PathLib
 
     try:
-        # 查询已解析的文档（有 section_header）
-        docs = query_documents_by_status(processing_status="parsed")
+        # 查询所有文档（不再限制状态，由断点续传逻辑跳过已处理的文档）
+        docs = query_documents_by_status()
         if not docs:
             return DocTocAllResponse(
                 success=True,
-                message="没有已解析的文档",
+                message="没有文档",
                 total=0,
                 parallel_count=request.parallel_count,
             )
