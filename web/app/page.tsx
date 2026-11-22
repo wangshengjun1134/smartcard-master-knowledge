@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { listDocuments, uploadDocument, deleteDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings, embeddingAllDocuments, getStatusCounts, pageIndex, pageIndexAll, summaryDocument, docToc, getDirectoryTree } from '@/lib/api'
+import { listDocuments, uploadDocument, deleteDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings, embeddingAllDocuments, getStatusCounts, docToc, getDirectoryTree } from '@/lib/api'
 import type { DocumentInfo } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -78,13 +78,11 @@ export default function Home() {
   const [chunkingAll, setChunkingAll] = useState(false)
   const [embeddingAll, setEmbeddingAll] = useState(false)
   const [extractingToc, setExtractingToc] = useState(false)
-  const [pageIndexRunning, setPageIndexRunning] = useState(false)
   const [parseAllDialogOpen, setParseAllDialogOpen] = useState(false)
   const [vlmAllDialogOpen, setVlmAllDialogOpen] = useState(false)
   const [chunkAllDialogOpen, setChunkAllDialogOpen] = useState(false)
   const [embeddingAllDialogOpen, setEmbeddingAllDialogOpen] = useState(false)
   const [tocAllDialogOpen, setTocAllDialogOpen] = useState(false)
-  const [pageIndexPathDialogOpen, setPageIndexPathDialogOpen] = useState(false)
   const [parseAllForm, setParseAllForm] = useState({
     parallel_count: 1,
     do_ocr: true,
@@ -346,33 +344,6 @@ export default function Home() {
     }
   }
 
-  const handleExtractTocAll = async () => {
-    setExtractingToc(true)
-    try {
-      const result = await pageIndexAll({
-        parallel_count: tocAllForm.parallel_count,
-        api_key: tocAllForm.api_key || undefined,
-        base_url: tocAllForm.base_url || undefined,
-        model: tocAllForm.model || undefined,
-        max_pages: tocAllForm.max_pages,
-      })
-      toast({
-        title: '批量 PageIndex 任务已提交',
-        description: result.message || `已提交 ${result.total} 个文档的 PageIndex 任务`,
-      })
-      await refreshData()
-      setTocAllDialogOpen(false)
-    } catch (error: any) {
-      toast({
-        title: '批量 PageIndex 失败',
-        description: error.response?.data?.detail || '请重试',
-        variant: 'destructive',
-      })
-    } finally {
-      setExtractingToc(false)
-    }
-  }
-
   const handleVLM = async (doc: DocumentInfo) => {
     setProcessingDoc(doc.id)
     setProcessingType('vlm')
@@ -449,54 +420,6 @@ export default function Home() {
     }
   }
 
-  const handlePageIndex = async (doc: DocumentInfo) => {
-    setProcessingDoc(doc.id)
-    setProcessingType('pageindex')
-    try {
-      const result = await pageIndex({
-        document_id: doc.id,
-      })
-      toast({
-        title: 'PageIndex 任务已提交',
-        description: result.message || '正在后台处理，请稍后刷新查看',
-      })
-      await refreshData()
-    } catch (error: any) {
-      toast({
-        title: 'PageIndex 失败',
-        description: error.response?.data?.detail || '请重试',
-        variant: 'destructive',
-      })
-    } finally {
-      setProcessingDoc(null)
-      setProcessingType(null)
-    }
-  }
-
-  const handleSummary = async (doc: DocumentInfo) => {
-    setProcessingDoc(doc.id)
-    setProcessingType('summary')
-    try {
-      const result = await summaryDocument({
-        document_id: doc.id,
-      })
-      toast({
-        title: 'Summary 任务已提交',
-        description: result.message || '正在后台处理，请稍后刷新查看',
-      })
-      await refreshData()
-    } catch (error: any) {
-      toast({
-        title: 'Summary 失败',
-        description: error.response?.data?.detail || '请重试',
-        variant: 'destructive',
-      })
-    } finally {
-      setProcessingDoc(null)
-      setProcessingType(null)
-    }
-  }
-
   const handleDocToc = async (doc: DocumentInfo) => {
     setProcessingDoc(doc.id)
     setProcessingType('doctoc')
@@ -563,18 +486,6 @@ export default function Home() {
     return <Badge variant={config.variant}>{config.label}</Badge>
   }
 
-  const getPageIndexBadge = (status?: string) => {
-    const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-      indexing: { label: 'PageIndex中', variant: 'default' },
-      indexed: { label: 'PageIndexed', variant: 'outline' },
-      index_failed: { label: 'PageIndex失败', variant: 'destructive' },
-      pi_vlm_completed: { label: 'Summarized', variant: 'outline' },
-      pi_vlm_failed: { label: 'Summary失败', variant: 'destructive' },
-    }
-    if (!status) return <Badge variant="secondary">-</Badge>
-    const config = statusMap[status] || { label: status, variant: 'outline' as const }
-    return <Badge variant={config.variant}>{config.label}</Badge>
-  }
 
   // 生成分页页码
   const getPageNumbers = () => {
@@ -675,46 +586,7 @@ export default function Home() {
               </div>
             </div>
             <div className="flex items-start gap-2 pb-1">
-              {/* Summarized */}
-              <div className="flex-1 min-w-[100px] flex flex-col items-center">
-                <div className="w-full flex flex-col items-center px-3 py-2 rounded-lg border border-border">
-                  <span className="text-xs font-semibold">Summarized</span>
-                  <span className="text-xs mt-1 px-2 py-0.5 rounded-full font-bold bg-muted text-muted-foreground">
-                    {statusCounts['pi_vlm_completed'] || 0}
-                  </span>
-                </div>
-                <div className="w-full mt-1 flex items-center justify-center gap-1 px-2 py-1 rounded-lg border border-destructive/30 bg-destructive/5 text-xs">
-                  <AlertCircle className="h-3 w-3 text-destructive" />
-                  <span className="text-xs font-medium text-destructive">Summary失败</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-destructive/10 text-destructive">
-                    {statusCounts['pi_vlm_failed'] || 0}
-                  </span>
-                </div>
-              </div>
-
-              {/* ← Arrow */}
-              <ArrowRight className="h-4 w-4 text-muted-foreground mt-2 flex-shrink-0 rotate-180" />
-
-              {/* PageIndexed */}
-              <div className="flex-1 min-w-[100px] flex flex-col items-center">
-                <div className="w-full flex flex-col items-center px-3 py-2 rounded-lg border border-border">
-                  <span className="text-xs font-semibold">PageIndexed</span>
-                  <span className="text-xs mt-1 px-2 py-0.5 rounded-full font-bold bg-muted text-muted-foreground">
-                    {statusCounts['indexed'] || 0}
-                  </span>
-                </div>
-                <div className="w-full mt-1 flex items-center justify-center gap-1 px-2 py-1 rounded-lg border border-destructive/30 bg-destructive/5 text-xs">
-                  <AlertCircle className="h-3 w-3 text-destructive" />
-                  <span className="text-xs font-medium text-destructive">PageIndex失败</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-destructive/10 text-destructive">
-                    {statusCounts['index_failed'] || 0}
-                  </span>
-                </div>
-              </div>
-
-              {/* ← Arrow */}
-              <ArrowRight className="h-4 w-4 text-muted-foreground mt-2 flex-shrink-0 rotate-180" />
-
+              
               {/* 全部 */}
               <button
                 onClick={() => { setPipelineFilter(''); setCurrentPage(1) }}
@@ -1462,100 +1334,7 @@ export default function Home() {
                   </DialogContent>
                 </Dialog>
 
-                {/* PageIndex Dialog */}
-                <Dialog open={tocAllDialogOpen} onOpenChange={setTocAllDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button
-                      disabled={extractingToc || totalDocs === 0}
-                      variant="secondary"
-                      size="sm"
-                      className="gap-1.5"
-                    >
-                      {extractingToc ? (
-                        <>
-                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                          处理中...
-                        </>
-                      ) : (
-                        <>
-                          <ListChecks className="h-4 w-4" />
-                          <span className="flex flex-col items-center leading-tight">
-                            <span>Page</span>
-                            <span>Index</span>
-                          </span>
-                        </>
-                      )}
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[500px]">
-                    <DialogHeader>
-                      <DialogTitle>批量 PageIndex</DialogTitle>
-                      <DialogDescription>
-                        使用 LLM 从 PDF 前 N 页提取目录结构，构建层级骨架
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="toc-parallel">并行数量</Label>
-                        <Input
-                          id="toc-parallel"
-                          type="number"
-                          min={1}
-                          max={10}
-                          value={tocAllForm.parallel_count}
-                          onChange={(e) => setTocAllForm({ ...tocAllForm, parallel_count: parseInt(e.target.value) || 1 })}
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="toc-pages">提取页数</Label>
-                        <Input
-                          id="toc-pages"
-                          type="number"
-                          min={1}
-                          max={20}
-                          value={tocAllForm.max_pages}
-                          onChange={(e) => setTocAllForm({ ...tocAllForm, max_pages: parseInt(e.target.value) || 5 })}
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="toc-api-key">LLM API Key（可选）</Label>
-                        <Input
-                          id="toc-api-key"
-                          type="password"
-                          placeholder="留空使用环境变量"
-                          value={tocAllForm.api_key}
-                          onChange={(e) => setTocAllForm({ ...tocAllForm, api_key: e.target.value })}
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="toc-base-url">Base URL（可选）</Label>
-                        <Input
-                          id="toc-base-url"
-                          placeholder="留空使用环境变量"
-                          value={tocAllForm.base_url}
-                          onChange={(e) => setTocAllForm({ ...tocAllForm, base_url: e.target.value })}
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="toc-model">模型名称（可选）</Label>
-                        <Input
-                          id="toc-model"
-                          placeholder="留空使用默认模型"
-                          value={tocAllForm.model}
-                          onChange={(e) => setTocAllForm({ ...tocAllForm, model: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setTocAllDialogOpen(false)} disabled={extractingToc}>
-                        取消
-                      </Button>
-                      <Button onClick={handleExtractTocAll} disabled={extractingToc}>
-                        {extractingToc ? '提交中...' : '确认提交'}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+             
           </div>
           </div>
 
@@ -1581,7 +1360,6 @@ export default function Home() {
                         <TableHead className="hidden sm:table-cell h-8 px-2 py-1">系列 ID</TableHead>
                         <TableHead className="hidden sm:table-cell h-8 px-2 py-1">修订版本</TableHead>
                         <TableHead className="h-8 px-2 py-1">状态</TableHead>
-                        <TableHead className="h-8 px-2 py-1">PageIndex</TableHead>
                         <TableHead className="h-8 px-2 py-1">操作</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1601,7 +1379,6 @@ export default function Home() {
                             {doc.revision || '-'}
                           </TableCell>
                           <TableCell className="px-2 py-1">{getStatusBadge(doc.processing_status)}</TableCell>
-                          <TableCell className="px-2 py-1">{getPageIndexBadge(doc.page_index_status)}</TableCell>
                           <TableCell className="px-2 py-1">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -1633,14 +1410,6 @@ export default function Home() {
                                   {processingDoc === doc.id && processingType === 'embedding' ? '嵌入中...' : '嵌入'}
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => handlePageIndex(doc)} disabled={processingDoc === doc.id}>
-                                  <ListChecks className="h-4 w-4 mr-2" />
-                                  {processingDoc === doc.id && processingType === 'pageindex' ? 'PageIndex中...' : 'PageIndex'}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleSummary(doc)} disabled={processingDoc === doc.id}>
-                                  <FileText className="h-4 w-4 mr-2" />
-                                  {processingDoc === doc.id && processingType === 'summary' ? 'Summary中...' : 'Summary'}
-                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleDocToc(doc)} disabled={processingDoc === doc.id}>
                                   <ListTree className="h-4 w-4 mr-2" />
                                   {processingDoc === doc.id && processingType === 'doctoc' ? '生成目录中...' : '生成目录'}

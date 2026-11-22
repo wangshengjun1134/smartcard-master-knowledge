@@ -3,8 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getDocument, listDocumentItems, getItemStatistics, listDocumentChunks, getPageIndexData } from '@/lib/api'
-import type { PageIndexData } from '@/lib/api'
+import { getDocument, listDocumentItems, getItemStatistics, listDocumentChunks } from '@/lib/api'
 import type { DocumentInfo, DocItem, Chunk, ItemStatistics, PaginatedItemsResponse } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -20,7 +19,7 @@ import { useToast } from '@/hooks/use-toast'
 import { formatDate, truncateText } from '@/lib/utils'
 import { ArrowLeft, FileText, Table2, Image, List, Hash, BookOpen, ChevronLeft, ChevronRight, Blocks, Scan, Link2, Eye, ChevronDown } from 'lucide-react'
 
-type TabType = 'items' | 'chunks' | 'skeleton' | 'summary'
+type TabType = 'items' | 'chunks'
 
 export default function DocumentDetail() {
   const params = useParams()
@@ -49,24 +48,6 @@ export default function DocumentDetail() {
   const [chunkTotalItems, setChunkTotalItems] = useState(0)
   const chunkPageSize = 20
   const [imageViewer, setImageViewer] = useState<{ open: boolean; src: string; title: string }>({ open: false, src: '', title: '' })
-  const [pageIndexData, setPageIndexData] = useState<PageIndexData | null>(null)
-  const [pageIndexLoading, setPageIndexLoading] = useState(false)
-
-  const loadPageIndexData = async () => {
-    if (pageIndexData) return // 已加载过
-    setPageIndexLoading(true)
-    try {
-      const data = await getPageIndexData(documentId)
-      setPageIndexData(data)
-    } catch (error: any) {
-      // 404 表示尚未执行 PageIndex，不报错
-      if (error?.response?.status !== 404) {
-        toast({ title: '加载失败', description: error?.response?.data?.detail || '请重试', variant: 'destructive' })
-      }
-    } finally {
-      setPageIndexLoading(false)
-    }
-  }
 
   const toggleItem = (itemId: string) => {
     setExpandedItems(prev => {
@@ -359,28 +340,6 @@ export default function DocumentDetail() {
             >
               <Blocks className="h-4 w-4 inline mr-2" />
               Chunk 信息 ({chunks.length})
-            </button>
-            <button
-              onClick={() => { setActiveTab('skeleton'); loadPageIndexData() }}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'skeleton'
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <List className="h-4 w-4 inline mr-2" />
-              Skeleton
-            </button>
-            <button
-              onClick={() => { setActiveTab('summary'); loadPageIndexData() }}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'summary'
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <BookOpen className="h-4 w-4 inline mr-2" />
-              Summary
             </button>
           </div>
         </div>
@@ -795,40 +754,6 @@ export default function DocumentDetail() {
                   )}
                 </div>
               )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Skeleton Tab */}
-        {activeTab === 'skeleton' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Skeleton 骨架树</CardTitle>
-              <CardDescription>
-                {pageIndexLoading ? '加载中...' : pageIndexData ? `${pageIndexData.toc_entry_count} 个节点，模型: ${pageIndexData.llm_model || '-'}` : '尚未执行 PageIndex'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {pageIndexLoading && <div className="text-sm text-muted-foreground">加载中...</div>}
-              {pageIndexData?.skeleton && <JsonTree data={pageIndexData.skeleton} />}
-              {!pageIndexLoading && !pageIndexData?.skeleton && <div className="text-sm text-muted-foreground">暂无数据</div>}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Summary Tab */}
-        {activeTab === 'summary' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Summary 章节摘要</CardTitle>
-              <CardDescription>
-                {pageIndexLoading ? '加载中...' : pageIndexData ? `${pageIndexData.summary_count} 个摘要，模型: ${pageIndexData.llm_model || '-'}` : '尚未执行 Summary'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {pageIndexLoading && <div className="text-sm text-muted-foreground">加载中...</div>}
-              {pageIndexData?.summary && <JsonTree data={pageIndexData.summary} />}
-              {!pageIndexLoading && !pageIndexData?.summary && <div className="text-sm text-muted-foreground">暂无数据</div>}
             </CardContent>
           </Card>
         )}
