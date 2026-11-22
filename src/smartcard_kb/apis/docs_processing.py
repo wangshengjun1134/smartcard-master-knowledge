@@ -1825,3 +1825,284 @@ async def doc_toc_all(request: DocTocAllRequest):
     except Exception as e:
         logger.error(f"Batch Doc TOC failed: {e}")
         raise HTTPException(status_code=500, detail=f"批量 Doc TOC 失败: {str(e)}")
+
+
+# ==================== Doc Summary（分层概要提取） ====================
+
+
+class DocSummaryRequest(BaseModel):
+    """单文档概要提取请求"""
+    document_id: str
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    model: Optional[str] = None
+
+
+class DocSummaryResponse(BaseModel):
+    """单文档概要提取响应"""
+    success: bool
+    message: str
+    processed_count: int = 0
+
+
+@router.post("/doc-summary", response_model=DocSummaryResponse)
+async def doc_summary(request: DocSummaryRequest):
+    """
+    对单个文档执行分层概要提取
+
+    - **document_id**: 文档 ID
+    - **api_key**: LLM API Key（可选）
+    - **base_url**: LLM API URL（可选）
+    - **model**: LLM 模型名（可选）
+    """
+    import sys
+    import psycopg2
+    import psycopg2.extras
+    from pathlib import Path as PathLib
+
+    try:
+        # 查询文档信息
+        docs = query_document_info(document_id=request.document_id)
+        if not docs:
+            raise HTTPException(status_code=404, detail=f"文档 {request.document_id} 不存在")
+
+        # LLM 参数
+        api_key = request.api_key or settings.openai_api_key
+        base_url = request.base_url or settings.openai_base_url
+        model = request.model or settings.openai_model
+
+        if not api_key or not base_url:
+            raise HTTPException(
+                status_code=400,
+                detail="未配置 LLM API。请提供 api_key 和 base_url，或在环境变量中设置"
+            )
+
+        logger.info(f"Doc Summary for document {request.document_id}")
+
+        # 查询 doc_tocs
+        from smartcard_kb.docs_compile.database import get_connection, query_doc_tocs, update_doc_toc_summaries
+        tocs = query_doc_tocs(request.document_id)
+        if not tocs:
+            return DocSummaryResponse(
+                success=False,
+                message="该文档没有目录结构，请先执行「生成目录」",
+                processed_count=0,
+            )
+
+        # 添加 tests 目录到 path
+        project_root = PathLib(__file__).parent.parent.parent.parent
+        tests_dir = str(project_root / "tests")
+        if tests_dir not in sys.path:
+            sys.path.insert(0, tests_dir)
+
+        from summary_extractor_llm import extract_summary_with_llm
+
+        # 构建 id -> toc 映射和父子关系
+        toc_map = {toc["id"]: toc for toc in tocs}
+        children_map = {}  # parent_id -> [child_tocs]
+        for toc in tocs:
+            parent_id = toc.get("parent_id")
+            if parent_id:
+                if parent_id not in children_map:
+                    children_map[parent_id] = []
+                children_map[parent_id].append(toc)
+
+        # 查询所有 doc_items 用于获取章节内容
+        conn = get_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor.execute(
+            """
+            SELECT order_index, text, label, page_id
+            FROM doc_items
+            WHERE document_id = %s
+            ORDER BY order_index
+            """,
+            (request.document_id,),
+        )
+        all_items = [dict(row) for row in cursor.fetchall()]
+        cursor.close()
+        conn.close()
+
+        # 构建 order_index -> item 映射
+        items_by_order = {item["order_index"]: item for item in all_items}
+        all_order_indices = sorted(items_by_order.keys())
+
+        # 按层级分组（从大到小，即从最底层开始）
+        levels = sorted(set(toc["level"] for toc in tocs), reverse=True)
+        processed_count = 0
+
+        for level in levels:
+            level_tocs = [toc for toc in tocs if toc["level"] == level]
+            logger.info(f"Processing level {level}: {len(level_tocs)} nodes")
+
+            for toc in level_tocs:
+                toc_id = toc["id"]
+                title = toc["title"]
+                start_item_index = toc.get("start_item_index", 0)
+                end_item_index = toc.get("end_item_index")
+
+                # 获取该章节范围内的 items 内容
+                content_parts = []
+                for order in all_order_indices:
+                    if order < start_item_index:
+                        continue
+                    if end_item_index is not None and order > end_item_index:
+                        break
+                    item = items_by_order[order]
+                    text = item.get("text", "").strip()
+                    label = item.get("label", "")
+                    if text:
+                        content_parts.append(f"[{label}] {text}")
+                content = "\n".join(content_parts)
+
+                # 获取子节点概要（如果有）
+                children_summaries = []
+                if toc_id in children_map:
+                    for child in children_map[toc_id]:
+                        child_summary = child.get("summary_512") or child.get("summary_256") or ""
+                        if child_summary:
+                            children_summaries.append({
+                                "title": child["title"],
+                                "summary": child_summary,
+                            })
+
+                # 调用 LLM 提取概要
+                try:
+                    summaries = await asyncio.to_thread(
+                        extract_summary_with_llm,
+                        title=title,
+                        level=level,
+                        content=content,
+                        children_summaries=children_summaries if children_summaries else None,
+                        api_url=base_url,
+                        api_key=api_key,
+                        model=model,
+                    )
+                    # 更新数据库
+                    update_doc_toc_summaries(
+                        toc_id=toc_id,
+                        summary_256=summaries.get("summary_256"),
+                        summary_512=summaries.get("summary_512"),
+                        summary_1024=summaries.get("summary_1024"),
+                    )
+                    processed_count += 1
+                    # 更新 toc_map 中的概要，供父节点使用
+                    toc_map[toc_id].update(summaries)
+                except Exception as e:
+                    logger.error(f"Summary extraction failed for toc {toc_id} '{title}': {e}")
+
+        return DocSummaryResponse(
+            success=True,
+            message=f"成功处理 {processed_count} 个章节",
+            processed_count=processed_count,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Doc Summary failed for {request.document_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"概要提取失败: {str(e)}")
+
+
+class DocSummaryAllRequest(BaseModel):
+    """批量概要提取请求"""
+    parallel_count: int = 1
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    model: Optional[str] = None
+
+
+class DocSummaryAllResponse(BaseModel):
+    """批量概要提取响应"""
+    success: bool
+    message: str
+    total: int
+    parallel_count: int
+
+
+@router.post("/doc-summary-all", response_model=DocSummaryAllResponse)
+async def doc_summary_all(request: DocSummaryAllRequest):
+    """
+    批量执行概要提取
+
+    - **parallel_count**: 并行数量（默认 1）
+    - **api_key**: LLM API Key（可选）
+    - **base_url**: LLM API URL（可选）
+    - **model**: LLM 模型名（可选）
+    """
+    import sys
+    import psycopg2
+    import psycopg2.extras
+
+    try:
+        # 查询所有有 doc_tocs 的文档
+        from smartcard_kb.docs_compile.database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor.execute("""
+            SELECT DISTINCT document_id FROM doc_tocs
+        """)
+        doc_ids = [row["document_id"] for row in cursor.fetchall()]
+        cursor.close()
+        conn.close()
+
+        if not doc_ids:
+            return DocSummaryAllResponse(
+                success=True,
+                message="没有已生成目录的文档",
+                total=0,
+                parallel_count=request.parallel_count,
+            )
+
+        # 查询这些文档的详情
+        docs = []
+        for doc_id in doc_ids:
+            doc_list = query_document_info(document_id=doc_id)
+            if doc_list:
+                docs.append(doc_list[0])
+
+        logger.info(f"Batch Doc Summary: {len(docs)} documents, parallel={request.parallel_count}")
+
+        sem = asyncio.Semaphore(request.parallel_count)
+        success_count = 0
+        fail_count = 0
+
+        async def summary_one(doc):
+            nonlocal success_count, fail_count
+            async with sem:
+                doc_id = doc["id"]
+                t0 = time.time()
+                try:
+                    # 构造单文档请求
+                    single_request = DocSummaryRequest(
+                        document_id=doc_id,
+                        api_key=request.api_key,
+                        base_url=request.base_url,
+                        model=request.model,
+                    )
+                    result = await doc_summary(single_request)
+                    elapsed = time.time() - t0
+                    logger.info(f"Doc Summary {doc_id}: {result.processed_count} nodes in {elapsed:.1f}s")
+                    if result.success:
+                        success_count += 1
+                    else:
+                        fail_count += 1
+                except Exception as e:
+                    logger.error(f"Doc Summary failed for {doc_id}: {e}")
+                    fail_count += 1
+
+        tasks = [summary_one(doc) for doc in docs]
+        await asyncio.gather(*tasks)
+
+        return DocSummaryAllResponse(
+            success=True,
+            message=f"完成: {success_count} 成功, {fail_count} 失败",
+            total=len(docs),
+            parallel_count=request.parallel_count,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Batch Doc Summary failed: {e}")
+        raise HTTPException(status_code=500, detail=f"批量概要提取失败: {str(e)}")
