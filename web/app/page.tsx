@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { listDocuments, uploadDocument, deleteDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings, embeddingAllDocuments, getStatusCounts, docToc, docSummary, getDirectoryTree } from '@/lib/api'
+import { listDocuments, uploadDocument, deleteDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings, embeddingAllDocuments, getStatusCounts, docToc, docTocAll, docSummary, docSummaryAll, getDirectoryTree } from '@/lib/api'
 import type { DocumentInfo } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -78,11 +78,14 @@ export default function Home() {
   const [chunkingAll, setChunkingAll] = useState(false)
   const [embeddingAll, setEmbeddingAll] = useState(false)
   const [extractingToc, setExtractingToc] = useState(false)
+  const [tocAll, setTocAll] = useState(false)
+  const [summaryAll, setSummaryAll] = useState(false)
   const [parseAllDialogOpen, setParseAllDialogOpen] = useState(false)
   const [vlmAllDialogOpen, setVlmAllDialogOpen] = useState(false)
   const [chunkAllDialogOpen, setChunkAllDialogOpen] = useState(false)
   const [embeddingAllDialogOpen, setEmbeddingAllDialogOpen] = useState(false)
   const [tocAllDialogOpen, setTocAllDialogOpen] = useState(false)
+  const [summaryAllDialogOpen, setSummaryAllDialogOpen] = useState(false)
   const [parseAllForm, setParseAllForm] = useState({
     parallel_count: 1,
     do_ocr: true,
@@ -119,6 +122,12 @@ export default function Home() {
     base_url: '',
     model: '',
     max_pages: 5,
+  })
+  const [summaryAllForm, setSummaryAllForm] = useState({
+    parallel_count: 1,
+    api_key: '',
+    base_url: '',
+    model: '',
   })
   // Pipeline filter state
   const [pipelineFilter, setPipelineFilter] = useState<string>('')
@@ -341,6 +350,59 @@ export default function Home() {
       })
     } finally {
       setEmbeddingAll(false)
+    }
+  }
+
+  const handleTocAll = async () => {
+    setTocAll(true)
+    try {
+      const result = await docTocAll({
+        parallel_count: tocAllForm.parallel_count,
+        api_key: tocAllForm.api_key || undefined,
+        base_url: tocAllForm.base_url || undefined,
+        model: tocAllForm.model || undefined,
+        max_pages: tocAllForm.max_pages,
+      })
+      toast({
+        title: '批量生成目录任务已提交',
+        description: result.message || `已提交 ${result.total} 个文档的目录生成任务`,
+      })
+      await refreshData()
+      setTocAllDialogOpen(false)
+    } catch (error: any) {
+      toast({
+        title: '批量生成目录失败',
+        description: error.response?.data?.detail || '请重试',
+        variant: 'destructive',
+      })
+    } finally {
+      setTocAll(false)
+    }
+  }
+
+  const handleSummaryAll = async () => {
+    setSummaryAll(true)
+    try {
+      const result = await docSummaryAll({
+        parallel_count: summaryAllForm.parallel_count,
+        api_key: summaryAllForm.api_key || undefined,
+        base_url: summaryAllForm.base_url || undefined,
+        model: summaryAllForm.model || undefined,
+      })
+      toast({
+        title: '批量提取概要任务已提交',
+        description: result.message || `已提交 ${result.total} 个文档的概要提取任务`,
+      })
+      await refreshData()
+      setSummaryAllDialogOpen(false)
+    } catch (error: any) {
+      toast({
+        title: '批量提取概要失败',
+        description: error.response?.data?.detail || '请重试',
+        variant: 'destructive',
+      })
+    } finally {
+      setSummaryAll(false)
     }
   }
 
@@ -1358,7 +1420,178 @@ export default function Home() {
                   </DialogContent>
                 </Dialog>
 
-             
+                {/* 批量生成目录 Dialog */}
+                <Dialog open={tocAllDialogOpen} onOpenChange={setTocAllDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      disabled={tocAll || totalDocs === 0}
+                      variant="secondary"
+                      size="sm"
+                      className="gap-1.5"
+                    >
+                      {tocAll ? (
+                        <>
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          目录生成中...
+                        </>
+                      ) : (
+                        <>
+                          <ListTree className="h-4 w-4" />
+                          生成目录
+                        </>
+                      )}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>批量生成目录</DialogTitle>
+                      <DialogDescription>
+                        对所有已解析的文档生成目录结构
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="toc-parallel">并行数量</Label>
+                        <Input
+                          id="toc-parallel"
+                          type="number"
+                          min="1"
+                          max="10"
+                          value={tocAllForm.parallel_count}
+                          onChange={(e) => setTocAllForm({ ...tocAllForm, parallel_count: parseInt(e.target.value) || 1 })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="toc-max-pages">PDF 目录提取页数</Label>
+                        <Input
+                          id="toc-max-pages"
+                          type="number"
+                          min="1"
+                          max="20"
+                          value={tocAllForm.max_pages}
+                          onChange={(e) => setTocAllForm({ ...tocAllForm, max_pages: parseInt(e.target.value) || 5 })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="toc-api-key">API Key（可选）</Label>
+                        <Input
+                          id="toc-api-key"
+                          placeholder="留空使用默认配置"
+                          value={tocAllForm.api_key}
+                          onChange={(e) => setTocAllForm({ ...tocAllForm, api_key: e.target.value })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="toc-base-url">API Base URL（可选）</Label>
+                        <Input
+                          id="toc-base-url"
+                          placeholder="留空使用默认配置"
+                          value={tocAllForm.base_url}
+                          onChange={(e) => setTocAllForm({ ...tocAllForm, base_url: e.target.value })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="toc-model">模型名称（可选）</Label>
+                        <Input
+                          id="toc-model"
+                          placeholder="留空使用默认模型"
+                          value={tocAllForm.model}
+                          onChange={(e) => setTocAllForm({ ...tocAllForm, model: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setTocAllDialogOpen(false)} disabled={tocAll}>
+                        取消
+                      </Button>
+                      <Button onClick={handleTocAll} disabled={tocAll}>
+                        {tocAll ? '提交中...' : '确认提交'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                {/* 批量提取概要 Dialog */}
+                <Dialog open={summaryAllDialogOpen} onOpenChange={setSummaryAllDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      disabled={summaryAll || totalDocs === 0}
+                      variant="secondary"
+                      size="sm"
+                      className="gap-1.5"
+                    >
+                      {summaryAll ? (
+                        <>
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          概要提取中...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="h-4 w-4" />
+                          提取概要
+                        </>
+                      )}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>批量提取概要</DialogTitle>
+                      <DialogDescription>
+                        对所有已生成目录的文档提取分层概要
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="summary-parallel">并行数量</Label>
+                        <Input
+                          id="summary-parallel"
+                          type="number"
+                          min="1"
+                          max="10"
+                          value={summaryAllForm.parallel_count}
+                          onChange={(e) => setSummaryAllForm({ ...summaryAllForm, parallel_count: parseInt(e.target.value) || 1 })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="summary-api-key">API Key（可选）</Label>
+                        <Input
+                          id="summary-api-key"
+                          placeholder="留空使用默认配置"
+                          value={summaryAllForm.api_key}
+                          onChange={(e) => setSummaryAllForm({ ...summaryAllForm, api_key: e.target.value })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="summary-base-url">API Base URL（可选）</Label>
+                        <Input
+                          id="summary-base-url"
+                          placeholder="留空使用默认配置"
+                          value={summaryAllForm.base_url}
+                          onChange={(e) => setSummaryAllForm({ ...summaryAllForm, base_url: e.target.value })}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="summary-model">模型名称（可选）</Label>
+                        <Input
+                          id="summary-model"
+                          placeholder="留空使用默认模型"
+                          value={summaryAllForm.model}
+                          onChange={(e) => setSummaryAllForm({ ...summaryAllForm, model: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setSummaryAllDialogOpen(false)} disabled={summaryAll}>
+                        取消
+                      </Button>
+                      <Button onClick={handleSummaryAll} disabled={summaryAll}>
+                        {summaryAll ? '提交中...' : '确认提交'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+
           </div>
           </div>
 
