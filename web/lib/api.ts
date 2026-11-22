@@ -172,20 +172,6 @@ export async function getDocumentPageCount(documentId: string): Promise<number> 
   return response.data.total_pages
 }
 
-export interface PageIndexData {
-  status: string
-  skeleton: any[]
-  summary: any[]
-  toc_entry_count: number
-  summary_count: number
-  llm_model: string
-}
-
-export async function getPageIndexData(documentId: string): Promise<PageIndexData> {
-  const response = await api.get(`/api/docs/${documentId}/page-index-data`)
-  return response.data
-}
-
 // ==================== 文档处理流程 API ====================
 
 export async function parseDocument(request: {
@@ -435,78 +421,6 @@ export async function extractTocAll(request: {
   max_pages?: number
 }): Promise<ExtractTocAllResponse> {
   const response = await api.post('/api/docs/extract-toc-all', request)
-  return response.data
-}
-
-// ==================== PageIndex API ====================
-
-export interface PageIndexResponse {
-  success: boolean
-  message: string
-  toc_count: number
-}
-
-export async function pageIndex(request: {
-  document_id: string
-  api_key?: string
-  base_url?: string
-  model?: string
-  max_pages?: number
-}): Promise<PageIndexResponse> {
-  const response = await api.post('/api/docs/page-index', request)
-  return response.data
-}
-
-export interface PageIndexAllResponse {
-  success: boolean
-  message: string
-  total: number
-  parallel_count: number
-}
-
-export async function pageIndexAll(request: {
-  parallel_count?: number
-  api_key?: string
-  base_url?: string
-  model?: string
-  max_pages?: number
-}): Promise<PageIndexAllResponse> {
-  const response = await api.post('/api/docs/page-index-all', request)
-  return response.data
-}
-
-// ==================== Summary API ====================
-
-export interface SummaryResponse {
-  success: boolean
-  message: string
-  summary_count: number
-}
-
-export async function summaryDocument(request: {
-  document_id: string
-  api_key?: string
-  base_url?: string
-  model?: string
-}): Promise<SummaryResponse> {
-  const response = await api.post('/api/docs/summary', request)
-  return response.data
-}
-
-export interface SummaryAllResponse {
-  success: boolean
-  message: string
-  total: number
-  parallel_count: number
-}
-
-export async function summaryAll(request: {
-  parallel_count?: number
-  api_key?: string
-  base_url?: string
-  model?: string
-}): Promise<SummaryAllResponse> {
-  const response = await api.post('/api/docs/summary-all', request)
   return response.data
 }
 
