@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { listDocuments, uploadDocument, deleteDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings, embeddingAllDocuments, getStatusCounts, docToc, getDirectoryTree } from '@/lib/api'
+import { listDocuments, uploadDocument, deleteDocument, parseDocument, parseAllDocuments, vlmAllDocuments, generateVLMDocuments, chunkDocument, chunkAllDocuments, generateEmbeddings, embeddingAllDocuments, getStatusCounts, docToc, docSummary, getDirectoryTree } from '@/lib/api'
 import type { DocumentInfo } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -435,6 +435,30 @@ export default function Home() {
     } catch (error: any) {
       toast({
         title: '生成目录 失败',
+        description: error.response?.data?.detail || '请重试',
+        variant: 'destructive',
+      })
+    } finally {
+      setProcessingDoc(null)
+      setProcessingType(null)
+    }
+  }
+
+  const handleDocSummary = async (doc: DocumentInfo) => {
+    setProcessingDoc(doc.id)
+    setProcessingType('docsummary')
+    try {
+      const result = await docSummary({
+        document_id: doc.id,
+      })
+      toast({
+        title: '提取概要 任务已提交',
+        description: result.message || '正在后台处理，请稍后刷新查看',
+      })
+      await refreshData()
+    } catch (error: any) {
+      toast({
+        title: '提取概要 失败',
         description: error.response?.data?.detail || '请重试',
         variant: 'destructive',
       })
@@ -1413,6 +1437,10 @@ export default function Home() {
                                 <DropdownMenuItem onClick={() => handleDocToc(doc)} disabled={processingDoc === doc.id}>
                                   <ListTree className="h-4 w-4 mr-2" />
                                   {processingDoc === doc.id && processingType === 'doctoc' ? '生成目录中...' : '生成目录'}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDocSummary(doc)} disabled={processingDoc === doc.id}>
+                                  <FileText className="h-4 w-4 mr-2" />
+                                  {processingDoc === doc.id && processingType === 'docsummary' ? '提取概要中...' : '提取概要'}
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={() => window.open(`/api/docs/${doc.id}/download`, '_blank')}>

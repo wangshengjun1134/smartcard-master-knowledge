@@ -462,3 +462,38 @@ export async function docTocAll(request: {
   const response = await api.post('/api/docs/doc-toc-all', request)
   return response.data
 }
+
+// ==================== Doc Summary API ====================
+
+export interface DocSummaryResponse {
+  success: boolean
+  message: string
+  processed_count: number
+}
+
+export async function docSummary(request: {
+  document_id: string
+  api_key?: string
+  base_url?: string
+  model?: string
+}): Promise<DocSummaryResponse> {
+  const response = await api.post('/api/docs/doc-summary', request)
+  return response.data
+}
+
+export interface DocSummaryAllResponse {
+  success: boolean
+  message: string
+  total: number
+  parallel_count: number
+}
+
+export async function docSummaryAll(request: {
+  parallel_count?: number
+  api_key?: string
+  base_url?: string
+  model?: string
+}): Promise<DocSummaryAllResponse> {
+  const response = await api.post('/api/docs/doc-summary-all', request)
+  return response.data
+}
