@@ -1503,35 +1503,69 @@ async def doc_toc(request: DocTocRequest):
                 toc_count=0,
             )
 
+        # 查询所有 doc_items 用于计算 end_page/end_item_index
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor.execute(
+            """
+            SELECT order_index, page_id
+            FROM doc_items
+            WHERE document_id = %s
+            ORDER BY order_index
+            """,
+            (request.document_id,),
+        )
+        all_items = [dict(row) for row in cursor.fetchall()]
+        cursor.close()
+        conn.close()
+
+        # 构建 order_index -> (page_id, order_index) 的映射，便于快速查找
+        items_by_order = {item["order_index"]: item for item in all_items}
+        all_order_indices = sorted(items_by_order.keys())
+
         # 构建 doc_tocs 记录（计算 start/end_page, start/end_item_index, parent_id）
         tocs = []
         for i, entry in enumerate(entries):
             item_index = entry.get("item_index", 0)
             page = entry.get("page", 1)
 
-            # 找下一个同级或更高级标题的 item_index 作为 end
+            # 找下一个同级或更高级标题的 item_index
             next_item_index = None
             for j in range(i + 1, len(entries)):
                 next_entry = entries[j]
                 if next_entry.get("level", 1) <= entry.get("level", 1):
-                    next_item_index = next_entry.get("item_index", 0) - 1
+                    next_item_index = next_entry.get("item_index", 0)
                     break
 
-            # end_page: 下一个同级标题的起始页
-            next_page = None
-            for j in range(i + 1, len(entries)):
-                next_entry = entries[j]
-                if next_entry.get("level", 1) <= entry.get("level", 1):
-                    next_page = next_entry.get("page", 1) - 1  # 前一页
-                    break
+            # 通过 doc_items 计算 end_page 和 end_item_index
+            # 范围：[item_index, next_item_index - 1]
+            end_page = None
+            end_item_index = None
+
+            if next_item_index is not None:
+                # 找到范围内最后一个 order_index <= next_item_index - 1 的 item
+                # 即找到 < next_item_index 的最大 order_index
+                candidate_orders = [o for o in all_order_indices if o < next_item_index and o >= item_index]
+                if candidate_orders:
+                    last_order = max(candidate_orders)
+                    last_item = items_by_order[last_order]
+                    end_page = last_item["page_id"]
+                    end_item_index = last_order
+            else:
+                # 最后一个章节，找文档末尾的 item
+                candidate_orders = [o for o in all_order_indices if o >= item_index]
+                if candidate_orders:
+                    last_order = max(candidate_orders)
+                    last_item = items_by_order[last_order]
+                    end_page = last_item["page_id"]
+                    end_item_index = last_order
 
             tocs.append({
                 "title": entry.get("title", ""),
                 "level": entry.get("level", 1),
                 "start_page": page,
-                "end_page": next_page,  # 可能为 None，表示到文档末尾
+                "end_page": end_page,
                 "start_item_index": item_index,
-                "end_item_index": next_item_index,  # 可能为 None
+                "end_item_index": end_item_index,
                 "parent_id": None,  # 后续构建父子关系
             })
 
@@ -1690,31 +1724,65 @@ async def doc_toc_all(request: DocTocAllRequest):
                         fail_count += 1
                         return
 
+                    # 查询所有 doc_items 用于计算 end_page/end_item_index
+                    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                    cursor.execute(
+                        """
+                        SELECT order_index, page_id
+                        FROM doc_items
+                        WHERE document_id = %s
+                        ORDER BY order_index
+                        """,
+                        (doc_id,),
+                    )
+                    all_items = [dict(row) for row in cursor.fetchall()]
+                    cursor.close()
+
+                    # 构建 order_index -> (page_id, order_index) 的映射
+                    items_by_order = {item["order_index"]: item for item in all_items}
+                    all_order_indices = sorted(items_by_order.keys())
+
                     # 构建 doc_tocs 记录
                     tocs = []
                     for i, entry in enumerate(entries):
                         item_index = entry.get("item_index", 0)
                         page = entry.get("page", 1)
 
+                        # 找下一个同级或更高级标题的 item_index
                         next_item_index = None
                         for j in range(i + 1, len(entries)):
                             if entries[j].get("level", 1) <= entry.get("level", 1):
-                                next_item_index = entries[j].get("item_index", 0) - 1
+                                next_item_index = entries[j].get("item_index", 0)
                                 break
 
-                        next_page = None
-                        for j in range(i + 1, len(entries)):
-                            if entries[j].get("level", 1) <= entry.get("level", 1):
-                                next_page = entries[j].get("page", 1) - 1
-                                break
+                        # 通过 doc_items 计算 end_page 和 end_item_index
+                        end_page = None
+                        end_item_index = None
+
+                        if next_item_index is not None:
+                            # 找到范围内最后一个 order_index < next_item_index 的 item
+                            candidate_orders = [o for o in all_order_indices if o < next_item_index and o >= item_index]
+                            if candidate_orders:
+                                last_order = max(candidate_orders)
+                                last_item = items_by_order[last_order]
+                                end_page = last_item["page_id"]
+                                end_item_index = last_order
+                        else:
+                            # 最后一个章节，找文档末尾的 item
+                            candidate_orders = [o for o in all_order_indices if o >= item_index]
+                            if candidate_orders:
+                                last_order = max(candidate_orders)
+                                last_item = items_by_order[last_order]
+                                end_page = last_item["page_id"]
+                                end_item_index = last_order
 
                         tocs.append({
                             "title": entry.get("title", ""),
                             "level": entry.get("level", 1),
                             "start_page": page,
-                            "end_page": next_page,
+                            "end_page": end_page,
                             "start_item_index": item_index,
-                            "end_item_index": next_item_index,
+                            "end_item_index": end_item_index,
                             "parent_id": None,
                         })
 

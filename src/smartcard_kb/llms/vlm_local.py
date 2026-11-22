@@ -79,7 +79,7 @@ class LocalQwenVLMBackend(VLMBackend):
         logger.debug(f"Input tokens: {inputs.input_ids.shape[1]}")
         logger.debug(f"Output tokens: {generated_ids_trimmed[0].shape[0]}")
         logger.debug(f"\n💬 Response Content ({len(content)} chars):")
-        logger.debug(f"  {content[:500]}...")
+        logger.debug(f"  {content[:]}")
         logger.debug("="*80 + "\n")
 
         return content

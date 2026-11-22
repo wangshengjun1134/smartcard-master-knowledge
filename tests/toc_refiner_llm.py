@@ -239,7 +239,7 @@ def _call_llm_for_refined_toc(
         logger.info("-" * 80)
         logger.info("Response Content:")
         content = choice["message"]["content"]
-        logger.info(content[:3000] + "..." if len(content) > 3000 else content)
+        logger.info(content)
     else:
         logger.info(f"Unexpected response format: {result}")
     logger.info("=" * 80)

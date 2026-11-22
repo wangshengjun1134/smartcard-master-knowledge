@@ -98,7 +98,7 @@ class OpenAICompatibleBackend(VLMBackend):
 
         content = response.choices[0].message.content
         logger.debug(f"\n💬 Response Content ({len(content)} chars):")
-        logger.debug(f"  {content[:500]}...")
+        logger.debug(f"  {content[:]}")
         logger.debug("="*80 + "\n")
 
         return content
