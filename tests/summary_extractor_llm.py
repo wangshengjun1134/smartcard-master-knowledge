@@ -26,12 +26,14 @@ SUMMARY_EXTRACTOR_SYSTEM_PROMPT = """你是一个文档概要提取专家。你�
 2. **章节层级**：当前章节在文档结构中的层级（1=一级, 2=二级...）
 3. **章节内容**：当前章节范围内的所有 doc_items 内容（包括文本、表格描述、图片描述等）
 4. **子节点概要**（可选）：如果当前章节有子章节，会提供子章节的概要信息
+5. **目标语言**：概要应使用的语言（如 en/zh/ja 等）
 
 **任务要求：**
 
 1. 仔细阅读章节内容，提取核心信息和关键要点
 2. 如果有子节点概要，需要综合子节点概要和自身内容，生成更高层次的概括
 3. 输出指定长度的概要（目标字符数：256/512/1024）
+4. **概要必须使用指定的目标语言**
 
 **概要编写规则：**
 
@@ -40,6 +42,7 @@ SUMMARY_EXTRACTOR_SYSTEM_PROMPT = """你是一个文档概要提取专家。你�
 - 按内容逻辑组织，而非简单罗列
 - 语言简洁、信息密度高
 - 概要长度尽量接近目标字符数（允许 ±10% 偏差）
+- **使用目标语言撰写概要**
 
 **输出格式：**
 
@@ -53,7 +56,8 @@ SUMMARY_EXTRACTOR_SYSTEM_PROMPT = """你是一个文档概要提取专家。你�
 **注意事项：**
 
 - 只输出 JSON 对象，不要输出任何解释、Markdown 标记或代码围栏
-- 如果内容为空或无法提取，返回空字符串"""
+- 如果内容为空或无法提取，返回空字符串
+- 概要语言必须与目标语言一致"""
 
 
 SUMMARY_EXTRACTOR_USER_TEMPLATE = """请为以下章节提取概要。
@@ -62,13 +66,14 @@ SUMMARY_EXTRACTOR_USER_TEMPLATE = """请为以下章节提取概要。
 - 标题：{title}
 - 层级：{level}
 - 目标概要长度：约 {target_length} 字符
+- 目标语言：{language}
 
 **章节内容：**
 {content}
 
 {children_summaries_section}
 
-请输出约 {target_length} 字符的概要，严格遵循 JSON 格式输出。"""
+请输出约 {target_length} 字符的概要，使用{language}语言，严格遵循 JSON 格式输出。"""
 
 
 CHILDREN_SUMMARIES_TEMPLATE = """**子章节概要（供参考）：**
@@ -88,6 +93,7 @@ def _call_llm_for_summary(
     content: str,
     children_summaries: List[Dict[str, Any]] = None,
     target_length: int = 512,
+    language: str = "en",
     temperature: float = 0.3,
     timeout: float = 300.0,
 ) -> str:
@@ -103,6 +109,7 @@ def _call_llm_for_summary(
         content: 章节内容文本
         children_summaries: 子节点概要列表，每个包含 title 和 summary
         target_length: 目标概要长度（256/512/1024）
+        language: 目标语言（如 en/zh/ja）
         temperature: 温度参数
         timeout: 请求超时（秒）
 
@@ -128,6 +135,7 @@ def _call_llm_for_summary(
         title=title,
         level=level,
         target_length=target_length,
+        language=language,
         content=content if content else "(无内容)",
         children_summaries_section=children_section,
     )
@@ -229,6 +237,7 @@ def extract_summary_with_llm(
     api_url: str = "",
     api_key: str = "",
     model: str = "",
+    language: str = "en",
     temperature: float = 0.3,
     timeout: float = 300.0,
 ) -> Dict[str, str]:
@@ -245,6 +254,7 @@ def extract_summary_with_llm(
         api_url: LLM API URL
         api_key: API Key
         model: 模型名称
+        language: 目标语言（如 en/zh/ja）
         temperature: 温度参数
         timeout: 请求超时（秒）
 
@@ -272,6 +282,7 @@ def extract_summary_with_llm(
                 content=content,
                 children_summaries=children_summaries,
                 target_length=target_length,
+                language=language,
                 temperature=temperature,
                 timeout=timeout,
             )
