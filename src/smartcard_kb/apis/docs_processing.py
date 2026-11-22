@@ -1637,7 +1637,7 @@ async def doc_toc_all(request: DocTocAllRequest):
 
     try:
         # 查询已解析的文档（有 section_header）
-        docs = query_documents_by_status(status="parsed")
+        docs = query_documents_by_status(processing_status="parsed")
         if not docs:
             return DocTocAllResponse(
                 success=True,
