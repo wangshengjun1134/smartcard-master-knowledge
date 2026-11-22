@@ -1658,6 +1658,23 @@ async def doc_toc_all(request: DocTocAllRequest):
                 doc_id = doc["id"]
                 t0 = time.time()
                 try:
+                    # 检查是否已生成目录（doc_tocs 表中已有该文档数据）
+                    from smartcard_kb.docs_compile.database import get_connection
+                    conn = get_connection()
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "SELECT COUNT(*) FROM doc_tocs WHERE document_id = %s",
+                        (doc_id,),
+                    )
+                    toc_count = cursor.fetchone()[0]
+                    cursor.close()
+                    conn.close()
+
+                    if toc_count > 0:
+                        logger.info(f"Doc TOC skip {doc_id}: already has {toc_count} toc records")
+                        success_count += 1
+                        return
+
                     pdf_path = doc.get("file_path", "")
                     if not pdf_path:
                         logger.warning(f"Doc TOC skip {doc_id}: no file_path")
@@ -1670,7 +1687,6 @@ async def doc_toc_all(request: DocTocAllRequest):
                         return
 
                     # 查询 doc_items
-                    from smartcard_kb.docs_compile.database import get_connection
                     conn = get_connection()
                     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
                     cursor.execute(
@@ -2078,6 +2094,29 @@ async def doc_summary_all(request: DocSummaryAllRequest):
                 doc_id = doc["id"]
                 t0 = time.time()
                 try:
+                    # 检查是否所有 toc 记录都已填充概要
+                    from smartcard_kb.docs_compile.database import get_connection
+                    conn = get_connection()
+                    cursor = conn.cursor()
+                    # 查询总记录数和已填充概要的记录数
+                    cursor.execute("""
+                        SELECT 
+                            COUNT(*) as total,
+                            COUNT(CASE WHEN summary_256 IS NOT NULL AND summary_512 IS NOT NULL AND summary_1024 IS NOT NULL THEN 1 END) as completed
+                        FROM doc_tocs 
+                        WHERE document_id = %s
+                    """, (doc_id,))
+                    result = cursor.fetchone()
+                    total = result[0]
+                    completed = result[1]
+                    cursor.close()
+                    conn.close()
+
+                    if total > 0 and total == completed:
+                        logger.info(f"Doc Summary skip {doc_id}: all {total} toc records already have summaries")
+                        success_count += 1
+                        return
+
                     # 构造单文档请求
                     single_request = DocSummaryRequest(
                         document_id=doc_id,
