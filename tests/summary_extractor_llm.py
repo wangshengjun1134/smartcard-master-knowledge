@@ -235,6 +235,8 @@ def extract_summary_with_llm(
     """
     提取单个章节的三种长度概要。
 
+    优化逻辑：当内容长度小于目标长度时，直接使用原内容，不调用 LLM。
+
     Args:
         title: 章节标题
         level: 章节层级
@@ -250,9 +252,16 @@ def extract_summary_with_llm(
         dict: {"summary_256": "...", "summary_512": "...", "summary_1024": "..."}
     """
     result = {}
+    content_length = len(content)
 
     # 依次提取三种长度的概要
     for target_length in [256, 512, 1024]:
+        # 优化：当内容长度小于目标长度时，直接使用原内容，不调用 LLM
+        if content_length <= target_length:
+            result[f"summary_{target_length}"] = content
+            logger.info(f"Summary skipped for '{title}' (target={target_length}): content length {content_length} <= target, using original content")
+            continue
+
         try:
             summary = _call_llm_for_summary(
                 api_url=api_url,
