@@ -1464,9 +1464,10 @@ async def doc_toc(request: DocTocRequest):
         )
         doc_items = [dict(row) for row in cursor.fetchall()]
         cursor.close()
-        conn.close()
+        # 注意：这里不关闭 conn，后续还需要查询所有 doc_items
 
         if not doc_items:
+            conn.close()  # 提前返回时关闭连接
             return DocTocResponse(
                 success=False,
                 message="该文档没有 section_header 类型的 doc_items，请先执行解析",
@@ -1497,6 +1498,7 @@ async def doc_toc(request: DocTocRequest):
         )
 
         if not entries:
+            conn.close()  # 提前返回时关闭连接
             return DocTocResponse(
                 success=False,
                 message="LLM 未返回任何目录条目",
@@ -1516,7 +1518,7 @@ async def doc_toc(request: DocTocRequest):
         )
         all_items = [dict(row) for row in cursor.fetchall()]
         cursor.close()
-        conn.close()
+        conn.close()  # 现在才关闭连接
 
         # 构建 order_index -> (page_id, order_index) 的映射，便于快速查找
         items_by_order = {item["order_index"]: item for item in all_items}
@@ -1682,9 +1684,10 @@ async def doc_toc_all(request: DocTocAllRequest):
                     )
                     doc_items = [dict(row) for row in cursor.fetchall()]
                     cursor.close()
-                    conn.close()
+                    # 注意：这里不关闭 conn，后续还需要查询所有 doc_items
 
                     if not doc_items:
+                        conn.close()  # 提前返回时关闭连接
                         logger.warning(f"Doc TOC skip {doc_id}: no section_headers")
                         fail_count += 1
                         return
@@ -1737,6 +1740,7 @@ async def doc_toc_all(request: DocTocAllRequest):
                     )
                     all_items = [dict(row) for row in cursor.fetchall()]
                     cursor.close()
+                    conn.close()  # 现在才关闭连接
 
                     # 构建 order_index -> (page_id, order_index) 的映射
                     items_by_order = {item["order_index"]: item for item in all_items}
