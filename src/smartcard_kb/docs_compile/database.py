@@ -251,20 +251,22 @@ def init_database():
         CREATE TABLE IF NOT EXISTS doc_tocs (
             id BIGSERIAL PRIMARY KEY,
             document_id TEXT NOT NULL REFERENCES doc_info(id) ON DELETE CASCADE,
-            
+
             -- 目录信息
             title TEXT NOT NULL,           -- 章节标题（含编号，如 "1.2.3 xxx"）
             level INTEGER NOT NULL,        -- 层级：1=一级, 2=二级...
-            
+
             -- 位置范围
             start_page INTEGER,            -- 起始页码
             end_page INTEGER,              -- 结束页码
             start_item_index INTEGER,      -- 对应 doc_items 的起始 order_index
             end_item_index INTEGER,        -- 对应 doc_items 的结束 order_index
-            
-            -- 摘要（暂不处理，由后续独立接口触发更新）
-            summary TEXT,
-            
+
+            -- 摘要（三种长度）
+            summary_256 TEXT,              -- 约 256 字符概要
+            summary_512 TEXT,              -- 约 512 字符概要
+            summary_1024 TEXT,             -- 约 1024 字符概要
+
             -- 树结构
             parent_id BIGINT,              -- 父节点 ID
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -284,6 +286,34 @@ def init_database():
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_doc_tocs_parent_id
         ON doc_tocs(parent_id)
+    """)
+
+    # 迁移：将旧的 summary 列重命名为 summary_256，并添加 summary_512/summary_1024 列
+    cursor.execute("""
+        DO $$
+        BEGIN
+            -- 如果存在旧的 summary 列，重命名为 summary_256
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'doc_tocs' AND column_name = 'summary'
+            ) THEN
+                ALTER TABLE doc_tocs RENAME COLUMN summary TO summary_256;
+            END IF;
+            -- 添加 summary_512 列（如果不存在）
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'doc_tocs' AND column_name = 'summary_512'
+            ) THEN
+                ALTER TABLE doc_tocs ADD COLUMN summary_512 TEXT;
+            END IF;
+            -- 添加 summary_1024 列（如果不存在）
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'doc_tocs' AND column_name = 'summary_1024'
+            ) THEN
+                ALTER TABLE doc_tocs ADD COLUMN summary_1024 TEXT;
+            END IF;
+        END $$;
     """)
 
     # 删除旧的 embedding bytea 字段（如果存在）
@@ -1395,7 +1425,7 @@ def insert_doc_tocs(document_id: str, tocs: List[Dict[str, Any]]) -> int:
     # 批量插入
     insert_sql = """
         INSERT INTO doc_tocs (document_id, title, level, start_page, end_page,
-                              start_item_index, end_item_index, summary, parent_id)
+                              start_item_index, end_item_index, parent_id)
         VALUES %s
     """
 
@@ -1409,7 +1439,6 @@ def insert_doc_tocs(document_id: str, tocs: List[Dict[str, Any]]) -> int:
             toc.get("end_page"),
             toc.get("start_item_index"),
             toc.get("end_item_index"),
-            toc.get("summary"),
             toc.get("parent_id"),
         ))
 
@@ -1436,8 +1465,9 @@ def query_doc_tocs(document_id: str) -> List[Dict[str, Any]]:
     cursor.execute(
         """
         SELECT id, document_id, title, level, start_page, end_page,
-               start_item_index, end_item_index, summary, parent_id,
-               created_at, updated_at
+               start_item_index, end_item_index,
+               summary_256, summary_512, summary_1024,
+               parent_id, created_at, updated_at
         FROM doc_tocs
         WHERE document_id = %s
         ORDER BY id
@@ -1478,26 +1508,51 @@ def query_doc_tocs_tree(document_id: str) -> List[Dict[str, Any]]:
     return roots
 
 
-def update_doc_toc_summary(toc_id: int, summary: str) -> bool:
+def update_doc_toc_summaries(toc_id: int, summary_256: str = None, summary_512: str = None, summary_1024: str = None) -> bool:
     """
-    更新单个目录条目的摘要。
+    更新单个目录条目的三种长度概要。
 
     :param toc_id: 目录条目 ID
-    :param summary: 摘要内容
+    :param summary_256: 约 256 字符概要
+    :param summary_512: 约 512 字符概要
+    :param summary_1024: 约 1024 字符概要
     :return: 是否更新成功
     """
     conn = get_connection()
     cursor = conn.cursor()
 
+    # 动态构建 UPDATE 语句
+    updates = []
+    params = []
+    if summary_256 is not None:
+        updates.append("summary_256 = %s")
+        params.append(summary_256)
+    if summary_512 is not None:
+        updates.append("summary_512 = %s")
+        params.append(summary_512)
+    if summary_1024 is not None:
+        updates.append("summary_1024 = %s")
+        params.append(summary_1024)
+
+    if not updates:
+        cursor.close()
+        conn.close()
+        return False
+
+    updates.append("updated_at = CURRENT_TIMESTAMP")
+    params.append(toc_id)
+
     cursor.execute(
-        """
-        UPDATE doc_tocs
-        SET summary = %s, updated_at = CURRENT_TIMESTAMP
-        WHERE id = %s
-        """,
-        (summary, toc_id),
+        f"UPDATE doc_tocs SET {', '.join(updates)} WHERE id = %s",
+        params,
     )
     updated = cursor.rowcount > 0
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return updated
 
     conn.commit()
     cursor.close()
