@@ -1866,6 +1866,10 @@ async def doc_summary(request: DocSummaryRequest):
         if not docs:
             raise HTTPException(status_code=404, detail=f"文档 {request.document_id} 不存在")
 
+        doc = docs[0]
+        # 获取文档语言，默认为 en
+        doc_language = doc.get("language") or "en"
+
         # LLM 参数
         api_key = request.api_key or settings.openai_api_key
         base_url = request.base_url or settings.openai_base_url
@@ -1877,7 +1881,7 @@ async def doc_summary(request: DocSummaryRequest):
                 detail="未配置 LLM API。请提供 api_key 和 base_url，或在环境变量中设置"
             )
 
-        logger.info(f"Doc Summary for document {request.document_id}")
+        logger.info(f"Doc Summary for document {request.document_id}, language={doc_language}")
 
         # 查询 doc_tocs
         from smartcard_kb.docs_compile.database import get_connection, query_doc_tocs, update_doc_toc_summaries
@@ -1977,6 +1981,7 @@ async def doc_summary(request: DocSummaryRequest):
                         api_url=base_url,
                         api_key=api_key,
                         model=model,
+                        language=doc_language,
                     )
                     # 更新数据库
                     update_doc_toc_summaries(
