@@ -721,6 +721,287 @@ async def _async_embedding_all(
         logger.info(f"Batch embedding completed: {len(docs)} documents processed")
 
 
+async def _async_doc_toc_all(
+    docs: list,
+    parallel_count: int,
+    api_key: Optional[str],
+    base_url: Optional[str],
+    model: Optional[str],
+    max_pages: int,
+    max_items: int,
+):
+    """
+    异步批量生成目录
+
+    :param docs: 文档列表
+    :param parallel_count: 并行数量
+    :param api_key: LLM API Key
+    :param base_url: LLM API Base URL
+    :param model: LLM 模型名称
+    :param max_pages: 从 PDF 提取前 N 页
+    :param max_items: 最多送入 LLM 的标题数
+    """
+    import sys
+    import psycopg2
+    import psycopg2.extras
+    from pathlib import Path as PathLib
+
+    semaphore = asyncio.Semaphore(parallel_count)
+    success_count = 0
+    fail_count = 0
+
+    async def toc_one(doc):
+        nonlocal success_count, fail_count
+        async with semaphore:
+            doc_id = doc["id"]
+            t0 = time.time()
+            try:
+                # 检查是否已生成目录（doc_tocs 表中已有该文档数据）
+                from smartcard_kb.docs_compile.database import get_connection
+                conn = get_connection()
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT COUNT(*) FROM doc_tocs WHERE document_id = %s",
+                    (doc_id,),
+                )
+                toc_count = cursor.fetchone()[0]
+                cursor.close()
+                conn.close()
+
+                if toc_count > 0:
+                    logger.info(f"Doc TOC skip {doc_id}: already has {toc_count} toc records")
+                    success_count += 1
+                    return
+
+                pdf_path = doc.get("file_path", "")
+                if not pdf_path:
+                    logger.warning(f"Doc TOC skip {doc_id}: no file_path")
+                    fail_count += 1
+                    return
+                pdf_path = resolve_file(pdf_path)
+                if not PathLib(pdf_path).exists():
+                    logger.warning(f"Doc TOC skip {doc_id}: file not found")
+                    fail_count += 1
+                    return
+
+                # 查询 doc_items
+                conn = get_connection()
+                cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                cursor.execute(
+                    """
+                    SELECT order_index, text, page_id, metadata
+                    FROM doc_items
+                    WHERE document_id = %s AND label = 'section_header'
+                    ORDER BY order_index
+                    """,
+                    (doc_id,),
+                )
+                doc_items = [dict(row) for row in cursor.fetchall()]
+                cursor.close()
+                # 注意：这里不关闭 conn，后续还需要查询所有 doc_items
+
+                if not doc_items:
+                    conn.close()  # 提前返回时关闭连接
+                    logger.warning(f"Doc TOC skip {doc_id}: no section_headers")
+                    fail_count += 1
+                    return
+
+                # 添加 tests 目录到 path
+                project_root = PathLib(__file__).parent.parent.parent.parent
+                tests_dir = str(project_root / "tests")
+                if tests_dir not in sys.path:
+                    sys.path.insert(0, tests_dir)
+
+                from toc_refiner_llm import refine_toc_with_llm
+                from smartcard_kb.docs_compile.database import insert_doc_tocs
+
+                resolved_api_key = api_key or settings.openai_api_key
+                resolved_base_url = base_url or settings.openai_base_url
+                resolved_model = model or settings.openai_model
+
+                if not resolved_api_key or not resolved_base_url:
+                    logger.error(f"Doc TOC skip {doc_id}: no LLM config")
+                    fail_count += 1
+                    return
+
+                # 调用 LLM 推理
+                entries = await asyncio.to_thread(
+                    refine_toc_with_llm,
+                    pdf_path=pdf_path,
+                    doc_items=doc_items,
+                    api_url=resolved_base_url,
+                    api_key=resolved_api_key,
+                    model=resolved_model,
+                    max_pages=max_pages,
+                    max_items=max_items,
+                )
+
+                if not entries:
+                    logger.warning(f"Doc TOC skip {doc_id}: LLM returned empty")
+                    fail_count += 1
+                    return
+
+                # 查询所有 doc_items 用于计算 end_page/end_item_index
+                cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                cursor.execute(
+                    """
+                    SELECT order_index, page_id
+                    FROM doc_items
+                    WHERE document_id = %s
+                    ORDER BY order_index
+                    """,
+                    (doc_id,),
+                )
+                all_items = [dict(row) for row in cursor.fetchall()]
+                cursor.close()
+                conn.close()  # 现在才关闭连接
+
+                # 构建 order_index -> (page_id, order_index) 的映射
+                items_by_order = {item["order_index"]: item for item in all_items}
+                all_order_indices = sorted(items_by_order.keys())
+
+                # 构建 doc_tocs 记录
+                tocs = []
+                for i, entry in enumerate(entries):
+                    item_index = entry.get("item_index", 0)
+                    page = entry.get("page", 1)
+
+                    # 找下一个同级或更高级标题的 item_index
+                    next_item_index = None
+                    for j in range(i + 1, len(entries)):
+                        if entries[j].get("level", 1) <= entry.get("level", 1):
+                            next_item_index = entries[j].get("item_index", 0)
+                            break
+
+                    # 通过 doc_items 计算 end_page 和 end_item_index
+                    end_page = None
+                    end_item_index = None
+
+                    if next_item_index is not None:
+                        # 找到范围内最后一个 order_index < next_item_index 的 item
+                        candidate_orders = [o for o in all_order_indices if o < next_item_index and o >= item_index]
+                        if candidate_orders:
+                            last_order = max(candidate_orders)
+                            last_item = items_by_order[last_order]
+                            end_page = last_item["page_id"]
+                            end_item_index = last_order
+                    else:
+                        # 最后一个章节，找文档末尾的 item
+                        candidate_orders = [o for o in all_order_indices if o >= item_index]
+                        if candidate_orders:
+                            last_order = max(candidate_orders)
+                            last_item = items_by_order[last_order]
+                            end_page = last_item["page_id"]
+                            end_item_index = last_order
+
+                    tocs.append({
+                        "title": entry.get("title", ""),
+                        "level": entry.get("level", 1),
+                        "start_page": page,
+                        "end_page": end_page,
+                        "start_item_index": item_index,
+                        "end_item_index": end_item_index,
+                        "parent_id": None,
+                    })
+
+                # 构建 parent_id
+                stack = []
+                for i, toc in enumerate(tocs):
+                    level = toc["level"]
+                    while stack and stack[-1][0] >= level:
+                        stack.pop()
+                    if stack:
+                        toc["parent_id"] = stack[-1][1]
+                    stack.append((level, i))
+
+                # 插入数据库
+                inserted = insert_doc_tocs(doc_id, tocs)
+
+                elapsed = time.time() - t0
+                logger.info(f"Doc TOC {doc_id}: {inserted} entries in {elapsed:.1f}s")
+                success_count += 1
+            except Exception as e:
+                logger.error(f"Doc TOC failed for {doc_id}: {e}")
+                fail_count += 1
+
+    tasks = [toc_one(doc) for doc in docs]
+    await asyncio.gather(*tasks)
+    logger.info(f"Batch Doc TOC completed: {success_count} success, {fail_count} failed")
+
+
+async def _async_doc_summary_all(
+    docs: list,
+    parallel_count: int,
+    api_key: Optional[str],
+    base_url: Optional[str],
+    model: Optional[str],
+):
+    """
+    异步批量提取概要
+
+    :param docs: 文档列表
+    :param parallel_count: 并行数量
+    :param api_key: LLM API Key
+    :param base_url: LLM API Base URL
+    :param model: LLM 模型名称
+    """
+    import sys
+
+    semaphore = asyncio.Semaphore(parallel_count)
+    success_count = 0
+    fail_count = 0
+
+    async def summary_one(doc):
+        nonlocal success_count, fail_count
+        async with semaphore:
+            doc_id = doc["id"]
+            t0 = time.time()
+            try:
+                # 检查是否所有 toc 记录都已填充概要
+                from smartcard_kb.docs_compile.database import get_connection
+                conn = get_connection()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT
+                        COUNT(*) as total,
+                        COUNT(CASE WHEN summary_256 IS NOT NULL AND summary_512 IS NOT NULL AND summary_1024 IS NOT NULL THEN 1 END) as completed
+                    FROM doc_tocs
+                    WHERE document_id = %s
+                """, (doc_id,))
+                result = cursor.fetchone()
+                total = result[0]
+                completed = result[1]
+                cursor.close()
+                conn.close()
+
+                if total > 0 and total == completed:
+                    logger.info(f"Doc Summary skip {doc_id}: all {total} toc records already have summaries")
+                    success_count += 1
+                    return
+
+                # 构造单文档请求
+                single_request = DocSummaryRequest(
+                    document_id=doc_id,
+                    api_key=api_key,
+                    base_url=base_url,
+                    model=model,
+                )
+                result = await doc_summary(single_request)
+                elapsed = time.time() - t0
+                logger.info(f"Doc Summary {doc_id}: {result.processed_count} nodes in {elapsed:.1f}s")
+                if result.success:
+                    success_count += 1
+                else:
+                    fail_count += 1
+            except Exception as e:
+                logger.error(f"Doc Summary failed for {doc_id}: {e}")
+                fail_count += 1
+
+    tasks = [summary_one(doc) for doc in docs]
+    await asyncio.gather(*tasks)
+    logger.info(f"Batch Doc Summary completed: {success_count} success, {fail_count} failed")
+
+
 # ==================== API 接口 ====================
 
 
@@ -1501,9 +1782,9 @@ class DocTocAllResponse(BaseModel):
 
 
 @router.post("/doc-toc-all", response_model=DocTocAllResponse)
-async def doc_toc_all(request: DocTocAllRequest):
+async def doc_toc_all(request: DocTocAllRequest, background_tasks: BackgroundTasks):
     """
-    批量执行 Doc TOC
+    批量执行 Doc TOC（异步）
 
     - **parallel_count**: 并行数量（默认 1）
     - **api_key**: LLM API Key（可选）
@@ -1512,217 +1793,36 @@ async def doc_toc_all(request: DocTocAllRequest):
     - **max_pages**: 从 PDF 提取前 N 页（默认 10）
     - **max_items**: 最多送入 LLM 的标题数（默认 500）
     """
-    import sys
-    import psycopg2
-    import psycopg2.extras
-    from pathlib import Path as PathLib
-
-    try:
-        # 查询所有文档（不再限制状态，由断点续传逻辑跳过已处理的文档）
-        docs = query_documents_by_status()
-        if not docs:
-            return DocTocAllResponse(
-                success=True,
-                message="没有文档",
-                total=0,
-                parallel_count=request.parallel_count,
-            )
-
-        logger.info(f"Batch Doc TOC: {len(docs)} documents, parallel={request.parallel_count}")
-
-        sem = asyncio.Semaphore(request.parallel_count)
-        success_count = 0
-        fail_count = 0
-
-        async def toc_one(doc):
-            nonlocal success_count, fail_count
-            async with sem:
-                doc_id = doc["id"]
-                t0 = time.time()
-                try:
-                    # 检查是否已生成目录（doc_tocs 表中已有该文档数据）
-                    from smartcard_kb.docs_compile.database import get_connection
-                    conn = get_connection()
-                    cursor = conn.cursor()
-                    cursor.execute(
-                        "SELECT COUNT(*) FROM doc_tocs WHERE document_id = %s",
-                        (doc_id,),
-                    )
-                    toc_count = cursor.fetchone()[0]
-                    cursor.close()
-                    conn.close()
-
-                    if toc_count > 0:
-                        logger.info(f"Doc TOC skip {doc_id}: already has {toc_count} toc records")
-                        success_count += 1
-                        return
-
-                    pdf_path = doc.get("file_path", "")
-                    if not pdf_path:
-                        logger.warning(f"Doc TOC skip {doc_id}: no file_path")
-                        fail_count += 1
-                        return
-                    pdf_path = resolve_file(pdf_path)
-                    if not PathLib(pdf_path).exists():
-                        logger.warning(f"Doc TOC skip {doc_id}: file not found")
-                        fail_count += 1
-                        return
-
-                    # 查询 doc_items
-                    conn = get_connection()
-                    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-                    cursor.execute(
-                        """
-                        SELECT order_index, text, page_id, metadata
-                        FROM doc_items
-                        WHERE document_id = %s AND label = 'section_header'
-                        ORDER BY order_index
-                        """,
-                        (doc_id,),
-                    )
-                    doc_items = [dict(row) for row in cursor.fetchall()]
-                    cursor.close()
-                    # 注意：这里不关闭 conn，后续还需要查询所有 doc_items
-
-                    if not doc_items:
-                        conn.close()  # 提前返回时关闭连接
-                        logger.warning(f"Doc TOC skip {doc_id}: no section_headers")
-                        fail_count += 1
-                        return
-
-                    # 添加 tests 目录到 path
-                    project_root = PathLib(__file__).parent.parent.parent.parent
-                    tests_dir = str(project_root / "tests")
-                    if tests_dir not in sys.path:
-                        sys.path.insert(0, tests_dir)
-
-                    from toc_refiner_llm import refine_toc_with_llm
-                    from smartcard_kb.docs_compile.database import insert_doc_tocs
-
-                    api_key = request.api_key or settings.openai_api_key
-                    base_url = request.base_url or settings.openai_base_url
-                    model = request.model or settings.openai_model
-
-                    if not api_key or not base_url:
-                        logger.error(f"Doc TOC skip {doc_id}: no LLM config")
-                        fail_count += 1
-                        return
-
-                    # 调用 LLM 推理
-                    entries = await asyncio.to_thread(
-                        refine_toc_with_llm,
-                        pdf_path=pdf_path,
-                        doc_items=doc_items,
-                        api_url=base_url,
-                        api_key=api_key,
-                        model=model,
-                        max_pages=request.max_pages,
-                        max_items=request.max_items,
-                    )
-
-                    if not entries:
-                        logger.warning(f"Doc TOC skip {doc_id}: LLM returned empty")
-                        fail_count += 1
-                        return
-
-                    # 查询所有 doc_items 用于计算 end_page/end_item_index
-                    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-                    cursor.execute(
-                        """
-                        SELECT order_index, page_id
-                        FROM doc_items
-                        WHERE document_id = %s
-                        ORDER BY order_index
-                        """,
-                        (doc_id,),
-                    )
-                    all_items = [dict(row) for row in cursor.fetchall()]
-                    cursor.close()
-                    conn.close()  # 现在才关闭连接
-
-                    # 构建 order_index -> (page_id, order_index) 的映射
-                    items_by_order = {item["order_index"]: item for item in all_items}
-                    all_order_indices = sorted(items_by_order.keys())
-
-                    # 构建 doc_tocs 记录
-                    tocs = []
-                    for i, entry in enumerate(entries):
-                        item_index = entry.get("item_index", 0)
-                        page = entry.get("page", 1)
-
-                        # 找下一个同级或更高级标题的 item_index
-                        next_item_index = None
-                        for j in range(i + 1, len(entries)):
-                            if entries[j].get("level", 1) <= entry.get("level", 1):
-                                next_item_index = entries[j].get("item_index", 0)
-                                break
-
-                        # 通过 doc_items 计算 end_page 和 end_item_index
-                        end_page = None
-                        end_item_index = None
-
-                        if next_item_index is not None:
-                            # 找到范围内最后一个 order_index < next_item_index 的 item
-                            candidate_orders = [o for o in all_order_indices if o < next_item_index and o >= item_index]
-                            if candidate_orders:
-                                last_order = max(candidate_orders)
-                                last_item = items_by_order[last_order]
-                                end_page = last_item["page_id"]
-                                end_item_index = last_order
-                        else:
-                            # 最后一个章节，找文档末尾的 item
-                            candidate_orders = [o for o in all_order_indices if o >= item_index]
-                            if candidate_orders:
-                                last_order = max(candidate_orders)
-                                last_item = items_by_order[last_order]
-                                end_page = last_item["page_id"]
-                                end_item_index = last_order
-
-                        tocs.append({
-                            "title": entry.get("title", ""),
-                            "level": entry.get("level", 1),
-                            "start_page": page,
-                            "end_page": end_page,
-                            "start_item_index": item_index,
-                            "end_item_index": end_item_index,
-                            "parent_id": None,
-                        })
-
-                    # 构建 parent_id
-                    stack = []
-                    for i, toc in enumerate(tocs):
-                        level = toc["level"]
-                        while stack and stack[-1][0] >= level:
-                            stack.pop()
-                        if stack:
-                            toc["parent_id"] = stack[-1][1]
-                        stack.append((level, i))
-
-                    # 插入数据库
-                    inserted = insert_doc_tocs(doc_id, tocs)
-
-                    elapsed = time.time() - t0
-                    logger.info(f"Doc TOC {doc_id}: {inserted} entries in {elapsed:.1f}s")
-                    success_count += 1
-                except Exception as e:
-                    logger.error(f"Doc TOC failed for {doc_id}: {e}")
-                    fail_count += 1
-
-        tasks = [toc_one(doc) for doc in docs]
-        await asyncio.gather(*tasks)
-
+    # 查询所有文档（不再限制状态，由断点续传逻辑跳过已处理的文档）
+    docs = query_documents_by_status()
+    if not docs:
         return DocTocAllResponse(
             success=True,
-            message=f"完成: {success_count} 成功, {fail_count} 失败",
-            total=len(docs),
+            message="没有文档",
+            total=0,
             parallel_count=request.parallel_count,
         )
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Batch Doc TOC failed: {e}")
-        raise HTTPException(status_code=500, detail=f"批量 Doc TOC 失败: {str(e)}")
+    logger.info(f"Batch Doc TOC: {len(docs)} documents, parallel={request.parallel_count}")
+
+    # 使用 BackgroundTasks 异步执行
+    background_tasks.add_task(
+        _async_doc_toc_all,
+        docs,
+        request.parallel_count,
+        request.api_key,
+        request.base_url,
+        request.model,
+        request.max_pages,
+        request.max_items,
+    )
+
+    return DocTocAllResponse(
+        success=True,
+        message=f"已提交 {len(docs)} 个文档的目录生成任务，并行数: {request.parallel_count}",
+        total=len(docs),
+        parallel_count=request.parallel_count,
+    )
 
 
 # ==================== Doc Summary（分层概要提取） ====================
@@ -1924,111 +2024,59 @@ class DocSummaryAllResponse(BaseModel):
 
 
 @router.post("/doc-summary-all", response_model=DocSummaryAllResponse)
-async def doc_summary_all(request: DocSummaryAllRequest):
+async def doc_summary_all(request: DocSummaryAllRequest, background_tasks: BackgroundTasks):
     """
-    批量执行概要提取
+    批量执行概要提取（异步）
 
     - **parallel_count**: 并行数量（默认 1）
     - **api_key**: LLM API Key（可选）
     - **base_url**: LLM API URL（可选）
     - **model**: LLM 模型名（可选）
     """
-    import sys
     import psycopg2
     import psycopg2.extras
 
-    try:
-        # 查询所有有 doc_tocs 的文档
-        from smartcard_kb.docs_compile.database import get_connection
-        conn = get_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cursor.execute("""
-            SELECT DISTINCT document_id FROM doc_tocs
-        """)
-        doc_ids = [row["document_id"] for row in cursor.fetchall()]
-        cursor.close()
-        conn.close()
+    # 查询所有有 doc_tocs 的文档
+    from smartcard_kb.docs_compile.database import get_connection
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor.execute("""
+        SELECT DISTINCT document_id FROM doc_tocs
+    """)
+    doc_ids = [row["document_id"] for row in cursor.fetchall()]
+    cursor.close()
+    conn.close()
 
-        if not doc_ids:
-            return DocSummaryAllResponse(
-                success=True,
-                message="没有已生成目录的文档",
-                total=0,
-                parallel_count=request.parallel_count,
-            )
-
-        # 查询这些文档的详情
-        docs = []
-        for doc_id in doc_ids:
-            doc_list = query_document_info(document_id=doc_id)
-            if doc_list:
-                docs.append(doc_list[0])
-
-        logger.info(f"Batch Doc Summary: {len(docs)} documents, parallel={request.parallel_count}")
-
-        sem = asyncio.Semaphore(request.parallel_count)
-        success_count = 0
-        fail_count = 0
-
-        async def summary_one(doc):
-            nonlocal success_count, fail_count
-            async with sem:
-                doc_id = doc["id"]
-                t0 = time.time()
-                try:
-                    # 检查是否所有 toc 记录都已填充概要
-                    from smartcard_kb.docs_compile.database import get_connection
-                    conn = get_connection()
-                    cursor = conn.cursor()
-                    # 查询总记录数和已填充概要的记录数
-                    cursor.execute("""
-                        SELECT 
-                            COUNT(*) as total,
-                            COUNT(CASE WHEN summary_256 IS NOT NULL AND summary_512 IS NOT NULL AND summary_1024 IS NOT NULL THEN 1 END) as completed
-                        FROM doc_tocs 
-                        WHERE document_id = %s
-                    """, (doc_id,))
-                    result = cursor.fetchone()
-                    total = result[0]
-                    completed = result[1]
-                    cursor.close()
-                    conn.close()
-
-                    if total > 0 and total == completed:
-                        logger.info(f"Doc Summary skip {doc_id}: all {total} toc records already have summaries")
-                        success_count += 1
-                        return
-
-                    # 构造单文档请求
-                    single_request = DocSummaryRequest(
-                        document_id=doc_id,
-                        api_key=request.api_key,
-                        base_url=request.base_url,
-                        model=request.model,
-                    )
-                    result = await doc_summary(single_request)
-                    elapsed = time.time() - t0
-                    logger.info(f"Doc Summary {doc_id}: {result.processed_count} nodes in {elapsed:.1f}s")
-                    if result.success:
-                        success_count += 1
-                    else:
-                        fail_count += 1
-                except Exception as e:
-                    logger.error(f"Doc Summary failed for {doc_id}: {e}")
-                    fail_count += 1
-
-        tasks = [summary_one(doc) for doc in docs]
-        await asyncio.gather(*tasks)
-
+    if not doc_ids:
         return DocSummaryAllResponse(
             success=True,
-            message=f"完成: {success_count} 成功, {fail_count} 失败",
-            total=len(docs),
+            message="没有已生成目录的文档",
+            total=0,
             parallel_count=request.parallel_count,
         )
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Batch Doc Summary failed: {e}")
-        raise HTTPException(status_code=500, detail=f"批量概要提取失败: {str(e)}")
+    # 查询这些文档的详情
+    docs = []
+    for doc_id in doc_ids:
+        doc_list = query_document_info(document_id=doc_id)
+        if doc_list:
+            docs.append(doc_list[0])
+
+    logger.info(f"Batch Doc Summary: {len(docs)} documents, parallel={request.parallel_count}")
+
+    # 使用 BackgroundTasks 异步执行
+    background_tasks.add_task(
+        _async_doc_summary_all,
+        docs,
+        request.parallel_count,
+        request.api_key,
+        request.base_url,
+        request.model,
+    )
+
+    return DocSummaryAllResponse(
+        success=True,
+        message=f"已提交 {len(docs)} 个文档的概要提取任务，并行数: {request.parallel_count}",
+        total=len(docs),
+        parallel_count=request.parallel_count,
+    )
